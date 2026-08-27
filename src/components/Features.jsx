@@ -1,34 +1,34 @@
 const Features = () => {
   const features = [
     {
-      icon: "fa-list-check",
-      title: "Task Management",
-      description: "Create, assign, and prioritize tasks in simple boards. Keep everyone on track without complexity.",
+      icon: "fa-building",
+      title: "Workspaces",
+      description: "Create and organize dedicated workspaces for your teams and conversations.",
     },
     {
       icon: "fa-comments",
-      title: "Real-Time Collaboration",
-      description: "Chat in real time. No refresh needed, everyone sees changes instantly.",
+      title: "Real-Time Messaging",
+      description: "Send messages instantly and see conversations update in real time without refreshing.",
     },
     {
       icon: "fa-hashtag",
       title: "Channels & Messaging",
-      description: "Organize conversations by topic, project, or team. Searchable and structured for clarity.",
+      description: "Keep conversations organized by team, topic, or purpose with public and private channels.",
     },
     {
       icon: "fa-users",
       title: "Direct Messaging",
-      description: "Private 1:1 or group messages for quick alignment without leaving the platform.",
+      description: "Have private one-to-one conversations with other members of your workspace.",
     },
     {
       icon: "fa-paperclip",
       title: "File Sharing",
-      description: "Share files, images, and docs inside conversations or tasks. Centralized and accessible.",
+      description: "Share images, documents, and other files directly inside conversations.",
     },
     {
       icon: "fa-bell",
       title: "Notifications & Presence",
-      description: "See who is online, get instant notifications, and never miss an important update.",
+      description: "Know who is online and receive notifications for important messages, mentions, and activity.",
     },
   ]
 

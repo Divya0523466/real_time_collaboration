@@ -1,39 +1,39 @@
 const steps = [
   {
-    number: "1",
+    number: "01",
     icon: "fa-building",
     title: "Create Workspace",
-    description: "Bring your team together in one shared workspace.",
+    description: "Create a workspace and bring your team together.",
   },
   {
-    number: "2",
-    icon: "fa-folder-plus",
-    title: "Create Project",
-    description: "Organize your work into projects and define what needs to be done.",
+    number: "02",
+    icon: "fa-user-plus",
+    title: "Invite Members",
+    description: "Invite team members to join your workspace.",
   },
   {
-    number: "3",
-    icon: "fa-list-check",
-    title: "Assign Tasks",
-    description: "Assign tasks to team members and set priorities.",
+    number: "03",
+    icon: "fa-hashtag",
+    title: "Create Channels",
+    description: "Organize conversations into public or private channels.",
   },
   {
-    number: "4",
+    number: "04",
     icon: "fa-comments",
-    title: "Collaborate",
-    description: "Discuss work through channels and direct messages in real time.",
+    title: "Start Conversations",
+    description: "Communicate through real-time channel messaging or direct messages.",
   },
   {
-    number: "5",
-    icon: "fa-chart-line",
-    title: "Track Progress",
-    description: "Monitor tasks, updates, and overall project progress.",
+    number: "05",
+    icon: "fa-paperclip",
+    title: "Share & Collaborate",
+    description: "Share files and keep your team updated through real-time communication.",
   },
   {
-    number: "6",
-    icon: "fa-circle-check",
-    title: "Complete",
-    description: "Finish the work and keep everyone aligned on the outcome.",
+    number: "06",
+    icon: "fa-bell",
+    title: "Stay Connected",
+    description: "Receive notifications and see who's online or offline.",
   },
 ]
 
@@ -45,7 +45,7 @@ const HowItWorks = () => {
           How It Works
         </h2>
         <p className="mx-auto mt-4 max-w-150 text-lg leading-relaxed text-[#395B64]">
-          From creating your workspace to completing your work, WorkNest keeps your team aligned at every step.
+          From creating your workspace to staying connected, WorkNest keeps your team aligned at every step.
         </p>
       </div>
 

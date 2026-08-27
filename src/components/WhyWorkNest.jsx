@@ -1,10 +1,10 @@
 import whyWorkNestImage from "../assets/whyworknest.jpg"
 
 const benefits = [
-  ["01", "Stay Connected", "Real-time conversations keep everyone aligned."],
-  ["02", "Keep Work Organized", "Projects, tasks, files and discussions stay together."],
-  ["03", "Track Progress", "See what is completed, in progress, and what's next."],
-  ["04", "Work From One Place", "Everything your team needs is available in one workspace."],
+  ["01", "Stay Connected", "Keep your team connected through real-time conversations."],
+  ["02", "Organize Conversations", "Use workspaces and channels to keep communication structured."],
+  ["03", "Communicate Instantly", "Send and receive messages in real time without refreshing."],
+  ["04", "Share Everything", "Share files directly within conversations and keep important information accessible."],
 ]
 
 const WhyWorkNest = () => {
@@ -14,7 +14,7 @@ const WhyWorkNest = () => {
         <header className="mx-auto max-w-190 text-center">
           <p className="text-sm font-bold tracking-[0.2em] text-[#A5C9CA]">WHY WORKNEST</p>
           <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-tight text-white md:text-4xl">
-            Everything your team needs to move from conversation to completion.
+            Everything your team needs to stay connected.
           </h2>
         </header>
 

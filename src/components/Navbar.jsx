@@ -16,8 +16,8 @@ const Navbar = () => {
         <li><a href="#features" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">Features</a></li>
         <li><a href="#how-it-works" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">How It Works</a></li>
         <li><a href="#why" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">Why WorkNest</a></li>
-        <li><a href="#about" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">About Us</a></li>
-        <li><a href="#contact" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">Contact Us</a></li>
+        <li><a href="#about" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">About</a></li>
+        <li><a href="#contact" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">Contact</a></li>
       </ul>
 
       <div className="flex gap-1 sm:gap-3">
@@ -41,8 +41,8 @@ const Navbar = () => {
           <li><a href="#features" onClick={() => setMenuOpen(false)}>Features</a></li>
           <li><a href="#how-it-works" onClick={() => setMenuOpen(false)}>How It Works</a></li>
           <li><a href="#why" onClick={() => setMenuOpen(false)}>Why WorkNest</a></li>
-          <li><a href="#about" onClick={() => setMenuOpen(false)}>About Us</a></li>
-          <li><a href="#contact" onClick={() => setMenuOpen(false)}>Contact Us</a></li>
+          <li><a href="#about" onClick={() => setMenuOpen(false)}>About</a></li>
+          <li><a href="#contact" onClick={() => setMenuOpen(false)}>Contact</a></li>
         </ul>
       )}
     </nav>
