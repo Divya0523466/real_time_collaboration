@@ -12,6 +12,7 @@ const Navbar = () => {
       </div>
 
       <ul className="hidden items-center gap-8 font-medium text-[1rem] text-[#5E6868] lg:flex">
+        <li><a href="#top" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">Home</a></li>
         <li><a href="#features" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">Features</a></li>
         <li><a href="#how-it-works" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">How It Works</a></li>
         <li><a href="#why" className="transition-colors duration-200 hover:text-[#395B64] hover:underline hover:underline-offset-4">Why WorkNest</a></li>

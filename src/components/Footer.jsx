@@ -2,7 +2,7 @@ import logo from "../assets/worknestlogo.png"
 
 const Footer = () => {
   return (
-    <footer className="site-footer w-full bg-[#2C3333] px-4 py-6 text-[#A5C9CA] md:px-8 md:py-8">
+    <footer className="w-full bg-[#2C3333] px-4 py-6 text-[#A5C9CA] md:px-8 md:py-8">
       <div className="mx-auto max-w-300">
         <div className="grid gap-5 border-b border-[#395B64] pb-6 md:grid-cols-2 lg:grid-cols-[1.35fr_0.8fr_1fr_0.9fr_1.1fr]">
           <div className="max-w-75"><div className="flex items-center gap-3"><img src={logo} alt="WorkNest logo" className="h-8 w-8" /><span className="text-xl font-bold text-white">WORKNEST</span></div><p className="mt-3 text-sm leading-5">Bring communication, tasks, files, and project progress together in one collaborative workspace.</p><p className="mt-3 text-xs font-bold tracking-[0.12em] text-white">Developed by SHNOOR International LLC</p></div>
