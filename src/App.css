@@ -2,12 +2,40 @@
   box-sizing: border-box;
 }
 
+html {
+  background: #2C3333;
+}
+
 body {
   min-width: 320px;
   margin: 0;
-  font-family: Arial, sans-serif;
-  color: #333;
-  background: #ffffff;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  color: #2C3333;
+  background: #F8FAFB;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(103, 116, 119, 0.4);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 @keyframes auth-modal-in {
@@ -20,4 +48,9 @@ body {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

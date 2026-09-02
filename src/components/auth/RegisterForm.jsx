@@ -49,7 +49,6 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
 
       toast.success(data.message);
       onRegisterSuccess();
-
       setName("");
       setEmail("");
       setPassword("");

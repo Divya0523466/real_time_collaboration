@@ -4,18 +4,21 @@ import "./App.css"
 import AboutUs from "./components/AboutUs"
 import ContactUs from "./components/ContactUs"
 import Features from "./components/Features"
-import Footer from "./components/Footer"
+import Footer from "./components/Footer" 
 import FinalCta from "./components/FinalCta"
 import Hero from "./components/Hero"
 import HowItWorks from "./components/HowItWorks"
 import Navbar from "./components/Navbar"
 import WhyWorkNest from "./components/WhyWorkNest"
 import AuthModal from "./components/auth/AuthModal"
-import Dashboard from "./pages/Dashboard"
+import GlobalDashboard from "./components/dashboard/GlobalDashboard"
+import SlackShell from "./components/dashboard/SlackShell"
+import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext"
 
 const LandingPage = () => {
   const [authMode, setAuthMode] = useState(null)
   const navigate = useNavigate()
+  const { initializeFromAuth } = useWorkspace()
 
   return (
     <div id="top">
@@ -33,9 +36,10 @@ const LandingPage = () => {
           mode={authMode}
           onClose={() => setAuthMode(null)}
           onSwitchMode={setAuthMode}
-          onLoginSuccess={() => {
+          onLoginSuccess={(user, workspaces) => {
             setAuthMode(null)
-            navigate("/dashboard")
+            initializeFromAuth(user, workspaces || [])
+            navigate("/app/dashboard")
           }}
         />
       )}
@@ -43,13 +47,23 @@ const LandingPage = () => {
   )
 }
 
-const App = () => {
+const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/app/dashboard" element={<GlobalDashboard />} />
+      <Route path="/app/workspace/:workspaceId" element={<SlackShell />} />
+      <Route path="/app/workspace/:workspaceId/channel/:channelId" element={<SlackShell />} />
     </Routes>
   )
 }
 
-export default App;
+const App = () => {
+  return (
+    <WorkspaceProvider>
+      <AppRoutes />
+    </WorkspaceProvider>
+  )
+}
+
+export default App
