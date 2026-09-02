@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import User from "../models/User.js"
+import WorkspaceMembership from "../models/WorkspaceMembership.js"
 
 const register = async (req, res) => {
   try {
@@ -51,6 +52,16 @@ const login = async (req, res) => {
       { expiresIn: "1d" },
     )
 
+    const memberships = await WorkspaceMembership.find({ userId: user._id }).populate("workspaceId")
+    const workspaces = memberships
+      .filter((m) => m.workspaceId)
+      .map((m) => ({
+        id: m.workspaceId._id,
+        name: m.workspaceId.name,
+        description: m.workspaceId.description,
+        role: m.role,
+      }))
+
     return res.json({
       message: "Login successful",
       token,
@@ -58,7 +69,9 @@ const login = async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        avatar: user.avatar,
       },
+      workspaces,
     })
   } catch {
     return res.status(500).json({ message: "Server error" })
