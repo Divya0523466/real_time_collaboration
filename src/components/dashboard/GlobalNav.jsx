@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom"
+import { useWorkspace } from "../../context/WorkspaceContext"
 import { toast } from "react-toastify"
 
 const GlobalNav = ({ user }) => {
   const navigate = useNavigate()
+  const { clearAuth } = useWorkspace()
 
   const handleLogout = async () => {
     try {
@@ -18,10 +20,12 @@ const GlobalNav = ({ user }) => {
         return
       }
       localStorage.removeItem("worknestToken")
+      clearAuth()
       toast.success(data.message || "Logout successful")
       navigate("/")
     } catch {
       localStorage.removeItem("worknestToken")
+      clearAuth()
       toast.success("Logout successful")
       navigate("/")
     }

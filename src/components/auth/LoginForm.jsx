@@ -40,6 +40,8 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
       }
 
       localStorage.setItem("worknestToken", data.token);
+      localStorage.setItem("worknestUser", JSON.stringify(data.user));
+      localStorage.setItem("worknestWorkspaces", JSON.stringify(data.workspaces || []));
 
       toast.success(data.message);
       onLoginSuccess(data.user, data.workspaces);

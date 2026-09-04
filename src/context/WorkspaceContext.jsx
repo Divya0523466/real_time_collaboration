@@ -1,6 +1,17 @@
-import { createContext, useContext, useState, useCallback } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import socket, { connectSocket } from "../services/socket";
 
 const WorkspaceContext = createContext();
+
+const readStoredValue = (key, fallback) => {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const normalizeWorkspaceData = (payload, fallbackId = null) => {
   const workspace = payload?.workspace ?? payload ?? {};
@@ -20,24 +31,94 @@ const normalizeWorkspaceData = (payload, fallbackId = null) => {
 };
 
 export const WorkspaceProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [workspaces, setWorkspaces] = useState([]);
+  const [user, setUser] = useState(() => readStoredValue("worknestUser", null));
+  const [workspaces, setWorkspaces] = useState(() => readStoredValue("worknestWorkspaces", []));
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
   const [workspaceData, setWorkspaceData] = useState(null);
   const [channels, setChannels] = useState([]);
+  const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
+  useEffect(() => {
+    if (!user) {
+      socket.disconnect();
+      return undefined;
+    }
+
+    const handleConnectionSuccess = (data) => {
+      console.log("Socket:", data);
+    };
+
+    const handleDirectMessage = (data) => {
+      console.log("Direct message received:", data);
+    };
+
+    socket.on("connection-success", handleConnectionSuccess);
+    socket.on("receive-direct-message", handleDirectMessage);
+    connectSocket();
+
+    return () => {
+      socket.off("connection-success", handleConnectionSuccess);
+      socket.off("receive-direct-message", handleDirectMessage);
+      socket.disconnect();
+    };
+  }, [user]);
+
+  const clearAuth = useCallback(() => {
+    localStorage.removeItem("worknestToken");
+    localStorage.removeItem("worknestUser");
+    localStorage.removeItem("worknestWorkspaces");
+    setUser(null);
+    setWorkspaces([]);
+    setSelectedWorkspace(null);
+    setWorkspaceData(null);
+    setChannels([]);
+    setInvitations([]);
+    setError(null);
+  }, []);
+
   const initializeFromAuth = useCallback((userData, userWorkspaces) => {
+    localStorage.setItem("worknestUser", JSON.stringify(userData));
+    localStorage.setItem("worknestWorkspaces", JSON.stringify(userWorkspaces || []));
     setUser(userData);
     setWorkspaces(Array.isArray(userWorkspaces) ? userWorkspaces : []);
     setSelectedWorkspace(null);
     setWorkspaceData(null);
     setChannels([]);
+    setInvitations([]);
     setError(null);
   }, []);
+
+  const fetchPendingInvitations = useCallback(async () => {
+    if (!user?.email) {
+      setInvitations([]);
+      return [];
+    }
+
+    try {
+      const token = localStorage.getItem("worknestToken");
+      const response = await fetch(`${API_URL}/workspaces/invitations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Failed to fetch invitations");
+      }
+
+      const data = await response.json();
+      const nextInvitations = Array.isArray(data.invitations) ? data.invitations : [];
+      setInvitations(nextInvitations);
+      return nextInvitations;
+    } catch (err) {
+      setError(err.message);
+      console.error("Error fetching invitations:", err);
+      return [];
+    }
+  }, [API_URL, user?.email]);
 
   const fetchUserWorkspaces = useCallback(async () => {
     setLoading(true);
@@ -196,6 +277,29 @@ export const WorkspaceProvider = ({ children }) => {
       } finally {
         setLoading(false);
       }
+    },
+    [selectedWorkspace, API_URL],
+  );
+
+  const getChannel = useCallback(
+    async (channelId) => {
+      if (!selectedWorkspace || !channelId) return null;
+
+      const token = localStorage.getItem("worknestToken");
+      const response = await fetch(
+        `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Failed to fetch channel");
+      }
+
+      const data = await response.json();
+      return data.channel;
     },
     [selectedWorkspace, API_URL],
   );
@@ -500,6 +604,55 @@ export const WorkspaceProvider = ({ children }) => {
     [selectedWorkspace, API_URL],
   );
 
+  const acceptInvitation = useCallback(async (invitationId) => {
+    try {
+      const token = localStorage.getItem("worknestToken");
+      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/accept`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Failed to accept invitation");
+      }
+
+      setInvitations((prev) => prev.filter((invitation) => invitation.id !== invitationId));
+      await fetchUserWorkspaces();
+      return true;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [API_URL, fetchUserWorkspaces]);
+
+  const declineInvitation = useCallback(async (invitationId) => {
+    try {
+      const token = localStorage.getItem("worknestToken");
+      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/decline`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Failed to decline invitation");
+      }
+
+      setInvitations((prev) => prev.filter((invitation) => invitation.id !== invitationId));
+      return true;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [API_URL]);
+
   const value = {
     user,
     setUser,
@@ -507,15 +660,19 @@ export const WorkspaceProvider = ({ children }) => {
     selectedWorkspace,
     workspaceData,
     channels,
+    invitations,
     loading,
     error,
     initializeFromAuth,
+    clearAuth,
+    fetchPendingInvitations,
     fetchUserWorkspaces,
     selectWorkspace,
     createWorkspace,
     updateWorkspace,
     deleteWorkspace,
     createChannel,
+    getChannel,
     updateChannel,
     deleteChannel,
     getCurrentUserRole,
@@ -523,6 +680,8 @@ export const WorkspaceProvider = ({ children }) => {
     removeMember,
     addChannelMember,
     removeChannelMember,
+    acceptInvitation,
+    declineInvitation,
   };
 
   return (

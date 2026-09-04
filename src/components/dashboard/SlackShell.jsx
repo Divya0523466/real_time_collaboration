@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { getPermissions, getRoleDisplayName } from "../../utils/permissions"
 import { toast } from "react-toastify"
+import socket from "../../services/socket"
 import CreateChannelModal from "./CreateChannelModal"
 import EditChannelModal from "./EditChannelModal"
 import DeleteChannelModal from "./DeleteChannelModal"
@@ -32,6 +33,10 @@ const SlackShell = () => {
     channels,
     selectedWorkspace,
     selectWorkspace,
+    clearAuth,
+    getChannel,
+    addChannelMember,
+    removeChannelMember,
     removeMember,
     loading,
     error,
@@ -50,6 +55,9 @@ const SlackShell = () => {
   const [editingChannel, setEditingChannel] = useState(null)
   const [deletingChannel, setDeletingChannel] = useState(null)
   const [activeChannelMenuId, setActiveChannelMenuId] = useState(null)
+  const [channelDetails, setChannelDetails] = useState(null)
+  const [memberToAdd, setMemberToAdd] = useState("")
+  const [channelMemberActionLoading, setChannelMemberActionLoading] = useState(false)
 
   // Panels & Views
   const [showDetailsPane, setShowDetailsPane] = useState(false)
@@ -82,6 +90,41 @@ const SlackShell = () => {
     return channels[0]
   }, [channels, channelId])
 
+  const refreshChannelDetails = async () => {
+    if (!currentChannel?.id) return null
+    try {
+      const channel = await getChannel(currentChannel.id)
+      setChannelDetails(channel)
+      return channel
+    } catch (err) {
+      setChannelDetails(null)
+      toast.error(err.message || "Failed to load channel details")
+      return null
+    }
+  }
+
+  useEffect(() => {
+    if (!currentChannel?.id) return undefined
+
+    let cancelled = false
+    getChannel(currentChannel.id)
+      .then((channel) => {
+        if (!cancelled) setChannelDetails(channel)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setChannelDetails(null)
+          toast.error(err.message || "Failed to load channel details")
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentChannel?.id, getChannel])
+
+  const activeChannel = channelDetails?.id === currentChannel?.id ? channelDetails : currentChannel
+
   // If no channelId in URL but channels are loaded, update URL to default channel
   useEffect(() => {
     if (workspaceId && channels.length > 0 && !channelId) {
@@ -91,6 +134,7 @@ const SlackShell = () => {
 
   const selectedRole = workspaceData?.userRole || "MEMBER"
   const permissions = useMemo(() => getPermissions(selectedRole), [selectedRole])
+  const workspaceMembers = workspaceData?.members || []
 
   const handleSelectWorkspace = async (id) => {
     if (!id || id === workspaceId) return
@@ -128,10 +172,12 @@ const SlackShell = () => {
         return
       }
       localStorage.removeItem("worknestToken")
+      clearAuth()
       toast.success(data.message || "Logout successful")
       navigate("/")
     } catch {
       localStorage.removeItem("worknestToken")
+      clearAuth()
       toast.success("Logout successful")
       navigate("/")
     }
@@ -150,16 +196,56 @@ const SlackShell = () => {
   }
 
   const filteredMembers = useMemo(() => {
-    if (!workspaceData?.members) return []
-    if (!memberSearchQuery.trim()) return workspaceData.members
+    if (!memberSearchQuery.trim()) return workspaceMembers
     const q = memberSearchQuery.toLowerCase()
-    return workspaceData.members.filter(
+    return workspaceMembers.filter(
       (m) =>
         m.username?.toLowerCase().includes(q) ||
         m.email?.toLowerCase().includes(q) ||
         m.role?.toLowerCase().includes(q),
     )
-  }, [workspaceData?.members, memberSearchQuery])
+  }, [workspaceMembers, memberSearchQuery])
+
+  const channelMemberIds = useMemo(
+    () => new Set((activeChannel?.members || []).map((member) => member.id || member._id || member)),
+    [activeChannel?.members],
+  )
+
+  const availableChannelMembers = useMemo(
+    () => workspaceMembers.filter((member) => !channelMemberIds.has(member.id)),
+    [workspaceMembers, channelMemberIds],
+  )
+
+  const handleAddChannelMember = async () => {
+    if (!memberToAdd || !activeChannel?.id) return
+
+    setChannelMemberActionLoading(true)
+    try {
+      await addChannelMember(activeChannel.id, memberToAdd)
+      setMemberToAdd("")
+      await refreshChannelDetails()
+      toast.success("Member added to channel")
+    } catch (err) {
+      toast.error(err.message || "Failed to add member to channel")
+    } finally {
+      setChannelMemberActionLoading(false)
+    }
+  }
+
+  const handleRemoveChannelMember = async (member) => {
+    if (!activeChannel?.id || !window.confirm(`Remove ${member.username} from this channel?`)) return
+
+    setChannelMemberActionLoading(true)
+    try {
+      await removeChannelMember(activeChannel.id, member.id)
+      await refreshChannelDetails()
+      toast.success(`${member.username} removed from channel`)
+    } catch (err) {
+      toast.error(err.message || "Failed to remove member from channel")
+    } finally {
+      setChannelMemberActionLoading(false)
+    }
+  }
 
   if (loading && !workspaceData) {
     return (
@@ -499,10 +585,17 @@ const SlackShell = () => {
                     const isMenuOpen = activeChannelMenuId === chan.id
                     return (
                       <div key={chan.id} className="relative group">
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleSelectChannel(chan)}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-medium transition ${
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault()
+                              handleSelectChannel(chan)
+                            }
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-md font-medium transition ${
                             isActive
                               ? "bg-[#395B64] text-white shadow-xs font-semibold"
                               : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
@@ -533,7 +626,7 @@ const SlackShell = () => {
                               <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
                             </button>
                           )}
-                        </button>
+                        </div>
 
                         {/* Channel Context Menu */}
                         {isMenuOpen && (
@@ -621,9 +714,8 @@ const SlackShell = () => {
                             : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
                         }`}
                       >
-                        <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-[#395B64] text-[9px] font-bold text-white">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
                           {member.username?.charAt(0)?.toUpperCase() || "U"}
-                          <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-[#1E2525]" />
                         </span>
                         <span className="truncate">
                           {member.username} {isSelf && "(you)"}
@@ -699,7 +791,7 @@ const SlackShell = () => {
               title="View members"
             >
               <i className="fa-solid fa-users text-xs" />
-              <span>{workspaceData.members?.length || 0}</span>
+              <span>{workspaceMembers.length}</span>
             </button>
 
             {/* Details panel toggle */}
@@ -735,14 +827,14 @@ const SlackShell = () => {
                     <i className="fa-solid fa-hashtag" />
                   )}
                 </div>
-                <h2 className="text-2xl font-bold text-[#2C3333]">
+                <h2 className="text-lg font-bold text-[#2C3333]">
                   {selectedDMUser
-                    ? `This is the beginning of your direct message history with @${selectedDMUser.username}`
+                    ? `Message @${selectedDMUser.username}`
                     : `This is the start of the #${currentChannel?.name || "general"} channel`}
                 </h2>
-                <p className="mt-2 text-sm text-[#52656A] max-w-xl">
+                <p className="mt-2 text-xs text-[#52656A] max-w-xl">
                   {selectedDMUser
-                    ? `Direct messages are private to you and @${selectedDMUser.username}.`
+                    ? `Private conversation with @${selectedDMUser.username}.`
                     : currentChannel?.description
                     ? currentChannel.description
                     : `Created on ${workspaceData.createdAt ? new Date(workspaceData.createdAt).toLocaleDateString() : "recently"}. This channel is for team communication.`}
@@ -788,10 +880,21 @@ const SlackShell = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      if (messageInput.trim()) {
-                        toast.info("Message sending will be enabled when real-time messaging is connected")
-                        setMessageInput("")
+                      if (!selectedDMUser) {
+                        toast.error("Select a direct-message recipient first")
+                        return
                       }
+                      if (!messageInput.trim()) return
+                      if (!socket.connected) {
+                        toast.error("Socket is not connected. Check the browser console.")
+                        return
+                      }
+
+                      socket.emit("send-direct-message", {
+                        receiverId: selectedDMUser.id,
+                        message: messageInput.trim(),
+                      })
+                      setMessageInput("")
                     }}
                     className="flex items-center gap-1.5 rounded-xl bg-[#395B64] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#2C3333] transition"
                   >
@@ -827,7 +930,7 @@ const SlackShell = () => {
                     {(selectedRole === "OWNER" || selectedRole === "ADMIN") && currentChannel && (
                       <button
                         type="button"
-                        onClick={() => setEditingChannel(currentChannel)}
+                        onClick={() => setEditingChannel(activeChannel)}
                         className="text-xs font-semibold text-[#395B64] hover:underline"
                       >
                         Edit
@@ -870,11 +973,38 @@ const SlackShell = () => {
                 <div>
                   <div className="flex items-center justify-between mb-2.5">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A]">
-                      Members ({workspaceData.members?.length || 0})
+                      Members ({activeChannel?.members?.length || 0})
                     </h4>
+                    {permissions.canManageChannelMembers && activeChannel && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#395B64]">Manage</span>
+                    )}
                   </div>
+                  {permissions.canManageChannelMembers && activeChannel && (
+                    <div className="mb-3 flex gap-2">
+                      <select
+                        value={memberToAdd}
+                        onChange={(event) => setMemberToAdd(event.target.value)}
+                        disabled={channelMemberActionLoading || availableChannelMembers.length === 0}
+                        className="min-w-0 flex-1 rounded-lg border border-[#A5C9CA] bg-white px-2 py-1.5 text-xs text-[#2C3333] disabled:opacity-60"
+                      >
+                        <option value="">Add workspace member...</option>
+                        {availableChannelMembers.map((member) => (
+                          <option key={member.id} value={member.id}>{member.username}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleAddChannelMember}
+                        disabled={!memberToAdd || channelMemberActionLoading}
+                        className="rounded-lg bg-[#395B64] px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                        title="Add member to channel"
+                      >
+                        <i className="fa-solid fa-user-plus" />
+                      </button>
+                    </div>
+                  )}
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {workspaceData.members?.map((m) => (
+                    {activeChannel?.members?.map((m) => (
                       <div key={m.id} className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-[#F8FAFB]">
                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#395B64] text-[10px] font-bold text-white">
                           {m.username?.charAt(0)?.toUpperCase() || "U"}
@@ -883,6 +1013,17 @@ const SlackShell = () => {
                         <span className="rounded bg-[#E7F6F2] px-1.5 py-0.5 text-[9px] font-semibold text-[#395B64]">
                           {m.role}
                         </span>
+                        {permissions.canManageChannelMembers && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveChannelMember(m)}
+                            disabled={channelMemberActionLoading}
+                            className="text-xs text-rose-500 hover:text-rose-700 disabled:opacity-50"
+                            title={`Remove ${m.username} from channel`}
+                          >
+                            <i className="fa-solid fa-user-minus" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -948,6 +1089,7 @@ const SlackShell = () => {
         <EditChannelModal
           channel={editingChannel}
           onClose={() => setEditingChannel(null)}
+          onSaved={refreshChannelDetails}
         />
       )}
 
