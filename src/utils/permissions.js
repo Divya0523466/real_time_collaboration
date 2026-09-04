@@ -21,7 +21,7 @@ const ROLE_PERMISSIONS = {
     canCreateChannels: true,
     canManageChannels: true,
     canManageChannelMembers: true,
-    canDeleteChannels: false,
+    canDeleteChannels: true,
     canEditChannels: true,
     canAccessAllChannels: true,
   },

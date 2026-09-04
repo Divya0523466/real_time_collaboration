@@ -155,6 +155,10 @@ const updateMemberRole = async (req, res) => {
       workspaceId,
     });
 
+    if (!targetMembership) {
+      return res.status(404).json({ message: "Member not found in workspace" });
+    }
+
     if (targetMembership.role === "OWNER" && role !== "OWNER") {
       return res.status(400).json({ message: "Cannot remove owner role" });
     }

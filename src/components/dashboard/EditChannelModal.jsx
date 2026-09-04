@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { toast } from "react-toastify"
 
-const EditChannelModal = ({ channel, onClose }) => {
+const EditChannelModal = ({ channel, onClose, onSaved }) => {
   const [name, setName] = useState(channel?.name || "")
   const [description, setDescription] = useState(channel?.description || "")
   const [selectedMemberIds, setSelectedMemberIds] = useState(
@@ -34,6 +34,7 @@ const EditChannelModal = ({ channel, onClose }) => {
     try {
       await updateChannel(channel.id, cleanName, description.trim(), selectedMemberIds)
       toast.success(`Channel #${cleanName} updated successfully!`)
+      onSaved?.()
       onClose()
     } catch (err) {
       setError(err.message || "Failed to update channel")

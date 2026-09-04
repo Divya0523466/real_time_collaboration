@@ -7,14 +7,31 @@ import { getWorkspaceInitials } from "./SlackShell"
 
 const GlobalDashboard = () => {
   const navigate = useNavigate()
-  const { user, workspaces, selectWorkspace, fetchUserWorkspaces, loading, error } = useWorkspace()
+  const {
+    user,
+    workspaces,
+    invitations,
+    selectWorkspace,
+    fetchUserWorkspaces,
+    fetchPendingInvitations,
+    acceptInvitation,
+    declineInvitation,
+    loading,
+    error,
+  } = useWorkspace()
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
     fetchUserWorkspaces().catch((err) => {
       console.error("Failed to fetch workspaces:", err)
     })
-  }, [fetchUserWorkspaces])
+
+    if (user?.email) {
+      fetchPendingInvitations().catch((err) => {
+        console.error("Failed to fetch invitations:", err)
+      })
+    }
+  }, [fetchUserWorkspaces, fetchPendingInvitations, user?.email])
 
   const handleSelectWorkspace = (workspace) => {
     selectWorkspace(workspace.id)
@@ -102,6 +119,70 @@ const GlobalDashboard = () => {
             </div>
           )}
 
+          {invitations.length > 0 && (
+            <section className="mb-8 rounded-3xl border border-[#A5C9CA] bg-white p-5 shadow-xs">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#395B64]">Invitations</p>
+                  <h2 className="mt-1 text-xl font-bold text-[#2C3333]">Pending Invitations</h2>
+                </div>
+                <span className="rounded-full bg-[#E7F6F2] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#395B64]">
+                  {invitations.length} pending
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {invitations.map((invitation) => (
+                  <div key={invitation.id} className="rounded-2xl border border-[#E0E7E6] bg-[#F8FAFB] p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="text-sm font-bold text-[#2C3333]">
+                          Workspace: <span className="text-[#395B64]">{invitation.workspaceName}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-[#52656A]">
+                          Invited by: {invitation.inviter?.username || invitation.inviter?.email || "Someone"}
+                        </div>
+                        <div className="mt-1 text-xs text-[#52656A]">
+                          Role: <span className="font-semibold text-[#2C3333]">{invitation.role}</span>
+                        </div>
+                        {invitation.message && (
+                          <div className="mt-2 text-xs text-[#52656A] italic">"{invitation.message}"</div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            acceptInvitation(invitation.id).then(() => {
+                              fetchUserWorkspaces().catch((err) => console.error("Failed to refresh workspaces:", err))
+                            }).catch((err) => {
+                              console.error("Failed to accept invitation:", err)
+                            })
+                          }}
+                          className="rounded-xl bg-[#395B64] px-3 py-2 text-xs font-semibold text-white hover:bg-[#2C3333] transition"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            declineInvitation(invitation.id).catch((err) => {
+                              console.error("Failed to decline invitation:", err)
+                            })
+                          }}
+                          className="rounded-xl border border-[#A5C9CA] bg-white px-3 py-2 text-xs font-semibold text-[#2C3333] hover:bg-[#E7F6F2] transition"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {!loading && !error && workspaces.length === 0 && (
             <div className="rounded-3xl border border-dashed border-[#A5C9CA] bg-white p-12 text-center max-w-lg mx-auto shadow-xs">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] text-3xl text-[#395B64] mx-auto mb-4">
@@ -159,7 +240,7 @@ const GlobalDashboard = () => {
               <button
                 type="button"
                 onClick={() => setShowCreateModal(true)}
-                className="rounded-2xl border-2 border-dashed border-[#A5C9CA] p-5 text-center hover:border-[#395B64] hover:bg-[#E7F6F2]/30 transition flex flex-col items-center justify-center min-h-[140px]"
+                className="rounded-2xl border-2 border-dashed border-[#A5C9CA] p-5 text-center hover:border-[#395B64] hover:bg-[#E7F6F2]/30 transition flex flex-col items-center justify-center min-h-35"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E7F6F2] text-[#395B64] text-sm mb-2">
                   <i className="fa-solid fa-plus" />
