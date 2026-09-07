@@ -24,10 +24,41 @@ export const connectSocket = () => {
   socket.auth = {
     token: localStorage.getItem("worknestToken"),
   }
-
   if (!socket.connected) {
     socket.connect()
   }
+}
+
+
+export const sendDirectMessage = (receiverId, content) => {
+  socket.emit("send-direct-message", {
+    receiverId,
+    content,
+  })
+}
+
+export const onDirectMessageReceived = (callback) => {
+  socket.on("receive-direct-message", callback)
+}
+
+export const onDirectMessageSent = (callback) => {
+  socket.on("direct-message-sent", callback)
+}
+
+export const onDirectMessageError = (callback) => {
+  socket.on("send-direct-message-error", callback)
+}
+
+export const offDirectMessageReceived = (callback) => {
+  socket.off("receive-direct-message", callback)
+}
+
+export const offDirectMessageSent = (callback) => {
+  socket.off("direct-message-sent", callback)
+}
+
+export const offDirectMessageError = (callback) => {
+  socket.off("send-direct-message-error", callback)
 }
 
 export default socket

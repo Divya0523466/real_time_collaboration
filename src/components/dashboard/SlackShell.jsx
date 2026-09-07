@@ -12,6 +12,7 @@ import RoleManagementModal from "./RoleManagementModal"
 import CreateWorkspaceModal from "./CreateWorkspaceModal"
 import EditWorkspaceModal from "./EditWorkspaceModal"
 import DeleteWorkspaceModal from "./DeleteWorkspaceModal"
+import DirectMessaging from "./DirectMessaging"
 
 export const getWorkspaceInitials = (name) => {
   if (!name || typeof name !== "string") return "W"
@@ -71,6 +72,7 @@ const SlackShell = () => {
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
   const [messageInput, setMessageInput] = useState("")
   const [selectedDMUser, setSelectedDMUser] = useState(null)
+  const [unreadDMCounts, setUnreadDMCounts] = useState({})
 
   // Load selected workspace if ID changed
   useEffect(() => {
@@ -135,6 +137,38 @@ const SlackShell = () => {
   const selectedRole = workspaceData?.userRole || "MEMBER"
   const permissions = useMemo(() => getPermissions(selectedRole), [selectedRole])
   const workspaceMembers = workspaceData?.members || []
+  const directMessageMembers = workspaceMembers.filter(
+    (member) => member.id?.toString() !== user?.id?.toString(),
+  )
+
+  useEffect(() => {
+    const handleDirectMessage = (message) => {
+      const senderId = message?.senderId?.toString()
+      const currentUserId = user?.id?.toString()
+
+      if (
+        !senderId ||
+        senderId === currentUserId ||
+        selectedDMUser?.id?.toString() === senderId ||
+        !directMessageMembers.some((member) => member.id?.toString() === senderId)
+      ) {
+        return
+      }
+
+      setUnreadDMCounts((counts) => ({
+        ...counts,
+        [senderId]: (counts[senderId] || 0) + 1,
+      }))
+    }
+
+    socket.on("receive-direct-message", handleDirectMessage)
+    return () => socket.off("receive-direct-message", handleDirectMessage)
+  }, [directMessageMembers, selectedDMUser?.id, user?.id])
+
+  useEffect(() => {
+    setUnreadDMCounts({})
+    setSelectedDMUser(null)
+  }, [workspaceId])
 
   const handleSelectWorkspace = async (id) => {
     if (!id || id === workspaceId) return
@@ -283,9 +317,6 @@ const SlackShell = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFB] text-[#2C3333]">
-      {/* ========================================================
-          1. WORKSPACE RAIL (FAR LEFT NARROW)
-      ======================================================== */}
       <aside className="flex w-17 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] z-30 select-none">
         {/* WorkNest Home Icon */}
         <button
@@ -696,9 +727,8 @@ const SlackShell = () => {
 
             {!isDMsCollapsed && (
               <div className="space-y-0.5 pt-1">
-                {workspaceData.members && workspaceData.members.length > 0 ? (
-                  workspaceData.members.map((member) => {
-                    const isSelf = member.id === user?.id
+                {directMessageMembers.length > 0 ? (
+                  directMessageMembers.map((member) => {
                     const isSelected = selectedDMUser?.id === member.id
                     return (
                       <button
@@ -706,6 +736,11 @@ const SlackShell = () => {
                         type="button"
                         onClick={() => {
                           setSelectedDMUser(member)
+                          setUnreadDMCounts((counts) => {
+                            const nextCounts = { ...counts }
+                            delete nextCounts[member.id?.toString()]
+                            return nextCounts
+                          })
                           setActiveChannelMenuId(null)
                         }}
                         className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
@@ -717,12 +752,19 @@ const SlackShell = () => {
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
                           {member.username?.charAt(0)?.toUpperCase() || "U"}
                         </span>
-                        <span className="truncate">
-                          {member.username} {isSelf && "(you)"}
+                        <span className="min-w-0 flex-1 truncate">
+                          {member.username}
                         </span>
+                        {unreadDMCounts[member.id?.toString()] > 0 && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                            {unreadDMCounts[member.id.toString()] > 99
+                              ? "99+"
+                              : unreadDMCounts[member.id.toString()]}
+                          </span>
+                        )}
                       </button>
                     )
-                  })
+                    })
                 ) : (
                   <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                     No members yet
@@ -812,8 +854,13 @@ const SlackShell = () => {
 
         {/* Center Messages & Details Panel Viewport */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* Messages Column */}
-          <div className="flex min-w-0 flex-1 flex-col bg-white">
+          {/* Show Direct Messaging when DM user is selected */}
+          {selectedDMUser ? (
+            <DirectMessaging externalSelectedUser={selectedDMUser} />
+          ) : (
+            <>
+              {/* Show Channel Messages */}
+              <div className="flex min-w-0 flex-1 flex-col bg-white">
             {/* Scrollable Message List */}
             <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
               {/* Channel Intro Header */}
@@ -892,7 +939,7 @@ const SlackShell = () => {
 
                       socket.emit("send-direct-message", {
                         receiverId: selectedDMUser.id,
-                        message: messageInput.trim(),
+                        content: messageInput.trim(),
                       })
                       setMessageInput("")
                     }}
@@ -905,6 +952,10 @@ const SlackShell = () => {
               </div>
             </div>
           </div>
+
+            </>
+          )}
+        </div>
 
           {/* ========================================================
               4. RIGHT DETAILS PANEL
@@ -1039,8 +1090,7 @@ const SlackShell = () => {
               </div>
             </aside>
           )}
-        </div>
-      </main>
+        </main>
 
       {/* ========================================================
           5. MODALS & SLIDEOVERS
@@ -1249,6 +1299,7 @@ const SlackShell = () => {
             <div className="flex items-center justify-between border-b border-[#E0E7E6] px-6 py-4 bg-[#F8FAFB]">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#395B64]">Workspace</p>
+          </div>
                 <h3 className="text-lg font-bold text-[#2C3333]">Activity & Notifications</h3>
               </div>
               <button
@@ -1270,7 +1321,7 @@ const SlackShell = () => {
               </p>
             </div>
           </div>
-        </div>
+      
       )}
     </div>
   )
