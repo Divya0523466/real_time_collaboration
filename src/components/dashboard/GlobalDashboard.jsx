@@ -16,12 +16,19 @@ const GlobalDashboard = () => {
     fetchPendingInvitations,
     acceptInvitation,
     declineInvitation,
+    clearAuth,
     loading,
     error,
   } = useWorkspace()
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
+    if (!localStorage.getItem("worknestToken")) {
+      clearAuth()
+      navigate("/", { replace: true })
+      return
+    }
+
     fetchUserWorkspaces().catch((err) => {
       console.error("Failed to fetch workspaces:", err)
     })
@@ -31,7 +38,7 @@ const GlobalDashboard = () => {
         console.error("Failed to fetch invitations:", err)
       })
     }
-  }, [fetchUserWorkspaces, fetchPendingInvitations, user?.email])
+  }, [clearAuth, fetchUserWorkspaces, fetchPendingInvitations, navigate, user?.email])
 
   const handleSelectWorkspace = (workspace) => {
     selectWorkspace(workspace.id)
