@@ -47,28 +47,28 @@ const MessageThread = ({
   return (
     <div className="flex-1 flex flex-col bg-white">
       {/* Header */}
-      <div className="border-b border-gray-200 p-4 bg-gray-50">
-        <h3 className="font-semibold text-gray-900">
+      <div className="border-b border-[#E0E7E6] bg-[#F8FAFB] p-4">
+        <h3 className="font-semibold text-[#2C3333]">
           {selectedUser.username || "User"}
         </h3>
-        <p className="text-xs text-gray-500">{selectedUser.email || ""}</p>
+        <p className="text-xs text-[#52656A]">{selectedUser.email || ""}</p>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 space-y-2 overflow-y-auto p-4">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">
+          <div className="rounded border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
             {error}
           </div>
         )}
 
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-400">Loading messages...</p>
+            <p className="text-[#52656A]">Loading messages...</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-400">No messages yet. Start the conversation!</p>
+            <p className="text-[#52656A]">No messages yet. Start the conversation!</p>
           </div>
         ) : (
           messages.map((message) => {
@@ -79,23 +79,25 @@ const MessageThread = ({
                 className={`flex ${isSender ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-xs px-4 py-2 rounded-lg ${
+                    className={`max-w-xs rounded-lg px-3 py-1.5 ${
                     isSender
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-900"
+                      ? "bg-[#395B64] text-white"
+                      : "bg-[#F1F5F4] text-[#2C3333]"
                   }`}
                 >
-                  <p className="break-words">{message.content}</p>
-                  <p
-                    className={`text-xs mt-1 ${
-                      isSender ? "text-blue-100" : "text-gray-500"
-                    }`}
-                  >
-                    {new Date(message.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
+                  <div className="flex items-end gap-2">
+                    <p className="wrap-break-word">{message.content}</p>
+                    <p
+                      className={`shrink-0 text-[10px] leading-4 ${
+                      isSender ? "text-[#A5C9CA]" : "text-[#52656A]"
+                      }`}
+                    >
+                      {new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
                 </div>
               </div>
             )
@@ -105,14 +107,14 @@ const MessageThread = ({
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 p-4 bg-gray-50">
+      <div className="border-t border-[#E0E7E6] bg-[#F8FAFB] p-4">
         <div className="flex gap-2">
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 resize-none rounded-lg border border-[#A5C9CA] px-4 py-2 focus:border-[#395B64] focus:outline-none focus:ring-2 focus:ring-[#E7F6F2]"
             rows="2"
           />
           
@@ -120,7 +122,7 @@ const MessageThread = ({
             type="button"
             onClick={handleSendClick}
             disabled={!inputValue.trim()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+            className="rounded-lg bg-[#395B64] px-4 py-2 font-medium text-white transition hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Send
           </button>

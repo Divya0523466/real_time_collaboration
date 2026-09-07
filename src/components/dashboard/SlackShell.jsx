@@ -13,6 +13,7 @@ import CreateWorkspaceModal from "./CreateWorkspaceModal"
 import EditWorkspaceModal from "./EditWorkspaceModal"
 import DeleteWorkspaceModal from "./DeleteWorkspaceModal"
 import DirectMessaging from "./DirectMessaging"
+import ChannelMessageThread from "./ChannelMessageThread"
 
 export const getWorkspaceInitials = (name) => {
   if (!name || typeof name !== "string") return "W"
@@ -70,7 +71,6 @@ const SlackShell = () => {
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false)
   const [isDMsCollapsed, setIsDMsCollapsed] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
-  const [messageInput, setMessageInput] = useState("")
   const [selectedDMUser, setSelectedDMUser] = useState(null)
   const [unreadDMCounts, setUnreadDMCounts] = useState({})
 
@@ -858,104 +858,8 @@ const SlackShell = () => {
           {selectedDMUser ? (
             <DirectMessaging externalSelectedUser={selectedDMUser} />
           ) : (
-            <>
-              {/* Show Channel Messages */}
-              <div className="flex min-w-0 flex-1 flex-col bg-white">
-            {/* Scrollable Message List */}
-            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-              {/* Channel Intro Header */}
-              <div className="border-b border-[#E0E7E6] pb-6 pt-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E7F6F2] text-2xl text-[#395B64] mb-4">
-                  {selectedDMUser ? (
-                    <i className="fa-solid fa-user" />
-                  ) : currentChannel?.type === "PRIVATE" ? (
-                    <i className="fa-solid fa-lock" />
-                  ) : (
-                    <i className="fa-solid fa-hashtag" />
-                  )}
-                </div>
-                <h2 className="text-lg font-bold text-[#2C3333]">
-                  {selectedDMUser
-                    ? `Message @${selectedDMUser.username}`
-                    : `This is the start of the #${currentChannel?.name || "general"} channel`}
-                </h2>
-                <p className="mt-2 text-xs text-[#52656A] max-w-xl">
-                  {selectedDMUser
-                    ? `Private conversation with @${selectedDMUser.username}.`
-                    : currentChannel?.description
-                    ? currentChannel.description
-                    : `Created on ${workspaceData.createdAt ? new Date(workspaceData.createdAt).toLocaleDateString() : "recently"}. This channel is for team communication.`}
-                </p>
-              </div>
-
-              {/* Empty state for real messages */}
-              <div className="flex flex-col items-center justify-center py-10 text-center text-[#52656A]">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F8FAFB] text-xl text-[#A5C9CA] mb-3">
-                  <i className="fa-regular fa-comment-dots" />
-                </div>
-                <p className="text-sm font-medium text-[#2C3333]">No messages yet</p>
-                <p className="mt-1 text-xs text-[#52656A]">
-                  Send a message below to start collaborating with your team!
-                </p>
-              </div>
-            </div>
-
-            {/* Sticky Fixed Message Composer */}
-            <div className="border-t border-[#E0E7E6] bg-white p-4">
-              <div className="rounded-2xl border border-[#A5C9CA] bg-[#F8FAFB] p-3 shadow-xs focus-within:border-[#395B64] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#E7F6F2] transition">
-                <input
-                  type="text"
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder={`Message ${selectedDMUser ? `@${selectedDMUser.username}` : `#${currentChannel?.name || "general"}`}`}
-                  className="w-full bg-transparent text-sm text-[#2C3333] outline-none placeholder:text-[#52656A]/60"
-                />
-
-                {/* Composer Actions Toolbar */}
-                <div className="mt-3 flex items-center justify-between pt-2 border-t border-[#E0E7E6]/60">
-                  <div className="flex items-center gap-2 text-[#52656A]">
-                    <button type="button" className="hover:text-[#395B64] p-1 text-xs" title="Bold"><i className="fa-solid fa-bold" /></button>
-                    <button type="button" className="hover:text-[#395B64] p-1 text-xs" title="Italic"><i className="fa-solid fa-italic" /></button>
-                    <button type="button" className="hover:text-[#395B64] p-1 text-xs" title="Link"><i className="fa-solid fa-link" /></button>
-                    <button type="button" className="hover:text-[#395B64] p-1 text-xs" title="List"><i className="fa-solid fa-list" /></button>
-                    <button type="button" className="hover:text-[#395B64] p-1 text-xs" title="Code"><i className="fa-solid fa-code" /></button>
-                    <div className="h-3 w-px bg-[#E0E7E6]" />
-                    <button type="button" className="hover:text-[#395B64] p-1 text-xs" title="Attach file"><i className="fa-solid fa-paperclip" /></button>
-                    <button type="button" className="hover:text-[#395B64] p-1 text-xs" title="Emoji"><i className="fa-regular fa-face-smile" /></button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedDMUser) {
-                        toast.error("Select a direct-message recipient first")
-                        return
-                      }
-                      if (!messageInput.trim()) return
-                      if (!socket.connected) {
-                        toast.error("Socket is not connected. Check the browser console.")
-                        return
-                      }
-
-                      socket.emit("send-direct-message", {
-                        receiverId: selectedDMUser.id,
-                        content: messageInput.trim(),
-                      })
-                      setMessageInput("")
-                    }}
-                    className="flex items-center gap-1.5 rounded-xl bg-[#395B64] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#2C3333] transition"
-                  >
-                    <span>Send</span>
-                    <i className="fa-solid fa-paper-plane text-[10px]" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-            </>
+            <ChannelMessageThread channel={activeChannel || currentChannel} currentUserId={user?.id} />
           )}
-        </div>
 
           {/* ========================================================
               4. RIGHT DETAILS PANEL
@@ -1090,6 +994,7 @@ const SlackShell = () => {
               </div>
             </aside>
           )}
+        </div>
         </main>
 
       {/* ========================================================

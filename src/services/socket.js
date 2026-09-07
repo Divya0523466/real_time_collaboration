@@ -37,6 +37,18 @@ export const sendDirectMessage = (receiverId, content) => {
   })
 }
 
+export const joinChannel = (channelId) => {
+  socket.emit("join-channel", { channelId })
+}
+
+export const leaveChannel = (channelId) => {
+  socket.emit("leave-channel", { channelId })
+}
+
+export const sendChannelMessage = (channelId, content) => {
+  socket.emit("send-channel-message", { channelId, content })
+}
+
 export const onDirectMessageReceived = (callback) => {
   socket.on("receive-direct-message", callback)
 }

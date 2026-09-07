@@ -1,5 +1,7 @@
 import Message from "../models/Message.js"
 import User from "../models/User.js"
+import ChannelMessage from "../models/ChannelMessage.js"
+import getChannelAccess from "../utils/channelAccess.js"
 
 const getDirectMessages = async (req, res) => {
   try {
@@ -41,4 +43,40 @@ const getDirectMessages = async (req, res) => {
   }
 }
 
-export { getDirectMessages }
+const formatChannelMessage = (message) => ({
+  id: message._id,
+  channelId: message.channelId,
+  senderId: message.senderId?._id || message.senderId,
+  sender: message.senderId?._id
+    ? {
+        id: message.senderId._id,
+        username: message.senderId.username,
+        avatar: message.senderId.avatar,
+      }
+    : undefined,
+  content: message.content,
+  createdAt: message.createdAt,
+  updatedAt: message.updatedAt,
+})
+
+const getChannelMessages = async (req, res) => {
+  try {
+    const { channelId } = req.params
+    const access = await getChannelAccess(req.userId, channelId)
+
+    if (!access.channel) {
+      return res.status(403).json({ message: "Access denied to channel" })
+    }
+
+    const messages = await ChannelMessage.find({ channelId })
+      .populate("senderId", "username avatar")
+      .sort({ createdAt: 1 })
+
+    return res.json({ messages: messages.map(formatChannelMessage) })
+  } catch (error) {
+    console.error("Error fetching channel messages:", error)
+    return res.status(500).json({ message: "Server error", error: error.message })
+  }
+}
+
+export { getDirectMessages, getChannelMessages, formatChannelMessage }

@@ -7,6 +7,9 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import User from "./models/User.js";
 import Message from "./models/Message.js";
+import ChannelMessage from "./models/ChannelMessage.js";
+import getChannelAccess from "./utils/channelAccess.js";
+import { formatChannelMessage } from "./controllers/messageController.js";
 import authRoutes from "./routes/authRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import workspaceRoutes from "./routes/workspaceRoutes.js";
@@ -53,11 +56,79 @@ io.engine.on("connection_error", (error) => {
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
+  let activeChannelRoom = null;
   const userSockets = onlineUsers.get(socket.userId) || new Set();
   userSockets.add(socket.id);
   onlineUsers.set(socket.userId, userSockets);
   socket.emit("connection-success", {
     message: "Socket connected successfully",
+  });
+
+  socket.on("join-channel", async ({ channelId } = {}) => {
+    try {
+      const access = await getChannelAccess(socket.userId, channelId);
+      if (!access.channel) {
+        socket.emit("join-channel-error", { message: "Access denied to channel" });
+        return;
+      }
+
+      const room = `channel:${access.channel._id}`;
+      if (activeChannelRoom && activeChannelRoom !== room) {
+        socket.leave(activeChannelRoom);
+      }
+      socket.join(room);
+      activeChannelRoom = room;
+      socket.emit("channel-joined", { channelId: access.channel._id });
+    } catch (error) {
+      console.error("Error joining channel:", error);
+      socket.emit("join-channel-error", { message: "Unable to join channel" });
+    }
+  });
+
+  socket.on("leave-channel", ({ channelId } = {}) => {
+    const room = channelId ? `channel:${channelId}` : activeChannelRoom;
+    if (room) {
+      socket.leave(room);
+      if (activeChannelRoom === room) activeChannelRoom = null;
+    }
+  });
+
+  socket.on("send-channel-message", async ({ channelId, content } = {}) => {
+    const trimmedContent = typeof content === "string" ? content.trim() : "";
+    if (!channelId || !trimmedContent) {
+      socket.emit("send-channel-message-error", {
+        message: "Channel and message content are required",
+      });
+      return;
+    }
+
+    try {
+      const access = await getChannelAccess(socket.userId, channelId);
+      if (!access.channel) {
+        socket.emit("send-channel-message-error", { message: "Access denied to channel" });
+        return;
+      }
+
+      const room = `channel:${access.channel._id}`;
+      if (activeChannelRoom !== room) {
+        socket.emit("send-channel-message-error", { message: "Join the channel before sending messages" });
+        return;
+      }
+
+      const savedMessage = await ChannelMessage.create({
+        channelId: access.channel._id,
+        senderId: socket.userId,
+        content: trimmedContent,
+      });
+      const populatedMessage = await savedMessage.populate("senderId", "username avatar");
+      const messagePayload = formatChannelMessage(populatedMessage);
+
+      io.to(room).emit("receive-channel-message", messagePayload);
+      socket.emit("channel-message-sent", messagePayload);
+    } catch (error) {
+      console.error("Error sending channel message:", error);
+      socket.emit("send-channel-message-error", { message: "Failed to send channel message" });
+    }
   });
 
   socket.on("send-direct-message", async ({ receiverId, content } = {}) => {
@@ -164,6 +235,7 @@ mongoose.connect(process.env.MONGO_URI)
   .catch((error) => {
     console.error("MongoDB connection failed:", error.message);
   });
+
 
 server.listen(port, () => {
   console.log(`Server running on port ${port}`);
