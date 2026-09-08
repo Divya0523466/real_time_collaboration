@@ -18,6 +18,19 @@ const channelMessageSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChannelMessage",
+      default: null,
+    },
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 )

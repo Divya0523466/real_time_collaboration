@@ -12,7 +12,7 @@ const DeleteChannelModal = ({ channel, onClose, onDeleted }) => {
     setError("")
     try {
       await deleteChannel(channel.id)
-      toast.success(`Channel #${channel.name} was deleted`)
+      toast.error(`Channel #${channel.name} was deleted`)
       if (onDeleted) onDeleted()
       onClose()
     } catch (err) {

@@ -23,7 +23,7 @@ const getDirectMessages = async (req, res) => {
         { senderId: otherUserId, receiverId: currentUserId },
       ],
     })
-      .select("_id senderId receiverId content createdAt")
+      .select("_id senderId receiverId content createdAt updatedAt isEdited isDeleted")
       .sort({ createdAt: 1 })
 
     return res.json({
@@ -31,8 +31,11 @@ const getDirectMessages = async (req, res) => {
         id: msg._id,
         senderId: msg.senderId,
         receiverId: msg.receiverId,
-        content: msg.content,
+        content: msg.isDeleted ? null : msg.content,
         createdAt: msg.createdAt,
+        updatedAt: msg.updatedAt,
+        isEdited: msg.isEdited || false,
+        isDeleted: msg.isDeleted || false,
       })),
     })
   } catch (error) {
@@ -40,6 +43,22 @@ const getDirectMessages = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server error", error: error.message })
+  }
+}
+
+
+const buildReplyToMessage = (parent) => {
+  if (!parent) return null
+  return {
+    id: parent._id,
+    content: parent.isDeleted ? null : parent.content,
+    isDeleted: parent.isDeleted || false,
+    sender: parent.senderId?._id
+      ? {
+          id: parent.senderId._id,
+          username: parent.senderId.username,
+        }
+      : undefined,
   }
 }
 
@@ -54,7 +73,11 @@ const formatChannelMessage = (message) => ({
         avatar: message.senderId.avatar,
       }
     : undefined,
-  content: message.content,
+  content: message.isDeleted ? null : message.content,
+  replyTo: message.replyTo?._id || message.replyTo || null,
+  replyToMessage: buildReplyToMessage(message.replyTo?._id ? message.replyTo : null),
+  isEdited: message.isEdited || false,
+  isDeleted: message.isDeleted || false,
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 })
@@ -70,6 +93,10 @@ const getChannelMessages = async (req, res) => {
 
     const messages = await ChannelMessage.find({ channelId })
       .populate("senderId", "username avatar")
+      .populate({
+        path: "replyTo",
+        populate: { path: "senderId", select: "username" },
+      })
       .sort({ createdAt: 1 })
 
     return res.json({ messages: messages.map(formatChannelMessage) })
@@ -79,4 +106,4 @@ const getChannelMessages = async (req, res) => {
   }
 }
 
-export { getDirectMessages, getChannelMessages, formatChannelMessage }
+export { getDirectMessages, getChannelMessages, formatChannelMessage, buildReplyToMessage }

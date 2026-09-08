@@ -53,6 +53,83 @@ const createChannel = async (req, res) => {
   }
 }
 
+const updateChannel = async (req, res) => {
+  try {
+    const { workspaceId, channelId } = req.params
+    const { name, description, members } = req.body
+    const userId = req.userId
+
+    const requesterMembership = await WorkspaceMembership.findOne({ userId, workspaceId })
+    if (!requesterMembership || !["OWNER", "ADMIN"].includes(requesterMembership.role)) {
+      return res.status(403).json({ message: "You do not have permission to edit channels" })
+    }
+
+    const channel = await Channel.findOne({ _id: channelId, workspaceId })
+    if (!channel) {
+      return res.status(404).json({ message: "Channel not found" })
+    }
+
+    if (name && name.trim()) {
+      channel.name = name.trim().toLowerCase().replace(/\s+/g, "-")
+    }
+
+    if (typeof description === "string") {
+      channel.description = description.trim()
+    }
+
+    if (channel.type === "PRIVATE" && Array.isArray(members)) {
+      const updatedMembers = [userId]
+      members.forEach((mId) => {
+        if (mId && !updatedMembers.includes(mId.toString())) {
+          updatedMembers.push(mId)
+        }
+      })
+      channel.members = updatedMembers
+    }
+
+    await channel.save()
+
+    return res.json({
+      message: "Channel updated successfully",
+      channel: {
+        id: channel._id,
+        name: channel.name,
+        description: channel.description,
+        type: channel.type,
+      },
+    })
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message })
+  }
+}
+
+const deleteChannel = async (req, res) => {
+  try {
+    const { workspaceId, channelId } = req.params
+    const userId = req.userId
+
+    const requesterMembership = await WorkspaceMembership.findOne({ userId, workspaceId })
+    if (!requesterMembership || !["OWNER", "ADMIN"].includes(requesterMembership.role)) {
+      return res.status(403).json({ message: "You do not have permission to delete channels" })
+    }
+
+    const totalChannels = await Channel.countDocuments({ workspaceId })
+    if (totalChannels <= 1) {
+      return res.status(400).json({ message: "Cannot delete the only channel in the workspace" })
+    }
+
+    const channel = await Channel.findOne({ _id: channelId, workspaceId })
+    if (!channel) {
+      return res.status(404).json({ message: "Channel not found" })
+    }
+
+    await Channel.deleteOne({ _id: channelId, workspaceId })
+
+    return res.json({ message: "Channel deleted successfully" })
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message })
+  }
+}
 
 const getWorkspaceChannels = async (req, res) => {
   try {
@@ -193,83 +270,7 @@ const removeChannelMember = async (req, res) => {
 }
 
 
-const updateChannel = async (req, res) => {
-  try {
-    const { workspaceId, channelId } = req.params
-    const { name, description, members } = req.body
-    const userId = req.userId
 
-    const requesterMembership = await WorkspaceMembership.findOne({ userId, workspaceId })
-    if (!requesterMembership || !["OWNER", "ADMIN"].includes(requesterMembership.role)) {
-      return res.status(403).json({ message: "You do not have permission to edit channels" })
-    }
-
-    const channel = await Channel.findOne({ _id: channelId, workspaceId })
-    if (!channel) {
-      return res.status(404).json({ message: "Channel not found" })
-    }
-
-    if (name && name.trim()) {
-      channel.name = name.trim().toLowerCase().replace(/\s+/g, "-")
-    }
-
-    if (typeof description === "string") {
-      channel.description = description.trim()
-    }
-
-    if (channel.type === "PRIVATE" && Array.isArray(members)) {
-      const updatedMembers = [userId]
-      members.forEach((mId) => {
-        if (mId && !updatedMembers.includes(mId.toString())) {
-          updatedMembers.push(mId)
-        }
-      })
-      channel.members = updatedMembers
-    }
-
-    await channel.save()
-
-    return res.json({
-      message: "Channel updated successfully",
-      channel: {
-        id: channel._id,
-        name: channel.name,
-        description: channel.description,
-        type: channel.type,
-      },
-    })
-  } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
-  }
-}
-
-const deleteChannel = async (req, res) => {
-  try {
-    const { workspaceId, channelId } = req.params
-    const userId = req.userId
-
-    const requesterMembership = await WorkspaceMembership.findOne({ userId, workspaceId })
-    if (!requesterMembership || !["OWNER", "ADMIN"].includes(requesterMembership.role)) {
-      return res.status(403).json({ message: "You do not have permission to delete channels" })
-    }
-
-    const totalChannels = await Channel.countDocuments({ workspaceId })
-    if (totalChannels <= 1) {
-      return res.status(400).json({ message: "Cannot delete the only channel in the workspace" })
-    }
-
-    const channel = await Channel.findOne({ _id: channelId, workspaceId })
-    if (!channel) {
-      return res.status(404).json({ message: "Channel not found" })
-    }
-
-    await Channel.deleteOne({ _id: channelId, workspaceId })
-
-    return res.json({ message: "Channel deleted successfully" })
-  } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
-  }
-}
 
 export {
   createChannel,

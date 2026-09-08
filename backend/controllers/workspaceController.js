@@ -81,7 +81,7 @@ const getUserWorkspaces = async (req, res) => {
   }
 };
 
-const getWorkspace = async (req, res) => {
+const getWorkspace = async (req, res) => { 
   try {
     const { workspaceId } = req.params;
     const userId = req.userId;

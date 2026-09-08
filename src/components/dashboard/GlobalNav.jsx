@@ -21,12 +21,12 @@ const GlobalNav = ({ user }) => {
       }
       localStorage.removeItem("worknestToken")
       clearAuth()
-      toast.success(data.message || "Logout successful")
+      toast.error(data.message || "Logout successful")
       navigate("/")
     } catch {
       localStorage.removeItem("worknestToken")
       clearAuth()
-      toast.success("Logout successful")
+      toast.error("Logout successful")
       navigate("/")
     }
   }

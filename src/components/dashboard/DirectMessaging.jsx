@@ -2,12 +2,18 @@ import { useState, useEffect, useRef } from "react"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import {
   sendDirectMessage,
+  editDirectMessage,
+  deleteDirectMessage,
   onDirectMessageReceived,
   onDirectMessageSent,
   onDirectMessageError,
+  onDirectMessageEdited,
+  onDirectMessageDeleted,
   offDirectMessageReceived,
   offDirectMessageSent,
   offDirectMessageError,
+  offDirectMessageEdited,
+  offDirectMessageDeleted,
 } from "../../services/socket"
 import MessageThread from "./MessageThread"
 
@@ -105,16 +111,42 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
     setError(error.message || "Failed to send message")
   }
 
-  // Setup socket listeners
+  // Handle edit — update the message in place without touching messageIdsRef
+  const handleDirectMessageEdited = (payload) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id?.toString() === payload.id?.toString()
+          ? { ...m, content: payload.content, isEdited: true, updatedAt: payload.updatedAt }
+          : m
+      )
+    )
+  }
+
+  // Handle delete — mark as deleted in place without touching messageIdsRef
+  const handleDirectMessageDeleted = (payload) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id?.toString() === payload.id?.toString()
+          ? { ...m, isDeleted: true, content: null }
+          : m
+      )
+    )
+  }
+
+  // Setup socket listeners — all registered in one effect, all cleaned up together
   useEffect(() => {
     onDirectMessageReceived(handleDirectMessageReceived)
     onDirectMessageSent(handleDirectMessageSent)
     onDirectMessageError(handleDirectMessageError)
+    onDirectMessageEdited(handleDirectMessageEdited)
+    onDirectMessageDeleted(handleDirectMessageDeleted)
 
     return () => {
       offDirectMessageReceived(handleDirectMessageReceived)
       offDirectMessageSent(handleDirectMessageSent)
       offDirectMessageError(handleDirectMessageError)
+      offDirectMessageEdited(handleDirectMessageEdited)
+      offDirectMessageDeleted(handleDirectMessageDeleted)
     }
   }, [currentSelectedUser])
 
@@ -131,6 +163,16 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
     }
   }
 
+  // Emit edit to server via socket
+  const handleEditMessage = (messageId, newContent) => {
+    editDirectMessage(messageId, newContent)
+  }
+
+  // Emit delete to server via socket
+  const handleDeleteMessage = (messageId) => {
+    deleteDirectMessage(messageId)
+  }
+
   return (
     <MessageThread
       selectedUser={currentSelectedUser}
@@ -138,6 +180,8 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
       loading={loading}
       error={error}
       onSendMessage={handleSendMessage}
+      onEditMessage={handleEditMessage}
+      onDeleteMessage={handleDeleteMessage}
       currentUserId={user?.id}
     />
   )

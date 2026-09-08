@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { getPermissions, getRoleDisplayName } from "../../utils/permissions"
 import { toast } from "react-toastify"
-import socket from "../../services/socket"
+import socket, { joinChannel, leaveChannel } from "../../services/socket"
 import CreateChannelModal from "./CreateChannelModal"
 import EditChannelModal from "./EditChannelModal"
 import DeleteChannelModal from "./DeleteChannelModal"
@@ -23,6 +23,15 @@ export const getWorkspaceInitials = (name) => {
     return words[0].charAt(0).toUpperCase()
   }
   return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+}
+
+const readUnreadCounts = (key) => {
+  try {
+    const storedCounts = localStorage.getItem(key)
+    return storedCounts ? JSON.parse(storedCounts) : {}
+  } catch {
+    return {}
+  }
 }
 
 const SlackShell = () => {
@@ -73,6 +82,14 @@ const SlackShell = () => {
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
   const [selectedDMUser, setSelectedDMUser] = useState(null)
   const [unreadDMCounts, setUnreadDMCounts] = useState({})
+  const [unreadChannelCounts, setUnreadChannelCounts] = useState({})
+  const joinedChannelIdsRef = useRef(new Set())
+  const hydratedUnreadKeyRef = useRef(null)
+  const skipUnreadPersistRef = useRef(false)
+
+  const unreadStorageKey = user?.id && workspaceId
+    ? `worknestUnread:${user.id}:${workspaceId}`
+    : null
 
   // Load selected workspace if ID changed
   useEffect(() => {
@@ -166,9 +183,70 @@ const SlackShell = () => {
   }, [directMessageMembers, selectedDMUser?.id, user?.id])
 
   useEffect(() => {
-    setUnreadDMCounts({})
+    const availableChannelIds = new Set(channels.map((channel) => channel.id.toString()))
+
+    joinedChannelIdsRef.current.forEach((channelId) => {
+      if (!availableChannelIds.has(channelId)) leaveChannel(channelId)
+    })
+
+    const joinAccessibleChannels = () => {
+      channels.forEach((channel) => joinChannel(channel.id))
+    }
+
+    joinAccessibleChannels()
+    socket.on("connect", joinAccessibleChannels)
+    joinedChannelIdsRef.current = availableChannelIds
+
+    return () => socket.off("connect", joinAccessibleChannels)
+  }, [channels])
+
+  useEffect(() => {
+    const handleChannelMessage = (message) => {
+      const messageChannelId = message?.channelId?.toString()
+      const currentUserId = user?.id?.toString()
+
+      if (
+        !messageChannelId ||
+        message?.senderId?.toString() === currentUserId ||
+        messageChannelId === currentChannel?.id?.toString() ||
+        !channels.some((channel) => channel.id.toString() === messageChannelId)
+      ) {
+        return
+      }
+
+      setUnreadChannelCounts((counts) => ({
+        ...counts,
+        [messageChannelId]: (counts[messageChannelId] || 0) + 1,
+      }))
+    }
+
+    socket.on("receive-channel-message", handleChannelMessage)
+    return () => socket.off("receive-channel-message", handleChannelMessage)
+  }, [channels, currentChannel?.id, user?.id])
+
+  useEffect(() => {
+    if (!unreadStorageKey) return
+
+    const storedCounts = readUnreadCounts(unreadStorageKey)
+    skipUnreadPersistRef.current = true
+    setUnreadDMCounts(storedCounts.dms || {})
+    setUnreadChannelCounts(storedCounts.channels || {})
+    hydratedUnreadKeyRef.current = unreadStorageKey
     setSelectedDMUser(null)
-  }, [workspaceId])
+  }, [unreadStorageKey])
+
+  useEffect(() => {
+    if (!unreadStorageKey || hydratedUnreadKeyRef.current !== unreadStorageKey) return
+    if (skipUnreadPersistRef.current) {
+      skipUnreadPersistRef.current = false
+      return
+    }
+
+    localStorage.setItem(
+      unreadStorageKey,
+      JSON.stringify({ dms: unreadDMCounts, channels: unreadChannelCounts }),
+    )
+  }, [unreadStorageKey, unreadDMCounts, unreadChannelCounts])
 
   const handleSelectWorkspace = async (id) => {
     if (!id || id === workspaceId) return
@@ -178,6 +256,11 @@ const SlackShell = () => {
 
   const handleSelectChannel = (chan) => {
     setSelectedDMUser(null)
+    setUnreadChannelCounts((counts) => {
+      const nextCounts = { ...counts }
+      delete nextCounts[chan.id.toString()]
+      return nextCounts
+    })
     setActiveChannelMenuId(null)
     navigate(`/app/workspace/${workspaceId}/channel/${chan.id}`)
   }
@@ -207,12 +290,12 @@ const SlackShell = () => {
       }
       localStorage.removeItem("worknestToken")
       clearAuth()
-      toast.success(data.message || "Logout successful")
+      toast.error(data.message || "Logout successful")
       navigate("/")
     } catch {
       localStorage.removeItem("worknestToken")
       clearAuth()
-      toast.success("Logout successful")
+      toast.error("Logout successful")
       navigate("/")
     }
   }
@@ -223,7 +306,7 @@ const SlackShell = () => {
     }
     try {
       await removeMember(memberId)
-      toast.success(`${memberName} has been removed from the workspace`)
+      toast.error(`${memberName} has been removed from the workspace`)
     } catch (err) {
       toast.error(err.message || "Failed to remove member")
     }
@@ -273,7 +356,7 @@ const SlackShell = () => {
     try {
       await removeChannelMember(activeChannel.id, member.id)
       await refreshChannelDetails()
-      toast.success(`${member.username} removed from channel`)
+      toast.error(`${member.username} removed from channel`)
     } catch (err) {
       toast.error(err.message || "Failed to remove member from channel")
     } finally {
@@ -626,19 +709,26 @@ const SlackShell = () => {
                               handleSelectChannel(chan)
                             }
                           }}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-md font-medium transition ${
+                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-md font-medium transition ${
                             isActive
                               ? "bg-[#395B64] text-white shadow-xs font-semibold"
                               : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
                             {chan.type === "PRIVATE" ? (
                               <i className="fa-solid fa-lock text-[10px] text-[#A5C9CA] w-3.5" />
                             ) : (
                               <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center">#</span>
                             )}
-                            <span className="truncate">{chan.name}</span>
+                            <span className="min-w-0 flex-1 truncate">{chan.name}</span>
+                            {unreadChannelCounts[chan.id.toString()] > 0 && (
+                              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                                {unreadChannelCounts[chan.id.toString()] > 99
+                                  ? "99+"
+                                  : unreadChannelCounts[chan.id.toString()]}
+                              </span>
+                            )}
                           </div>
 
                           {/* Channel Action Dots (Owner/Admin only) */}
@@ -649,7 +739,7 @@ const SlackShell = () => {
                                 e.stopPropagation()
                                 setActiveChannelMenuId(isMenuOpen ? null : chan.id)
                               }}
-                              className={`h-5 w-5 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
                                 isMenuOpen ? "flex" : "hidden group-hover:flex"
                               }`}
                               title="Channel options"

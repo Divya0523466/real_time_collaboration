@@ -73,8 +73,9 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
+          placeholder="Your full name"
           autoComplete="name"
-          className="w-full rounded-lg border border-[#ccc] px-4 py-3 font-normal text-[#2C3333] outline-none transition focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
+          className="w-full rounded-lg border border-[#A5C9CA] bg-white px-4 py-3 font-normal text-[#2C3333] outline-none transition placeholder:text-[#52656A]/55 focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
         />
       </label>
 
@@ -85,8 +86,9 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          placeholder="you@example.com"
           autoComplete="email"
-          className="w-full rounded-lg border border-[#ccc] px-4 py-3 font-normal text-[#2C3333] outline-none transition focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
+          className="w-full rounded-lg border border-[#A5C9CA] bg-white px-4 py-3 font-normal text-[#2C3333] outline-none transition placeholder:text-[#52656A]/55 focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
         />
       </label>
 
@@ -97,8 +99,9 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          placeholder="Create a password"
           autoComplete="new-password"
-          className="w-full rounded-lg border border-[#ccc] px-4 py-3 font-normal text-[#2C3333] outline-none transition focus:border-[#395B64] focus:ring-2 focus:ring-[#ccc]"
+          className="w-full rounded-lg border border-[#A5C9CA] bg-white px-4 py-3 font-normal text-[#2C3333] outline-none transition placeholder:text-[#52656A]/55 focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
         />
       </label>
 
@@ -109,8 +112,9 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
           type="password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
+          placeholder="Repeat your password"
           autoComplete="new-password"
-          className="w-full rounded-lg border border-[#ccc] px-4 py-3 font-normal text-[#2C3333] outline-none transition focus:border-[#395B64] focus:ring-2 focus:ring-[#ccc]"
+          className="w-full rounded-lg border border-[#A5C9CA] bg-white px-4 py-3 font-normal text-[#2C3333] outline-none transition placeholder:text-[#52656A]/55 focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
         />
       </label>
 

@@ -22,7 +22,7 @@ const DeleteWorkspaceModal = ({ workspace, onClose }) => {
     setIsLoading(true)
     try {
       await deleteWorkspace()
-      toast.success(`Workspace "${workspace.name}" was permanently deleted`)
+      toast.error(`Workspace "${workspace.name}" was permanently deleted`)
       onClose()
       navigate("/app/dashboard")
     } catch (err) {
