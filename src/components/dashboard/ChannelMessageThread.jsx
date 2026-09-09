@@ -10,6 +10,8 @@ import socket, {
   offChannelMessageEdited,
   offChannelMessageDeleted,
 } from "../../services/socket"
+import FileUpload from "../common/FileUpload"
+import MessageContent from "../common/MessageContent"
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -20,6 +22,16 @@ const formatTime = (dateStr) =>
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
   AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
+
+/** Detect if content is an uploaded image or file (disable editing) */
+const isImageOrFileMessage = (content) => {
+  if (!content) return false
+  const lower = content.toLowerCase()
+  return (
+    lower.includes("res.cloudinary.com") ||
+    lower.match(/\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt)(\?.*)?$/i) !== null
+  )
+}
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -118,7 +130,13 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
         </button>
       </div>
       {/* Input row */}
-      <div className="flex items-end gap-2 px-3 py-2">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <FileUpload
+          buttonClassName="flex items-center justify-center h-7 w-7 rounded-md text-[#52656A] hover:text-[#395B64] hover:bg-[#E7F6F2] transition-colors disabled:opacity-50"
+          iconClassName="text-xs"
+          onUploadSuccess={(file) => setValue((prev) => (prev ? `${prev}\n${file.url}` : file.url))}
+          onUploadError={(err) => alert(err)}
+        />
         <textarea
           ref={textareaRef}
           value={value}
@@ -128,7 +146,7 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
           rows={1}
           className="flex-1 resize-none bg-transparent text-sm text-[#2C3333] outline-none placeholder:text-[#52656A]/50 leading-5 py-0.5"
         />
-        <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
             type="button"
             disabled={!value.trim()}
@@ -171,6 +189,7 @@ const MessageRow = ({
   const isSender = message.senderId?.toString() === currentUserId?.toString()
   const isDeleted = message.isDeleted === true
   const isBeingEdited = editingState?.messageId === message.id?.toString()
+  const isImageOrFile = isImageOrFileMessage(message.content)
   const username = message.sender?.username || "User"
 
   // Show orphan reference only when a reply is displayed as a root-level message
@@ -252,7 +271,7 @@ const MessageRow = ({
           ) : isDeleted ? (
             <p className="text-sm italic text-[#52656A] opacity-50">This message was deleted</p>
           ) : (
-            <p className="text-sm text-[#2C3333] leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+            <MessageContent content={message.content} isSender={isSender} className="text-sm text-[#2C3333] leading-relaxed" />
           )}
         </div>
 
@@ -276,20 +295,24 @@ const MessageRow = ({
             )}
             {isSender && !isDeleted && (
               <>
-                <div className="w-px h-3.5 bg-[#E0E7E6] mx-0.5" />
-                <div className="group/tip relative">
-                  <button
-                    type="button"
-                    onClick={() => onStartEdit(message)}
-                    aria-label="Edit message"
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] hover:text-[#395B64] hover:bg-[#E7F6F2] transition-colors"
-                  >
-                    <i className="fa-solid fa-pen text-[10px]" />
-                  </button>
-                  <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
-                    Edit
-                  </span>
-                </div>
+                {!isImageOrFile && (
+                  <>
+                    <div className="w-px h-3.5 bg-[#E0E7E6] mx-0.5" />
+                    <div className="group/tip relative">
+                      <button
+                        type="button"
+                        onClick={() => onStartEdit(message)}
+                        aria-label="Edit message"
+                        className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] hover:text-[#395B64] hover:bg-[#E7F6F2] transition-colors"
+                      >
+                        <i className="fa-solid fa-pen text-[10px]" />
+                      </button>
+                      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                        Edit
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="group/tip relative">
                   <button
                     type="button"
@@ -355,6 +378,7 @@ ReplyCountBadge.propTypes = { count: PropTypes.number.isRequired, onClick: PropT
 const ChannelMessageThread = ({ channel, currentUserId }) => {
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState("")
+  const [attachedFile, setAttachedFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -501,11 +525,19 @@ const ChannelMessageThread = ({ channel, currentUserId }) => {
   // ── Actions ────────────────────────────────────────────────────────────────
 
   const handleSendNewMessage = () => {
-    const content = inputValue.trim()
-    if (!content || !channel?.id) return
+    const text = inputValue.trim()
+    if (!text && !attachedFile) return
+    if (!channel?.id) return
     if (!socket.connected) { setError("Socket is not connected. Please try again."); return }
+
+    let content = text
+    if (attachedFile) {
+      content = text ? `${text}\n${attachedFile.url}` : attachedFile.url
+    }
+
     sendChannelMessage(channel.id, content, null)
     setInputValue("")
+    setAttachedFile(null)
   }
 
   const handleKeyDown = (e) => {
@@ -729,7 +761,30 @@ const ChannelMessageThread = ({ channel, currentUserId }) => {
           </div>
         )}
 
-        <div className="flex gap-3 rounded-xl border border-[#D0DCDB] bg-[#F8FAFB] px-4 py-2.5 focus-within:border-[#395B64] focus-within:bg-white focus-within:ring-1 focus-within:ring-[#E7F6F2] transition-all">
+        {/* Attached file preview chip */}
+        {attachedFile && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#E7F6F2] px-3 py-1.5 text-xs text-[#2C3333] border border-[#A5C9CA]">
+            <div className="flex items-center gap-2 truncate">
+              <i className="fa-solid fa-paperclip text-[#395B64]" />
+              <span className="font-medium truncate">{attachedFile.originalName}</span>
+              <span className="text-[10px] text-[#52656A]">({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAttachedFile(null)}
+              className="text-[#52656A] hover:text-rose-500 transition-colors p-1"
+              title="Remove attachment"
+            >
+              <i className="fa-solid fa-xmark text-xs" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 rounded-xl border border-[#D0DCDB] bg-[#F8FAFB] px-3 py-2 focus-within:border-[#395B64] focus-within:bg-white focus-within:ring-1 focus-within:ring-[#E7F6F2] transition-all">
+          <FileUpload
+            onUploadSuccess={(file) => setAttachedFile(file)}
+            onUploadError={(err) => setError(err)}
+          />
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -741,8 +796,8 @@ const ChannelMessageThread = ({ channel, currentUserId }) => {
           <button
             type="button"
             onClick={handleSendNewMessage}
-            disabled={!inputValue.trim()}
-            className="flex items-center gap-1.5 self-end rounded-lg bg-[#395B64] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex-shrink-0"
+            disabled={!inputValue.trim() && !attachedFile}
+            className="flex items-center gap-1.5 self-center rounded-lg bg-[#395B64] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex-shrink-0"
           >
             Send <i className="fa-solid fa-paper-plane text-[9px]" />
           </button>

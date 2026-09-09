@@ -1,5 +1,17 @@
 import { useState, useEffect, useRef } from "react"
 import PropTypes from "prop-types"
+import FileUpload from "../common/FileUpload"
+import MessageContent from "../common/MessageContent"
+
+/** Detect if content is an uploaded image or file (disable editing) */
+const isImageOrFileMessage = (content) => {
+  if (!content) return false
+  const lower = content.toLowerCase()
+  return (
+    lower.includes("res.cloudinary.com") ||
+    lower.match(/\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt)(\?.*)?$/i) !== null
+  )
+}
 
 const MessageThread = ({
   selectedUser,
@@ -12,6 +24,8 @@ const MessageThread = ({
   currentUserId,
 }) => {
   const [inputValue, setInputValue] = useState("")
+  const [attachedFile, setAttachedFile] = useState(null)
+  const [uploadError, setUploadError] = useState(null)
   // editingState: { messageId: string, draftContent: string } | null
   const [editingState, setEditingState] = useState(null)
   const messagesEndRef = useRef(null)
@@ -22,10 +36,17 @@ const MessageThread = ({
   }, [messages])
 
   const handleSendClick = () => {
-    if (inputValue.trim()) {
-      onSendMessage(inputValue)
-      setInputValue("")
+    const text = inputValue.trim()
+    if (!text && !attachedFile) return
+
+    let content = text
+    if (attachedFile) {
+      content = text ? `${text}\n${attachedFile.url}` : attachedFile.url
     }
+
+    onSendMessage(content)
+    setInputValue("")
+    setAttachedFile(null)
   }
 
   const handleKeyPress = (e) => {
@@ -142,8 +163,8 @@ const MessageThread = ({
                     ) : isDeleted ? (
                       <p className="text-xs italic opacity-60">This message was deleted</p>
                     ) : (
-                      <div className="flex items-end gap-2">
-                        <p className="wrap-break-word">{message.content}</p>
+                      <div className="flex flex-col gap-1">
+                        <MessageContent content={message.content} isSender={isSender} />
                         <p
                           className={`shrink-0 text-[10px] leading-4 ${
                             isSender ? "text-[#A5C9CA]" : "text-[#52656A]"
@@ -164,14 +185,16 @@ const MessageThread = ({
                   {/* Hover action row — own messages only, hidden until group-hover */}
                   {isSender && !isDeleted && !isBeingEdited && (
                     <div className="mt-0.5 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(message)}
-                        className="rounded px-1.5 py-0.5 text-[10px] text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#395B64]"
-                        title="Edit"
-                      >
-                        <i className="fa-solid fa-pen mr-0.5" />Edit
-                      </button>
+                      {!isImageOrFileMessage(message.content) && (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(message)}
+                          className="rounded px-1.5 py-0.5 text-[10px] text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#395B64]"
+                          title="Edit"
+                        >
+                          <i className="fa-solid fa-pen mr-0.5" />Edit
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => onDeleteMessage(message.id?.toString())}
@@ -192,7 +215,51 @@ const MessageThread = ({
 
       {/* Input Area */}
       <div className="border-t border-[#E0E7E6] bg-[#F8FAFB] p-4">
-        <div className="flex gap-2">
+        {/* Attached file preview chip */}
+        {attachedFile && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#E7F6F2] px-3 py-1.5 text-xs text-[#2C3333] border border-[#A5C9CA]">
+            <div className="flex items-center gap-2 truncate">
+              <i className="fa-solid fa-paperclip text-[#395B64]" />
+              <span className="font-medium truncate">{attachedFile.originalName}</span>
+              <span className="text-[10px] text-[#52656A]">({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAttachedFile(null)}
+              className="text-[#52656A] hover:text-rose-500 transition-colors p-1"
+              title="Remove attachment"
+            >
+              <i className="fa-solid fa-xmark text-xs" />
+            </button>
+          </div>
+        )}
+
+        {/* Upload error banner */}
+        {uploadError && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 border border-rose-200">
+            <div className="flex items-center gap-1.5 truncate">
+              <i className="fa-solid fa-circle-exclamation text-rose-500 shrink-0" />
+              <span className="truncate">{uploadError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUploadError(null)}
+              className="text-rose-500 hover:text-rose-700 p-0.5"
+            >
+              <i className="fa-solid fa-xmark text-xs" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <FileUpload
+            onUploadSuccess={(file) => {
+              setAttachedFile(file);
+              setUploadError(null);
+            }}
+            onUploadError={(err) => setUploadError(err)}
+          />
+
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -205,7 +272,7 @@ const MessageThread = ({
           <button
             type="button"
             onClick={handleSendClick}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() && !attachedFile}
             className="rounded-lg bg-[#395B64] px-4 py-2 font-medium text-white transition hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Send

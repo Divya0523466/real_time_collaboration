@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary upload directories
+public/temp/*
+!public/temp/.gitkeep
+backend/public/temp/*
+!backend/public/temp/.gitkeep
