@@ -9,12 +9,13 @@ import User from "./models/User.js";
 import Message from "./models/Message.js";
 import ChannelMessage from "./models/ChannelMessage.js";
 import getChannelAccess from "./utils/channelAccess.js";
-import { formatChannelMessage, buildReplyToMessage } from "./controllers/messageController.js";
+import { formatChannelMessage } from "./controllers/messageController.js";
 import authRoutes from "./routes/authRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import workspaceRoutes from "./routes/workspaceRoutes.js";
 import channelRoutes from "./routes/channelRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use("/api/workspaces", invitationRoutes);
 app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/workspaces", channelRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/uploads", uploadRoutes);
 
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
