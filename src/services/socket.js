@@ -122,4 +122,15 @@ export const offChannelMessageDeleted = (callback) => {
   socket.off("channel-message-deleted", callback)
 }
 
+// ── Notifications ───────────────────────────────────────────────────────────
+
+export const onNotificationReceived = (callback) => {
+  socket.on("receive-notification", callback)
+}
+
+export const offNotificationReceived = (callback) => {
+  socket.off("receive-notification", callback)
+}
+
 export default socket
+

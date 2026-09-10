@@ -1,5 +1,6 @@
 import Channel from "../models/Channel.js"
 import WorkspaceMembership from "../models/WorkspaceMembership.js"
+import { createAndSendNotification } from "../utils/notificationService.js"
 
 
 const createChannel = async (req, res) => {
@@ -38,6 +39,23 @@ const createChannel = async (req, res) => {
       createdBy: userId,
       members: initialMembers,
     })
+
+    if (channelType === "PRIVATE" && Array.isArray(members)) {
+      const io = req.app.get("io")
+      for (const mId of initialMembers) {
+        if (mId.toString() !== userId.toString()) {
+          createAndSendNotification(io, {
+            recipientId: mId,
+            actorId: userId,
+            type: "CHANNEL_INVITED",
+            title: `Added to private channel #${channel.name}`,
+            message: `You were added to the private channel #${channel.name}.`,
+            workspaceId,
+            channelId: channel._id,
+          })
+        }
+      }
+    }
 
     return res.status(201).json({
       message: "Channel created successfully",
@@ -78,6 +96,7 @@ const updateChannel = async (req, res) => {
     }
 
     if (channel.type === "PRIVATE" && Array.isArray(members)) {
+      const prevMembers = (channel.members || []).map((m) => m.toString())
       const updatedMembers = [userId]
       members.forEach((mId) => {
         if (mId && !updatedMembers.includes(mId.toString())) {
@@ -85,6 +104,24 @@ const updateChannel = async (req, res) => {
         }
       })
       channel.members = updatedMembers
+
+      const newlyAdded = updatedMembers.filter(
+        (mId) => !prevMembers.includes(mId.toString()) && mId.toString() !== userId.toString()
+      )
+      if (newlyAdded.length > 0) {
+        const io = req.app.get("io")
+        for (const mId of newlyAdded) {
+          createAndSendNotification(io, {
+            recipientId: mId,
+            actorId: userId,
+            type: "CHANNEL_ADDED",
+            title: `Added to #${channel.name}`,
+            message: `You were added to the private channel #${channel.name}.`,
+            workspaceId,
+            channelId: channel._id,
+          })
+        }
+      }
     }
 
     await channel.save()
@@ -237,6 +274,35 @@ const addChannelMember = async (req, res) => {
     if (!channel.members.includes(memberId)) {
       channel.members.push(memberId)
       await channel.save()
+
+      const io = req.app.get("io")
+      createAndSendNotification(io, {
+        recipientId: memberId,
+        actorId: userId,
+        type: "CHANNEL_ADDED",
+        title: `Added to #${channel.name}`,
+        message: `You were added to the channel #${channel.name}.`,
+        workspaceId,
+        channelId: channel._id,
+      })
+
+      if (io) {
+        io.to(`user:${memberId}`).emit("channel-member-added", {
+          workspaceId,
+          channel: {
+            id: channel._id.toString(),
+            name: channel.name,
+            description: channel.description,
+            type: channel.type,
+          },
+        })
+        io.to(`channel:${channel._id}`).emit("channel-updated", {
+          workspaceId,
+          channelId: channel._id.toString(),
+          memberId: memberId.toString(),
+          action: "added",
+        })
+      }
     }
 
     return res.json({ message: "Member added to channel successfully" })
@@ -262,6 +328,47 @@ const removeChannelMember = async (req, res) => {
 
     channel.members = channel.members.filter((m) => m.toString() !== memberId.toString())
     await channel.save()
+
+    const io = req.app.get("io")
+    const onlineUsers = req.app.get("onlineUsers")
+
+    if (io && onlineUsers) {
+      const userSockets = onlineUsers.get(memberId.toString())
+      if (userSockets) {
+        userSockets.forEach((socketId) => {
+          const sock = io.sockets.sockets.get(socketId)
+          if (sock) {
+            sock.leave(`channel:${channel._id}`)
+          }
+        })
+      }
+    }
+
+    createAndSendNotification(io, {
+      recipientId: memberId,
+      actorId: userId,
+      type: "CHANNEL_REMOVED",
+      title: `Removed from #${channel.name}`,
+      message: `You were removed from the channel #${channel.name}.`,
+      workspaceId,
+      channelId: channel._id,
+    })
+
+    if (io) {
+      io.to(`user:${memberId}`).emit("channel-member-removed", {
+        workspaceId,
+        channelId: channel._id.toString(),
+        channelName: channel.name,
+        type: channel.type,
+        memberId: memberId.toString(),
+      })
+      io.to(`channel:${channel._id}`).emit("channel-updated", {
+        workspaceId,
+        channelId: channel._id.toString(),
+        memberId: memberId.toString(),
+        action: "removed",
+      })
+    }
 
     return res.json({ message: "Member removed from channel successfully" })
   } catch (error) {

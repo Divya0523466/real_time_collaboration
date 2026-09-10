@@ -3,6 +3,7 @@ import Invitation from "../models/Invitation.js"
 import Workspace from "../models/Workspace.js"
 import WorkspaceMembership from "../models/WorkspaceMembership.js"
 import User from "../models/User.js"
+import { createAndSendNotification } from "../utils/notificationService.js"
 
 const inviteMembers = async (req, res) => {
   try {
@@ -42,6 +43,17 @@ const inviteMembers = async (req, res) => {
             userId: existingUser._id,
             workspaceId,
             role: inviteRole,
+          })
+
+          const io = req.app.get("io")
+          const workspace = await Workspace.findById(workspaceId).select("name")
+          await createAndSendNotification(io, {
+            recipientId: existingUser._id,
+            actorId: userId,
+            type: "WORKSPACE_ADDED",
+            title: `Added to ${workspace?.name || "Workspace"}`,
+            message: `You were added to ${workspace?.name || "a workspace"} as a ${inviteRole.toLowerCase()}.`,
+            workspaceId,
           })
         }
         continue
@@ -155,6 +167,18 @@ const acceptInvitation = async (req, res) => {
     invitation.status = "ACCEPTED"
     await invitation.save()
 
+    const io = req.app.get("io")
+    if (invitation.invitedBy) {
+      await createAndSendNotification(io, {
+        recipientId: invitation.invitedBy,
+        actorId: currentUser._id,
+        type: "WORKSPACE_INVITE_ACCEPTED",
+        title: "Invitation Accepted",
+        message: `${currentUser.username || currentUser.email} accepted your invitation to ${workspace.name}.`,
+        workspaceId: workspace._id,
+      })
+    }
+
     return res.json({
       message: "Invitation accepted successfully",
       invitation: {
@@ -182,7 +206,7 @@ const declineInvitation = async (req, res) => {
       return res.status(400).json({ message: "Invalid invitation ID" })
     }
 
-    const currentUser = await User.findById(userId).select("_id email")
+    const currentUser = await User.findById(userId).select("_id email username")
     if (!currentUser) {
       return res.status(404).json({ message: "User not found" })
     }
@@ -199,6 +223,19 @@ const declineInvitation = async (req, res) => {
 
     invitation.status = "DECLINED"
     await invitation.save()
+
+    const io = req.app.get("io")
+    if (invitation.invitedBy) {
+      const workspace = await Workspace.findById(invitation.workspaceId).select("name")
+      await createAndSendNotification(io, {
+        recipientId: invitation.invitedBy,
+        actorId: currentUser._id,
+        type: "WORKSPACE_INVITE_DECLINED",
+        title: "Invitation Declined",
+        message: `${currentUser.username || currentUser.email} declined your invitation to ${workspace?.name || "the workspace"}.`,
+        workspaceId: invitation.workspaceId,
+      })
+    }
 
     return res.json({
       message: "Invitation declined successfully",

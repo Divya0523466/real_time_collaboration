@@ -1,4 +1,3 @@
-import PropTypes from "prop-types";
 
 // Helper to test if a string is a valid URL
 const isUrl = (string) => {
@@ -32,7 +31,7 @@ const getFileNameFromUrl = (url) => {
   }
 };
 
-const MessageContent = ({ content, isSender, className = "" }) => {
+const MessageContent = ({ content = "", isSender = false, className = "" }) => {
   if (!content) return null;
 
   // Split content by whitespace / lines to find URLs
@@ -186,18 +185,6 @@ const MessageContent = ({ content, isSender, className = "" }) => {
   }
 
   return <div className={`wrap-break-word ${className}`}>{elements}</div>;
-};
-
-MessageContent.propTypes = {
-  content: PropTypes.string,
-  isSender: PropTypes.bool,
-  className: PropTypes.string,
-};
-
-MessageContent.defaultProps = {
-  content: "",
-  isSender: false,
-  className: "",
 };
 
 export default MessageContent;

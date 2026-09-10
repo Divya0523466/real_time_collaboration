@@ -1,6 +1,13 @@
-/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { toast } from "react-toastify";
 import socket, { connectSocket } from "../services/socket";
+import {
+  fetchNotifications as apiFetchNotifications,
+  fetchUnreadCount as apiFetchUnreadCount,
+  markNotificationAsRead as apiMarkAsRead,
+  markAllNotificationsAsRead as apiMarkAllAsRead,
+  deleteNotification as apiDeleteNotification,
+} from "../services/notificationService";
 
 const WorkspaceContext = createContext();
 
@@ -37,10 +44,58 @@ export const WorkspaceProvider = ({ children }) => {
   const [workspaceData, setWorkspaceData] = useState(null);
   const [channels, setChannels] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL;
+
+  const fetchNotifications = useCallback(async (params = {}) => {
+    try {
+      const data = await apiFetchNotifications(params);
+      setNotifications(data.notifications || []);
+      setUnreadNotificationsCount(data.unreadCount || 0);
+      return data;
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+      return { notifications: [], totalCount: 0, unreadCount: 0 };
+    }
+  }, []);
+
+  const markNotificationAsRead = useCallback(async (id) => {
+    try {
+      const res = await apiMarkAsRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+      );
+      setUnreadNotificationsCount((prev) => (res.unreadCount !== undefined ? res.unreadCount : Math.max(0, prev - 1)));
+    } catch (err) {
+      console.error("Failed to mark notification read:", err);
+    }
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(async () => {
+    try {
+      await apiMarkAllAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadNotificationsCount(0);
+    } catch (err) {
+      console.error("Failed to mark all notifications read:", err);
+    }
+  }, []);
+
+  const deleteNotification = useCallback(async (id) => {
+    try {
+      const res = await apiDeleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n._id !== id));
+      if (res.unreadCount !== undefined) {
+        setUnreadNotificationsCount(res.unreadCount);
+      }
+    } catch (err) {
+      console.error("Failed to delete notification:", err);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -56,16 +111,52 @@ export const WorkspaceProvider = ({ children }) => {
       console.log("Direct message received:", data);
     };
 
+    const handleNotification = (newNotif) => {
+      setNotifications((prev) => [newNotif, ...prev]);
+      setUnreadNotificationsCount((prev) => prev + 1);
+      toast.info(newNotif.title, {
+        icon: "🔔",
+      });
+    };
+
+    const handleChannelMemberRemoved = (data) => {
+      if (!data?.channelId) return;
+      if (data.type === "PRIVATE") {
+        setChannels((prev) =>
+          prev.filter((c) => (c.id || c._id)?.toString() !== data.channelId.toString())
+        );
+      }
+    };
+
+    const handleChannelMemberAdded = (data) => {
+      if (!data?.channel) return;
+      setChannels((prev) => {
+        const exists = prev.some(
+          (c) => (c.id || c._id)?.toString() === (data.channel.id || data.channel._id)?.toString()
+        );
+        if (exists) return prev;
+        return [...prev, data.channel];
+      });
+    };
+
     socket.on("connection-success", handleConnectionSuccess);
     socket.on("receive-direct-message", handleDirectMessage);
+    socket.on("receive-notification", handleNotification);
+    socket.on("channel-member-removed", handleChannelMemberRemoved);
+    socket.on("channel-member-added", handleChannelMemberAdded);
     connectSocket();
+
+    fetchNotifications().catch(console.error);
 
     return () => {
       socket.off("connection-success", handleConnectionSuccess);
       socket.off("receive-direct-message", handleDirectMessage);
+      socket.off("receive-notification", handleNotification);
+      socket.off("channel-member-removed", handleChannelMemberRemoved);
+      socket.off("channel-member-added", handleChannelMemberAdded);
       socket.disconnect();
     };
-  }, [user]);
+  }, [user, fetchNotifications]);
 
   const clearAuth = useCallback(() => {
     localStorage.removeItem("worknestToken");
@@ -77,6 +168,8 @@ export const WorkspaceProvider = ({ children }) => {
     setWorkspaceData(null);
     setChannels([]);
     setInvitations([]);
+    setNotifications([]);
+    setUnreadNotificationsCount(0);
     setError(null);
   }, []);
 
@@ -206,6 +299,32 @@ export const WorkspaceProvider = ({ children }) => {
       }
     },
     [API_URL],
+  );
+
+  const refreshChannels = useCallback(
+    async (workspaceIdToRefresh = selectedWorkspace) => {
+      if (!workspaceIdToRefresh) return [];
+      try {
+        const token = localStorage.getItem("worknestToken");
+        const response = await fetch(
+          `${API_URL}/workspaces/${workspaceIdToRefresh}/channels`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const nextChannels = Array.isArray(data.channels) ? data.channels : [];
+          setChannels(nextChannels);
+          return nextChannels;
+        }
+        return [];
+      } catch (err) {
+        console.error("Error refreshing channels:", err);
+        return [];
+      }
+    },
+    [API_URL, selectedWorkspace],
   );
 
   const createWorkspace = useCallback(
@@ -680,8 +799,15 @@ export const WorkspaceProvider = ({ children }) => {
     removeMember,
     addChannelMember,
     removeChannelMember,
+    refreshChannels,
     acceptInvitation,
     declineInvitation,
+    notifications,
+    unreadNotificationsCount,
+    fetchNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
   };
 
   return (
