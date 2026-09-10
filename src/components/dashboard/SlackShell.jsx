@@ -14,6 +14,7 @@ import EditWorkspaceModal from "./EditWorkspaceModal"
 import DeleteWorkspaceModal from "./DeleteWorkspaceModal"
 import DirectMessaging from "./DirectMessaging"
 import ChannelMessageThread from "./ChannelMessageThread"
+import NotificationPanel from "./NotificationPanel"
 
 export const getWorkspaceInitials = (name) => {
   if (!name || typeof name !== "string") return "W"
@@ -49,11 +50,11 @@ const SlackShell = () => {
     addChannelMember,
     removeChannelMember,
     removeMember,
+    unreadNotificationsCount,
     loading,
     error,
   } = useWorkspace()
 
-  // Workspace Modals & Popovers
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false)
   const [showEditWorkspaceModal, setShowEditWorkspaceModal] = useState(false)
   const [showDeleteWorkspaceModal, setShowDeleteWorkspaceModal] = useState(false)
@@ -61,7 +62,6 @@ const SlackShell = () => {
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
 
-  // Channel Modals
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false)
   const [editingChannel, setEditingChannel] = useState(null)
   const [deletingChannel, setDeletingChannel] = useState(null)
@@ -70,13 +70,12 @@ const SlackShell = () => {
   const [memberToAdd, setMemberToAdd] = useState("")
   const [channelMemberActionLoading, setChannelMemberActionLoading] = useState(false)
 
-  // Panels & Views
+
   const [showDetailsPane, setShowDetailsPane] = useState(false)
   const [showMembersPanel, setShowMembersPanel] = useState(false)
   const [showActivityPanel, setShowActivityPanel] = useState(false)
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null)
 
-  // Sidebar Toggles & Input
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false)
   const [isDMsCollapsed, setIsDMsCollapsed] = useState(false)
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
@@ -91,7 +90,6 @@ const SlackShell = () => {
     ? `worknestUnread:${user.id}:${workspaceId}`
     : null
 
-  // Load selected workspace if ID changed
   useEffect(() => {
     if (!workspaceId) return
     if (!selectedWorkspace || selectedWorkspace !== workspaceId) {
@@ -99,7 +97,6 @@ const SlackShell = () => {
     }
   }, [workspaceId, selectedWorkspace, selectWorkspace])
 
-  // Auto-sync channel from URL or select first channel
   const currentChannel = useMemo(() => {
     if (!channels || channels.length === 0) return null
     if (channelId) {
@@ -143,13 +140,37 @@ const SlackShell = () => {
   }, [currentChannel?.id, getChannel])
 
   const activeChannel = channelDetails?.id === currentChannel?.id ? channelDetails : currentChannel
-
-  // If no channelId in URL but channels are loaded, update URL to default channel
   useEffect(() => {
-    if (workspaceId && channels.length > 0 && !channelId) {
-      navigate(`/app/workspace/${workspaceId}/channel/${channels[0].id}`, { replace: true })
+    if (workspaceId && channels.length > 0) {
+      const hasValidChannel = channelId && channels.some((c) => (c.id || c._id)?.toString() === channelId.toString())
+      if (!hasValidChannel) {
+        navigate(`/app/workspace/${workspaceId}/channel/${channels[0].id}`, { replace: true })
+      }
     }
   }, [workspaceId, channels, channelId, navigate])
+
+  useEffect(() => {
+    const handleChannelMemberRemoved = (data) => {
+      if (data?.channelId && data.channelId.toString() === channelId?.toString()) {
+        toast.info(`You have been removed from #${data.channelName || "the channel"}`)
+        leaveChannel(data.channelId)
+      }
+    }
+
+    const handleChannelUpdated = (data) => {
+      if (data?.channelId && data.channelId.toString() === currentChannel?.id?.toString()) {
+        refreshChannelDetails()
+      }
+    }
+
+    socket.on("channel-member-removed", handleChannelMemberRemoved)
+    socket.on("channel-updated", handleChannelUpdated)
+
+    return () => {
+      socket.off("channel-member-removed", handleChannelMemberRemoved)
+      socket.off("channel-updated", handleChannelUpdated)
+    }
+  }, [channelId, currentChannel?.id])
 
   const selectedRole = workspaceData?.userRole || "MEMBER"
   const permissions = useMemo(() => getPermissions(selectedRole), [selectedRole])
@@ -401,7 +422,7 @@ const SlackShell = () => {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFB] text-[#2C3333]">
       <aside className="flex w-17 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] z-30 select-none">
-        {/* WorkNest Home Icon */}
+       
         <button
           type="button"
           onClick={() => navigate("/app/dashboard")}
@@ -412,8 +433,6 @@ const SlackShell = () => {
         </button>
 
         <div className="w-8 h-px bg-[#395B64]/50 mb-3" />
-
-        {/* Workspaces List with Polished Avatar Icons */}
         <div className="flex w-full flex-1 flex-col items-center gap-2.5 overflow-y-auto px-2">
           {workspaces.map((ws) => {
             const active = ws.id === workspaceId
@@ -438,7 +457,6 @@ const SlackShell = () => {
             )
           })}
 
-          {/* Create Workspace Button */}
           <button
             type="button"
             onClick={() => setShowCreateWorkspaceModal(true)}
@@ -449,7 +467,7 @@ const SlackShell = () => {
           </button>
         </div>
 
-        {/* User Profile Avatar at Bottom */}
+        {/* user profile at the bottom */}
         <div className="relative mt-auto w-full px-2 pt-2">
           <button
             type="button"
@@ -511,10 +529,7 @@ const SlackShell = () => {
           )}
         </div>
       </aside>
-
-      {/* ========================================================
-          2. WORKSPACE SIDEBAR
-      ======================================================== */}
+        {/* Workspace sidebar */}
       <aside className="flex w-64 flex-col bg-[#1E2525] text-[#E7F6F2] border-r border-[#2C3333]/60 select-none z-20">
         {/* Workspace Name & Role Header */}
         <div className="relative border-b border-[#2C3333] px-3.5 py-3 bg-[#1E2525]">
@@ -537,7 +552,6 @@ const SlackShell = () => {
             <i className={`fa-solid fa-chevron-down text-xs text-[#A5C9CA] transition-transform ${showWorkspaceMenu ? "rotate-180" : ""}`} />
           </button>
 
-          {/* Workspace Dropdown Menu */}
           {showWorkspaceMenu && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowWorkspaceMenu(false)} />
@@ -633,8 +647,6 @@ const SlackShell = () => {
             </>
           )}
         </div>
-
-        {/* Global Nav Links (Activity, Threads, Drafts) */}
         <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-0.5">
           <button
             type="button"
@@ -642,29 +654,16 @@ const SlackShell = () => {
             className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
           >
             <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
-            <span>Activity</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => toast.info("Threads feature is coming soon")}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
-          >
-            <i className="fa-solid fa-comments w-4 text-center text-[#A5C9CA]" />
-            <span>Threads</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => toast.info("Drafts & sent feature is coming soon")}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
-          >
-            <i className="fa-solid fa-file-lines w-4 text-center text-[#A5C9CA]" />
-            <span>Drafts & sent</span>
+            <span className="flex-1 text-left">Activity</span>
+            {unreadNotificationsCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                {unreadNotificationsCount}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Scrollable Channel & DM List */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
-          {/* ==================== COLLAPSIBLE CHANNELS SECTION ==================== */}
           <div>
             <div className="flex items-center justify-between px-2 pb-1.5">
               <button
@@ -730,8 +729,7 @@ const SlackShell = () => {
                               </span>
                             )}
                           </div>
-
-                          {/* Channel Action Dots (Owner/Admin only) */}
+                          {/* Channel action buttons */}
                           {(selectedRole === "OWNER" || selectedRole === "ADMIN") && (
                             <button
                               type="button"
@@ -791,8 +789,6 @@ const SlackShell = () => {
               </div>
             )}
           </div>
-
-          {/* ==================== COLLAPSIBLE DIRECT MESSAGES SECTION ==================== */}
           <div>
             <div className="flex items-center justify-between px-2 pb-1.5">
               <button
@@ -866,11 +862,8 @@ const SlackShell = () => {
         </div>
       </aside>
 
-      {/* ========================================================
-          3. MAIN CONVERSATION / CHANNEL AREA
-      ======================================================== */}
+
       <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB]">
-        {/* Main Channel Top Header */}
         <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] bg-white px-6 shadow-xs select-none">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex items-center gap-2 min-w-0">
@@ -892,7 +885,6 @@ const SlackShell = () => {
               <i className="fa-regular fa-star" />
             </button>
 
-            {/* Quick edit channel for Owner/Admin */}
             {!selectedDMUser && currentChannel && (selectedRole === "OWNER" || selectedRole === "ADMIN") && (
               <button
                 type="button"
@@ -915,7 +907,6 @@ const SlackShell = () => {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Members shortcut */}
             <button
               type="button"
               onClick={() => setShowMembersPanel(true)}
@@ -942,18 +933,13 @@ const SlackShell = () => {
           </div>
         </header>
 
-        {/* Center Messages & Details Panel Viewport */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* Show Direct Messaging when DM user is selected */}
           {selectedDMUser ? (
             <DirectMessaging externalSelectedUser={selectedDMUser} />
           ) : (
             <ChannelMessageThread channel={activeChannel || currentChannel} currentUserId={user?.id} />
           )}
 
-          {/* ========================================================
-              4. RIGHT DETAILS PANEL
-          ======================================================== */}
           {showDetailsPane && (
             <aside className="w-80 border-l border-[#E0E7E6] bg-white flex flex-col h-full overflow-y-auto z-10 shadow-lg">
               <div className="flex items-center justify-between border-b border-[#E0E7E6] px-5 py-4">
@@ -993,7 +979,6 @@ const SlackShell = () => {
                   <p className="mt-1 text-xs text-[#52656A]">{currentChannel?.description || "General team discussion"}</p>
                 </div>
 
-                {/* About Section */}
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] mb-2.5">About</h4>
                   <div className="space-y-3 rounded-xl border border-[#E0E7E6] p-3 text-xs">
@@ -1014,7 +999,6 @@ const SlackShell = () => {
                   </div>
                 </div>
 
-                {/* Members in Channel */}
                 <div>
                   <div className="flex items-center justify-between mb-2.5">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A]">
@@ -1087,9 +1071,7 @@ const SlackShell = () => {
         </div>
         </main>
 
-      {/* ========================================================
-          5. MODALS & SLIDEOVERS
-      ======================================================== */}
+    
 
       {/* Create Workspace Modal */}
       {showCreateWorkspaceModal && (
@@ -1286,38 +1268,28 @@ const SlackShell = () => {
           </div>
         </div>
       )}
-
-      {/* Activity Panel (Slide-Over) */}
-      {showActivityPanel && (
-        <div className="fixed inset-0 z-50 bg-[#2C3333]/60 backdrop-blur-xs flex justify-end">
-          <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl animate-[fadeIn_0.15s_ease-out]">
-            <div className="flex items-center justify-between border-b border-[#E0E7E6] px-6 py-4 bg-[#F8FAFB]">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#395B64]">Workspace</p>
-          </div>
-                <h3 className="text-lg font-bold text-[#2C3333]">Activity & Notifications</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowActivityPanel(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] transition"
-              >
-                <i className="fa-solid fa-xmark" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] text-2xl text-[#395B64] mb-4">
-                <i className="fa-regular fa-bell" />
-              </div>
-              <h4 className="text-base font-bold text-[#2C3333]">No new notifications</h4>
-              <p className="mt-1 text-xs text-[#52656A] max-w-xs">
-                When you're mentioned or there's activity in your channels, it will show up here.
-              </p>
-            </div>
-          </div>
-      
-      )}
+      <NotificationPanel
+        isOpen={showActivityPanel}
+        onClose={() => setShowActivityPanel(false)}
+        onSelectChannel={(cId) => {
+          setSelectedDMUser(null)
+          navigate(`/app/workspace/${workspaceId}/channel/${cId}`)
+        }}
+        onSelectDM={(otherUserId, otherUser) => {
+          if (otherUser && (otherUser.id || otherUser._id)) {
+            setSelectedDMUser({
+              id: otherUser.id || otherUser._id,
+              username: otherUser.username,
+              avatar: otherUser.avatar,
+            })
+          } else {
+            const found = workspaceData?.members?.find(
+              (m) => (m.id || m._id)?.toString() === otherUserId?.toString()
+            )
+            setSelectedDMUser(found || { id: otherUserId, username: "User" })
+          }
+        }}
+      />
     </div>
   )
 }

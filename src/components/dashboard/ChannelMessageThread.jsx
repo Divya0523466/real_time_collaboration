@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useMemo } from "react"
-import PropTypes from "prop-types"
 import socket, {
   joinChannel,
   sendChannelMessage,
@@ -35,7 +34,7 @@ const isImageOrFileMessage = (content) => {
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-const Avatar = ({ username, small = false }) => (
+const Avatar = ({ username = null, small = false }) => (
   <div
     className={`flex items-center justify-center rounded-full font-semibold text-white flex-shrink-0 select-none ${
       small ? "w-6 h-6 text-[10px]" : "w-8 h-8 text-sm"
@@ -46,15 +45,9 @@ const Avatar = ({ username, small = false }) => (
   </div>
 )
 
-Avatar.propTypes = {
-  username: PropTypes.string,
-  small: PropTypes.bool,
-}
-Avatar.defaultProps = { username: null, small: false }
-
 // ─── Reply Reference (compact inline preview inside a reply) ──────────────────
 
-const ReplyReference = ({ replyToMessage }) => {
+const ReplyReference = ({ replyToMessage = null }) => {
   if (!replyToMessage) return null
   const content = replyToMessage.isDeleted
     ? "This message was deleted"
@@ -73,16 +66,6 @@ const ReplyReference = ({ replyToMessage }) => {
     </div>
   )
 }
-
-ReplyReference.propTypes = {
-  replyToMessage: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
-    content: PropTypes.string,
-    isDeleted: PropTypes.bool,
-    sender: PropTypes.shape({ username: PropTypes.string }),
-  }),
-}
-ReplyReference.defaultProps = { replyToMessage: null }
 
 // ─── Inline Reply Composer ────────────────────────────────────────────────────
 
@@ -161,13 +144,6 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
   )
 }
 
-InlineReplyComposer.propTypes = {
-  parentMessage: PropTypes.object.isRequired,
-  channelId: PropTypes.oneOfType([PropTypes.string, PropTypes.object]).isRequired,
-  onSend: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
-}
-
 // ─── Message Row ──────────────────────────────────────────────────────────────
 // Used for both root messages and replies. `isReply` controls visual indentation
 // and suppresses the ReplyReference (since replies inside a thread are already
@@ -175,16 +151,16 @@ InlineReplyComposer.propTypes = {
 
 const MessageRow = ({
   message,
-  currentUserId,
-  editingState,
-  replyingToId,
+  currentUserId = null,
+  editingState = null,
+  replyingToId = null,
   onStartEdit,
   onCancelEdit,
   onSubmitEdit,
   onSetEditDraft,
   onStartReply,
   onDelete,
-  isReply,
+  isReply = false,
 }) => {
   const isSender = message.senderId?.toString() === currentUserId?.toString()
   const isDeleted = message.isDeleted === true
@@ -335,26 +311,6 @@ const MessageRow = ({
   )
 }
 
-MessageRow.propTypes = {
-  message: PropTypes.object.isRequired,
-  currentUserId: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
-  editingState: PropTypes.shape({ messageId: PropTypes.string, draftContent: PropTypes.string }),
-  replyingToId: PropTypes.string,
-  onStartEdit: PropTypes.func.isRequired,
-  onCancelEdit: PropTypes.func.isRequired,
-  onSubmitEdit: PropTypes.func.isRequired,
-  onSetEditDraft: PropTypes.func.isRequired,
-  onStartReply: PropTypes.func.isRequired,
-  onDelete: PropTypes.func.isRequired,
-  isReply: PropTypes.bool,
-}
-MessageRow.defaultProps = {
-  currentUserId: null,
-  editingState: null,
-  replyingToId: null,
-  isReply: false,
-}
-
 // ─── Reply count badge ────────────────────────────────────────────────────────
 
 const ReplyCountBadge = ({ count, onClick }) => {
@@ -371,11 +327,9 @@ const ReplyCountBadge = ({ count, onClick }) => {
   )
 }
 
-ReplyCountBadge.propTypes = { count: PropTypes.number.isRequired, onClick: PropTypes.func.isRequired }
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const ChannelMessageThread = ({ channel, currentUserId }) => {
+const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState("")
   const [attachedFile, setAttachedFile] = useState(null)
@@ -805,21 +759,6 @@ const ChannelMessageThread = ({ channel, currentUserId }) => {
       </div>
     </div>
   )
-}
-
-ChannelMessageThread.propTypes = {
-  channel: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.object]).isRequired,
-    name: PropTypes.string.isRequired,
-    description: PropTypes.string,
-    type: PropTypes.string,
-  }),
-  currentUserId: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
-}
-
-ChannelMessageThread.defaultProps = {
-  channel: null,
-  currentUserId: null,
 }
 
 export default ChannelMessageThread

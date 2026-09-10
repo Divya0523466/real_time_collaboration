@@ -10,12 +10,15 @@ import Message from "./models/Message.js";
 import ChannelMessage from "./models/ChannelMessage.js";
 import getChannelAccess from "./utils/channelAccess.js";
 import { formatChannelMessage } from "./controllers/messageController.js";
+import WorkspaceMembership from "./models/WorkspaceMembership.js";
 import authRoutes from "./routes/authRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import workspaceRoutes from "./routes/workspaceRoutes.js";
 import channelRoutes from "./routes/channelRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import { createAndSendNotification } from "./utils/notificationService.js";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -26,7 +29,9 @@ const io = new Server(server, {
     credentials: true,
   },
 });
+app.set("io", io);
 const onlineUsers = new Map();
+app.set("onlineUsers", onlineUsers);
 
 app.use(cors());
 app.use(express.json());
@@ -37,6 +42,7 @@ app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/workspaces", channelRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/uploads", uploadRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
@@ -58,6 +64,7 @@ io.engine.on("connection_error", (error) => {
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
+  socket.join(`user:${socket.userId}`);
   const activeChannelRooms = new Set();
   const userSockets = onlineUsers.get(socket.userId) || new Set();
   userSockets.add(socket.id);
@@ -144,6 +151,73 @@ io.on("connection", (socket) => {
 
       io.to(room).emit("receive-channel-message", messagePayload);
       socket.emit("channel-message-sent", messagePayload);
+
+      // Asynchronously dispatch notifications for mentions and channel members
+      (async () => {
+        try {
+          const channel = access.channel;
+          let memberUserIds = [];
+          if (channel.type === "PUBLIC") {
+            const memberships = await WorkspaceMembership.find({ workspaceId: channel.workspaceId }).select("userId");
+            memberUserIds = memberships.map((m) => m.userId.toString());
+          } else {
+            memberUserIds = (channel.members || []).map((m) => m.toString());
+          }
+
+          // Parse @mentions
+          const mentionMatches = trimmedContent.match(/@([a-zA-Z0-9_.-]+)/g);
+          const mentionedUsernames = mentionMatches
+            ? [...new Set(mentionMatches.map((m) => m.slice(1).toLowerCase()))]
+            : [];
+
+          let mentionedUserIds = [];
+          if (mentionedUsernames.length > 0) {
+            const mentionedUsers = await User.find({
+              username: { $in: mentionedUsernames.map((u) => new RegExp(`^${u}$`, "i")) },
+            }).select("_id username");
+            mentionedUserIds = mentionedUsers
+              .map((u) => u._id.toString())
+              .filter((id) => memberUserIds.includes(id) && id !== socket.userId.toString());
+          }
+
+          const senderName = populatedMessage?.senderId?.username || "Someone";
+          const snippet = trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent;
+
+          // 1. Notify mentioned users
+          for (const mUserId of mentionedUserIds) {
+            await createAndSendNotification(io, {
+              recipientId: mUserId,
+              actorId: socket.userId,
+              type: "CHANNEL_MENTION",
+              title: `@${senderName} mentioned you in #${channel.name}`,
+              message: snippet,
+              workspaceId: channel.workspaceId,
+              channelId: channel._id,
+              messageId: savedMessage._id,
+            });
+          }
+
+          // 2. Notify other channel members (excluding sender and already mentioned)
+          const otherMemberIds = memberUserIds.filter(
+            (id) => id !== socket.userId.toString() && !mentionedUserIds.includes(id)
+          );
+
+          for (const recipientId of otherMemberIds) {
+            await createAndSendNotification(io, {
+              recipientId,
+              actorId: socket.userId,
+              type: "CHANNEL_MESSAGE",
+              title: `New message in #${channel.name}`,
+              message: `${senderName}: ${snippet}`,
+              workspaceId: channel.workspaceId,
+              channelId: channel._id,
+              messageId: savedMessage._id,
+            });
+          }
+        } catch (err) {
+          console.error("Error creating channel notifications:", err);
+        }
+      })();
     } catch (error) {
       console.error("Error sending channel message:", error);
       socket.emit("send-channel-message-error", { message: "Failed to send channel message" });
@@ -177,7 +251,7 @@ io.on("connection", (socket) => {
 
     let receiver;
     try {
-      receiver = await User.findById(receiverId).select("_id");
+      receiver = await User.findById(receiverId).select("_id username");
     } catch (error) {
       console.error("Error finding receiver:", error);
       receiver = null;
@@ -229,6 +303,36 @@ io.on("connection", (socket) => {
       }
 
       socket.emit("direct-message-sent", messagePayload);
+
+      // Asynchronously dispatch DM notification
+      (async () => {
+        try {
+          const sender = await User.findById(socket.userId).select("username");
+          const senderName = sender?.username || "Someone";
+          const snippet = trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent;
+
+          const isMentioned = receiver?.username
+            ? new RegExp(`@${receiver.username}\\b`, "i").test(trimmedContent)
+            : false;
+
+          await createAndSendNotification(io, {
+            recipientId: receiverId,
+            actorId: socket.userId,
+            type: isMentioned ? "DM_MENTION" : "DM_NEW_MESSAGE",
+            title: isMentioned
+              ? `@${senderName} mentioned you in a direct message`
+              : `New direct message from ${senderName}`,
+            message: snippet,
+            messageId: savedMessage._id,
+            metadata: {
+              senderId: socket.userId,
+              receiverId: receiverId.toString(),
+            },
+          });
+        } catch (err) {
+          console.error("Error creating DM notification:", err);
+        }
+      })();
     } catch (error) {
       console.error("Error saving message:", error);
       socket.emit("send-direct-message-error", {

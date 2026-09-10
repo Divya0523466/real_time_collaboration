@@ -91,14 +91,11 @@ const GlobalDashboard = () => {
       <main className="flex-1 p-10 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
           <div className="mb-8">
-            <div className="inline-flex items-center gap-2 bg-[#E7F6F2] text-[#395B64] px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider">
-              <i className="fa-solid fa-house text-[10px]" /> Workspace Hub
-            </div>
             <h1 className="mt-3 text-3xl font-bold text-[#2C3333]">
               Welcome back, {user?.username || "there"}
             </h1>
             <p className="mt-1.5 text-sm text-[#52656A]">
-              Select a workspace below or create a new one to start collaborating with your team.
+              Select a workspace below or create a new one to start collaborating.
             </p>
           </div>
 
@@ -197,7 +194,7 @@ const GlobalDashboard = () => {
               </div>
               <h2 className="text-xl font-bold text-[#2C3333]">Create your first workspace</h2>
               <p className="mt-2 text-sm text-[#52656A]">
-                Bring your team together in one place to chat, share channels, and collaborate in real time.
+                Bring your team together in one place.
               </p>
               <button
                 type="button"

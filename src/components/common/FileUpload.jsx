@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import PropTypes from "prop-types";
 import { uploadFile } from "../../services/uploadService";
 
 const FileUpload = ({
@@ -59,8 +58,6 @@ const FileUpload = ({
         onChange={handleFileChange}
         className="hidden"
         disabled={disabled || isUploading}
-        // Basic filter for file picker dialog
-        accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain"
       />
       <button
         type="button"
@@ -82,13 +79,6 @@ const FileUpload = ({
   );
 };
 
-FileUpload.propTypes = {
-  onUploadSuccess: PropTypes.func,
-  onUploadError: PropTypes.func,
-  buttonClassName: PropTypes.string,
-  iconClassName: PropTypes.string,
-  disabled: PropTypes.bool,
-  title: PropTypes.string,
-};
+
 
 export default FileUpload;

@@ -52,22 +52,12 @@ export const getPermissions = (role) => {
   return ROLE_PERMISSIONS[role]
 }
 
-/**
- * Check if user has a specific permission
- * @param {string} role - User's role in workspace
- * @param {string} permission - Permission to check
- * @returns {boolean}
- */
+
 export const hasPermission = (role, permission) => {
   const permissions = getPermissions(role)
   return permissions[permission] === true
 }
 
-/**
- * Get role display name
- * @param {string} role - Role constant (OWNER, ADMIN, MEMBER)
- * @returns {string}
- */
 export const getRoleDisplayName = (role) => {
   const names = {
     OWNER: "Owner",
@@ -77,13 +67,7 @@ export const getRoleDisplayName = (role) => {
   return names[role] || role
 }
 
-/**
- * Check if role is higher or equal to another role
- * Used for role management UI
- * @param {string} userRole - User's role
- * @param {string} targetRole - Role to compare
- * @returns {boolean}
- */
+
 export const canManageRole = (userRole, targetRole) => {
   const roleHierarchy = { OWNER: 3, ADMIN: 2, MEMBER: 1 }
   return (roleHierarchy[userRole] || 0) > (roleHierarchy[targetRole] || 0)

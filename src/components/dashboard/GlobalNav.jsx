@@ -1,10 +1,13 @@
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { toast } from "react-toastify"
+import NotificationPanel from "./NotificationPanel"
 
 const GlobalNav = ({ user }) => {
   const navigate = useNavigate()
-  const { clearAuth } = useWorkspace()
+  const { clearAuth, unreadNotificationsCount } = useWorkspace()
+  const [showNotifications, setShowNotifications] = useState(false)
 
   const handleLogout = async () => {
     try {
@@ -33,7 +36,6 @@ const GlobalNav = ({ user }) => {
 
   return (
     <div className="flex flex-col h-full bg-[#1E2525] text-[#E7F6F2]">
-      {/* Logo/Brand */}
       <div className="p-4 border-b border-[#2C3333]">
         <h1 className="text-base font-bold text-white flex items-center gap-2.5">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#395B64] text-xs font-bold text-[#E7F6F2]">
@@ -42,8 +44,6 @@ const GlobalNav = ({ user }) => {
           <span>WorkNest</span>
         </h1>
       </div>
-
-      {/* Main Nav Items */}
       <nav className="flex-1 p-3 space-y-1">
         <div className="text-[10px] font-bold text-[#A5C9CA] uppercase tracking-widest px-2 mb-2">
           Navigation
@@ -58,28 +58,27 @@ const GlobalNav = ({ user }) => {
         </button>
         <button
           type="button"
-          onClick={() => toast.info("Notifications & Activity")}
+          onClick={() => setShowNotifications(true)}
           className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition flex items-center gap-2.5"
         >
-          <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" /> Notifications
+          <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
+          <span className="flex-1">Notifications</span>
+          {unreadNotificationsCount > 0 && (
+            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-white">
+              {unreadNotificationsCount}
+            </span>
+          )}
         </button>
         <button
           type="button"
-          onClick={() => toast.info("Direct Messages")}
-          className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition flex items-center gap-2.5"
-        >
-          <i className="fa-solid fa-paper-plane w-4 text-center text-[#A5C9CA]" /> Direct Messages
-        </button>
-        <button
-          type="button"
-          onClick={() => toast.info("Activity")}
+          onClick={() => setShowNotifications(true)}
           className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition flex items-center gap-2.5"
         >
           <i className="fa-solid fa-chart-line w-4 text-center text-[#A5C9CA]" /> Activity
         </button>
       </nav>
 
-      {/* User Profile Section */}
+   
       <div className="p-3 border-t border-[#2C3333] space-y-2">
         {user && (
           <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#2C3333]/60">
@@ -101,6 +100,11 @@ const GlobalNav = ({ user }) => {
           <i className="fa-solid fa-arrow-right-from-bracket" /> Logout
         </button>
       </div>
+
+      <NotificationPanel
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
     </div>
   )
 }

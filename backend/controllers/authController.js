@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import User from "../models/User.js"
 import WorkspaceMembership from "../models/WorkspaceMembership.js"
+import Invitation from "../models/Invitation.js"
+import { createAndSendNotification } from "../utils/notificationService.js"
 
 const register = async (req, res) => {
   try {
@@ -20,11 +22,28 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    await User.create({
+    const newUser = await User.create({
       username: username.trim(),
       email: normalizedEmail,
       password: hashedPassword,
     })
+
+    // Check for pending workspace invitations and notify new user
+    try {
+      const pendingInvites = await Invitation.find({ email: normalizedEmail, status: "PENDING" }).populate("workspaceId", "name");
+      for (const inv of pendingInvites) {
+        await createAndSendNotification(null, {
+          recipientId: newUser._id,
+          actorId: inv.invitedBy,
+          type: "WORKSPACE_INVITED",
+          title: `Invited to ${inv.workspaceId?.name || "Workspace"}`,
+          message: `You have a pending invitation to join ${inv.workspaceId?.name || "a workspace"}.`,
+          workspaceId: inv.workspaceId?._id || inv.workspaceId,
+        });
+      }
+    } catch (inviteErr) {
+      console.error("Error creating pending invite notification on register:", inviteErr);
+    }
 
     return res.status(201).json({ message: "User registered successfully" })
   } catch {

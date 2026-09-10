@@ -65,7 +65,7 @@ const AuthModal = ({ mode, onClose, onSwitchMode, onLoginSuccess }) => {
         {mode === "login" ? (
           <LoginForm
             onSwitchToRegister={() => onSwitchMode("register")}
-            onLoginSuccess={(user, workspaces) => onLoginSuccess(user, workspaces)}
+            onLoginSuccess={onLoginSuccess}
           />
         ) : (
           <RegisterForm

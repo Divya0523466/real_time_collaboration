@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react"
-import PropTypes from "prop-types"
 import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
 
@@ -14,14 +13,14 @@ const isImageOrFileMessage = (content) => {
 }
 
 const MessageThread = ({
-  selectedUser,
-  messages,
-  loading,
-  error,
+  selectedUser = null,
+  messages = [],
+  loading = false,
+  error = null,
   onSendMessage,
-  onEditMessage,
-  onDeleteMessage,
-  currentUserId,
+  onEditMessage = () => {},
+  onDeleteMessage = () => {},
+  currentUserId = null,
 }) => {
   const [inputValue, setInputValue] = useState("")
   const [attachedFile, setAttachedFile] = useState(null)
@@ -281,41 +280,6 @@ const MessageThread = ({
       </div>
     </div>
   )
-}
-
-MessageThread.propTypes = {
-  selectedUser: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    username: PropTypes.string,
-    email: PropTypes.string,
-  }),
-  messages: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.object]).isRequired,
-      senderId: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
-      receiverId: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
-      content: PropTypes.string,
-      createdAt: PropTypes.string,
-      isEdited: PropTypes.bool,
-      isDeleted: PropTypes.bool,
-    }),
-  ),
-  loading: PropTypes.bool,
-  error: PropTypes.string,
-  onSendMessage: PropTypes.func.isRequired,
-  onEditMessage: PropTypes.func,
-  onDeleteMessage: PropTypes.func,
-  currentUserId: PropTypes.string,
-}
-
-MessageThread.defaultProps = {
-  selectedUser: null,
-  messages: [],
-  loading: false,
-  error: null,
-  onEditMessage: () => {},
-  onDeleteMessage: () => {},
-  currentUserId: null,
 }
 
 export default MessageThread

@@ -2,6 +2,7 @@ import Workspace from "../models/Workspace.js";
 import WorkspaceMembership, { ROLES } from "../models/WorkspaceMembership.js";
 import Channel from "../models/Channel.js";
 import Invitation from "../models/Invitation.js";
+import { createAndSendNotification } from "../utils/notificationService.js";
 
 const ensureDefaultChannel = async (workspaceId, createdBy) => {
   const existing = await Channel.findOne({ workspaceId, name: "general" });
@@ -166,6 +167,18 @@ const updateMemberRole = async (req, res) => {
     targetMembership.role = role;
     await targetMembership.save();
 
+    const io = req.app.get("io");
+    const workspace = await Workspace.findById(workspaceId).select("name");
+    await createAndSendNotification(io, {
+      recipientId: memberId,
+      actorId: userId,
+      type: "WORKSPACE_ROLE_CHANGED",
+      title: "Workspace Role Updated",
+      message: `Your role in ${workspace?.name || "the workspace"} has been changed to ${role.toLowerCase()}.`,
+      workspaceId,
+      metadata: { newRole: role },
+    });
+
     return res.json({ message: "Member role updated successfully", role });
   } catch (error) {
     return res
@@ -212,6 +225,17 @@ const removeMember = async (req, res) => {
     await WorkspaceMembership.deleteOne({ _id: targetMembership._id });
 
     await Channel.updateMany({ workspaceId }, { $pull: { members: memberId } });
+
+    const io = req.app.get("io");
+    const workspace = await Workspace.findById(workspaceId).select("name");
+    await createAndSendNotification(io, {
+      recipientId: memberId,
+      actorId: userId,
+      type: "WORKSPACE_REMOVED",
+      title: "Removed from Workspace",
+      message: `You were removed from ${workspace?.name || "the workspace"}.`,
+      workspaceId,
+    });
 
     return res.json({ message: "Member removed successfully" });
   } catch (error) {
