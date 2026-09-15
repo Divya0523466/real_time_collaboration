@@ -27,7 +27,6 @@ export const uploadFile = async (file) => {
 
     return data;
   } catch (error) {
-    console.error("Upload service error:", error);
     throw error;
   }
 };

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react"
+import { useWorkspace } from "../../context/WorkspaceContext"
 import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
+import DateSeparator from "../common/DateSeparator"
+import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
 
 /** Detect if content is an uploaded image or file (disable editing) */
 const isImageOrFileMessage = (content) => {
@@ -22,6 +25,7 @@ const MessageThread = ({
   onDeleteMessage = () => {},
   currentUserId = null,
 }) => {
+  const { isUserOnline } = useWorkspace()
   const [inputValue, setInputValue] = useState("")
   const [attachedFile, setAttachedFile] = useState(null)
   const [uploadError, setUploadError] = useState(null)
@@ -56,7 +60,7 @@ const MessageThread = ({
   }
 
   const startEdit = (message) => {
-    setEditingState({ messageId: message.id?.toString(), draftContent: message.content })
+    setEditingState({ messageId: message.id?.toString(), draftContent: message.content || "" })
   }
 
   const cancelEdit = () => setEditingState(null)
@@ -83,11 +87,42 @@ const MessageThread = ({
   return (
     <div className="flex-1 flex flex-col bg-white">
       {/* Header */}
-      <div className="border-b border-[#E0E7E6] bg-[#F8FAFB] p-4">
-        <h3 className="font-semibold text-[#2C3333]">
-          {selectedUser.username || "User"}
-        </h3>
-        <p className="text-xs text-[#52656A]">{selectedUser.email || ""}</p>
+      <div className="flex items-center justify-between border-b border-[#E0E7E6] bg-[#F8FAFB] px-6 py-3.5">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-shrink-0">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white shadow-xs">
+              {selectedUser.username?.charAt(0)?.toUpperCase() || "U"}
+            </span>
+            <span
+              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white ${
+                isUserOnline(selectedUser.id) ? "bg-emerald-500" : "bg-gray-300"
+              }`}
+              title={isUserOnline(selectedUser.id) ? "Online" : "Offline"}
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-base text-[#2C3333]">
+                {selectedUser.username || "User"}
+              </h3>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
+                  isUserOnline(selectedUser.id)
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-gray-100 text-gray-500 border border-gray-200"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isUserOnline(selectedUser.id) ? "bg-emerald-500" : "bg-gray-400"
+                  }`}
+                />
+                {isUserOnline(selectedUser.id) ? "Online" : "Offline"}
+              </span>
+            </div>
+            <p className="text-xs text-[#52656A]">{selectedUser.email || ""}</p>
+          </div>
+        </div>
       </div>
 
       {/* Messages Area */}
@@ -107,61 +142,122 @@ const MessageThread = ({
             <p className="text-[#52656A]">No messages yet. Start the conversation!</p>
           </div>
         ) : (
-          messages.map((message) => {
+          messages.map((message, index) => {
             const isSender = message.senderId?.toString() === currentUserId?.toString()
             const isDeleted = message.isDeleted === true
             const isBeingEdited = editingState?.messageId === message.id?.toString()
 
+            const prevMessage = index > 0 ? messages[index - 1] : null
+            const showDateSeparator = !prevMessage || !isSameDay(prevMessage.createdAt, message.createdAt)
+            const dateLabel = showDateSeparator ? formatMessageDate(message.createdAt) : null
+
             return (
-              <div
-                key={message.id}
-                className={`group flex ${isSender ? "justify-end" : "justify-start"}`}
-              >
-                <div className="flex max-w-xs flex-col">
-                  {/* Message bubble */}
-                  <div
-                    className={`rounded-lg px-3 py-1.5 ${
-                      isSender
-                        ? "bg-[#395B64] text-white"
-                        : "bg-[#F1F5F4] text-[#2C3333]"
-                    }`}
-                  >
-                    {isBeingEdited ? (
-                      /* Inline edit mode */
-                      <div className="flex flex-col gap-1">
-                        <textarea
-                          className="w-full resize-none rounded bg-white/20 p-1 text-sm outline-none"
-                          value={editingState.draftContent}
-                          onChange={(e) =>
-                            setEditingState((s) => ({ ...s, draftContent: e.target.value }))
+              <div key={message.id}>
+                {showDateSeparator && dateLabel && (
+                  <DateSeparator label={dateLabel} />
+                )}
+                <div
+                  className={`group flex items-end gap-1.5 ${
+                    isSender ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {/* Hover action toolbar for sender — floats beside bubble */}
+                  {isSender && !isDeleted && !isBeingEdited && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-lg border border-[#E0E7E6] shadow-sm px-1 py-0.5 flex-shrink-0 mb-1">
+                      {!isImageOrFileMessage(message.content) && (
+                        <div className="group/tip relative">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(message)}
+                            aria-label="Edit message"
+                            className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] hover:text-[#395B64] hover:bg-[#E7F6F2] transition-colors"
+                          >
+                            <i className="fa-solid fa-pen text-[10px]" />
+                          </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                            Edit
+                          </span>
+                        </div>
+                      )}
+                      <div className="group/tip relative">
+                        <button
+                          type="button"
+                          onClick={() => onDeleteMessage(message.id?.toString())}
+                          aria-label="Delete message"
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        >
+                          <i className="fa-solid fa-trash text-[10px]" />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                          Delete
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Message bubble / Edit box / Deleted indicator */}
+                  {isBeingEdited ? (
+                    <div className="w-full sm:w-[380px] max-w-full">
+                      <textarea
+                        className="w-full text-sm text-[#2C3333] bg-white border border-[#A5C9CA] rounded-lg px-3 py-2 outline-none focus:border-[#395B64] focus:ring-1 focus:ring-[#E7F6F2] resize-none transition-colors leading-relaxed shadow-xs"
+                        value={editingState.draftContent}
+                        onChange={(e) =>
+                          setEditingState((s) => ({ ...s, draftContent: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            submitEdit()
                           }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitEdit() }
-                            if (e.key === "Escape") cancelEdit()
-                          }}
-                          rows={2}
-                          autoFocus
-                        />
-                        <div className="flex gap-1">
+                          if (e.key === "Escape") cancelEdit()
+                        }}
+                        rows={Math.min(
+                          Math.max((editingState.draftContent || "").split("\n").length, 1),
+                          5
+                        )}
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-end gap-1.5 mt-1.5">
+                        <div className="group/tip relative">
                           <button
                             type="button"
                             onClick={submitEdit}
-                            className="rounded bg-[#A5C9CA] px-2 py-0.5 text-[10px] font-semibold text-[#2C3333] hover:bg-white"
+                            aria-label="Save"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-white bg-[#395B64] hover:bg-[#2C3333] transition-colors"
                           >
-                            Save
+                            <i className="fa-solid fa-check text-[11px]" />
                           </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                            Save
+                          </span>
+                        </div>
+                        <div className="group/tip relative">
                           <button
                             type="button"
                             onClick={cancelEdit}
-                            className="rounded px-2 py-0.5 text-[10px] opacity-70 hover:opacity-100"
+                            aria-label="Cancel"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-[#52656A] border border-[#E0E7E6] hover:bg-[#F1F5F4] hover:text-[#2C3333] transition-colors"
                           >
-                            Cancel
+                            <i className="fa-solid fa-xmark text-[11px]" />
                           </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                            Cancel
+                          </span>
                         </div>
                       </div>
-                    ) : isDeleted ? (
-                      <p className="text-xs italic opacity-60">This message was deleted</p>
-                    ) : (
+                    </div>
+                  ) : isDeleted ? (
+                    <div className="rounded-lg px-3 py-1.5 border border-dashed border-[#D0DCDB] bg-[#F8FAFB]">
+                      <p className="text-sm italic text-[#52656A] opacity-50">This message was deleted</p>
+                    </div>
+                  ) : (
+                    <div
+                      className={`rounded-lg px-3 py-1.5 max-w-xs sm:max-w-md ${
+                        isSender
+                          ? "bg-[#395B64] text-white"
+                          : "bg-[#F1F5F4] text-[#2C3333]"
+                      }`}
+                    >
                       <div className="flex flex-col gap-1">
                         <MessageContent content={message.content} isSender={isSender} />
                         <p
@@ -169,39 +265,12 @@ const MessageThread = ({
                             isSender ? "text-[#A5C9CA]" : "text-[#52656A]"
                           }`}
                         >
-                          {new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          {message.isEdited && (
+                          {formatMessageTime(message.createdAt)}
+                          {message.isEdited && !isDeleted && (
                             <span className="ml-1 opacity-60">(edited)</span>
                           )}
                         </p>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Hover action row — own messages only, hidden until group-hover */}
-                  {isSender && !isDeleted && !isBeingEdited && (
-                    <div className="mt-0.5 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      {!isImageOrFileMessage(message.content) && (
-                        <button
-                          type="button"
-                          onClick={() => startEdit(message)}
-                          className="rounded px-1.5 py-0.5 text-[10px] text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#395B64]"
-                          title="Edit"
-                        >
-                          <i className="fa-solid fa-pen mr-0.5" />Edit
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onDeleteMessage(message.id?.toString())}
-                        className="rounded px-1.5 py-0.5 text-[10px] text-rose-400 hover:bg-rose-50 hover:text-rose-600"
-                        title="Delete"
-                      >
-                        <i className="fa-solid fa-trash mr-0.5" />Delete
-                      </button>
                     </div>
                   )}
                 </div>

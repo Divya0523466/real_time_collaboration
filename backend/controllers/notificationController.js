@@ -3,21 +3,16 @@ import Notification from "../models/Notification.js";
 export const getNotifications = async (req, res) => {
   try {
     const userId = req.userId;
-    const { limit = 50, skip = 0, unreadOnly } = req.query;
+    const { unreadOnly } = req.query;
 
     const filter = { recipientId: userId };
     if (unreadOnly === "true") {
       filter.isRead = false;
     }
 
-    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
-    const parsedSkip = Math.max(parseInt(skip, 10) || 0, 0);
-
     const [notifications, totalCount, unreadCount] = await Promise.all([
       Notification.find(filter)
         .sort({ createdAt: -1 })
-        .skip(parsedSkip)
-        .limit(parsedLimit)
         .populate("actorId", "username email avatar")
         .populate("workspaceId", "name")
         .populate("channelId", "name type"),
@@ -32,7 +27,6 @@ export const getNotifications = async (req, res) => {
       unreadCount,
     });
   } catch (error) {
-    console.error("Error in getNotifications:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch notifications",
@@ -54,7 +48,6 @@ export const getUnreadCount = async (req, res) => {
       unreadCount,
     });
   } catch (error) {
-    console.error("Error in getUnreadCount:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to get unread count",
@@ -96,7 +89,6 @@ export const markAsRead = async (req, res) => {
       unreadCount,
     });
   } catch (error) {
-    console.error("Error in markAsRead:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to mark notification as read",
@@ -120,7 +112,6 @@ export const markAllAsRead = async (req, res) => {
       unreadCount: 0,
     });
   } catch (error) {
-    console.error("Error in markAllAsRead:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to mark all notifications as read",
@@ -157,7 +148,6 @@ export const deleteNotification = async (req, res) => {
       unreadCount,
     });
   } catch (error) {
-    console.error("Error in deleteNotification:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to delete notification",

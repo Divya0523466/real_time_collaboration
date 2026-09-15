@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import User from "./models/User.js";
 import Message from "./models/Message.js";
 import ChannelMessage from "./models/ChannelMessage.js";
+import ChannelReadState from "./models/ChannelReadState.js";
 import getChannelAccess from "./utils/channelAccess.js";
 import { formatChannelMessage } from "./controllers/messageController.js";
 import WorkspaceMembership from "./models/WorkspaceMembership.js";
@@ -29,9 +30,8 @@ const io = new Server(server, {
     credentials: true,
   },
 });
-app.set("io", io);
-const onlineUsers = new Map();
-app.set("onlineUsers", onlineUsers);
+
+app.set("io", io); //enables to use socket.io in route controllers (saves the io instance to express)
 
 app.use(cors());
 app.use(express.json());
@@ -44,6 +44,8 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 
+
+//socket io authentication middleware
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) {
@@ -58,19 +60,38 @@ io.use((socket, next) => {
   });
 });
 
-io.engine.on("connection_error", (error) => {
-  console.error("Socket connection error:", error.message);
-});
 
-io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
-  socket.join(`user:${socket.userId}`);
+//gets the unique usersIds of users who are online 
+const getOnlineUserIds = async () => {
+  const sockets = await io.fetchSockets();
+  return [...new Set(sockets.map((s) => s.userId).filter(Boolean))];
+};
+
+io.on("connection", async (socket) => {
+  //user room is created to handle multiple devices or tabs user online status
+  const userRoom = `user:${socket.userId}`;
+  const existingSockets = await io.in(userRoom).fetchSockets();
+  const isFirstConnection = existingSockets.length === 0; // avoids multiple user-online emits
+
+  socket.join(userRoom);
   const activeChannelRooms = new Set();
-  const userSockets = onlineUsers.get(socket.userId) || new Set();
-  userSockets.add(socket.id);
-  onlineUsers.set(socket.userId, userSockets);
+
+  // Send current list of online users to newly connected client
+  const onlineUsersList = await getOnlineUserIds();
+  socket.emit("get-online-users", onlineUsersList);
+
+  // Broadcast to all clients that this user is now online if first active connection
+  if (isFirstConnection) {
+    io.emit("user-online", { userId: socket.userId });
+  }
+
   socket.emit("connection-success", {
     message: "Socket connected successfully",
+  });
+
+  socket.on("request-online-users", async () => {
+    const users = await getOnlineUserIds();
+    socket.emit("get-online-users", users);
   });
 
   socket.on("join-channel", async ({ channelId } = {}) => {
@@ -85,8 +106,7 @@ io.on("connection", (socket) => {
       socket.join(room);
       activeChannelRooms.add(room);
       socket.emit("channel-joined", { channelId: access.channel._id });
-    } catch (error) {
-      console.error("Error joining channel:", error);
+    } catch {
       socket.emit("join-channel-error", { message: "Unable to join channel" });
     }
   });
@@ -148,6 +168,13 @@ io.on("connection", (socket) => {
         .populate({ path: "replyTo", populate: { path: "senderId", select: "username" } });
 
       const messagePayload = formatChannelMessage(populatedMessage);
+
+      // Update sender's read cursor since they just sent a message
+      ChannelReadState.findOneAndUpdate(
+        { channelId: access.channel._id, userId: socket.userId },
+        { $set: { lastReadAt: new Date() } },
+        { upsert: true }
+      ).catch(() => {});
 
       io.to(room).emit("receive-channel-message", messagePayload);
       socket.emit("channel-message-sent", messagePayload);
@@ -214,12 +241,10 @@ io.on("connection", (socket) => {
               messageId: savedMessage._id,
             });
           }
-        } catch (err) {
-          console.error("Error creating channel notifications:", err);
+        } catch {
         }
       })();
-    } catch (error) {
-      console.error("Error sending channel message:", error);
+    } catch {
       socket.emit("send-channel-message-error", { message: "Failed to send channel message" });
     }
   });
@@ -228,21 +253,18 @@ io.on("connection", (socket) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
 
     if (!socket.userId) {
-      console.log("Direct message rejected: no authenticated socket user");
       socket.emit("send-direct-message-error", {
         message: "Authentication failed",
       });
       return;
     }
     if (!receiverId) {
-      console.log("Direct message rejected: receiverId is required");
       socket.emit("send-direct-message-error", {
         message: "Receiver ID is required",
       });
       return;
     }
     if (!trimmedContent) {
-      console.log("Direct message rejected: message is empty");
       socket.emit("send-direct-message-error", {
         message: "Message cannot be empty",
       });
@@ -252,13 +274,11 @@ io.on("connection", (socket) => {
     let receiver;
     try {
       receiver = await User.findById(receiverId).select("_id username");
-    } catch (error) {
-      console.error("Error finding receiver:", error);
+    } catch {
       receiver = null;
     }
 
     if (!receiver) {
-      console.log("Direct message rejected: invalid receiverId", receiverId);
       socket.emit("send-direct-message-error", {
         message: "Receiver not found",
       });
@@ -266,7 +286,6 @@ io.on("connection", (socket) => {
     }
 
     if (socket.userId.toString() === receiverId.toString()) {
-      console.log("Direct message rejected: cannot message yourself");
       socket.emit("send-direct-message-error", {
         message: "Cannot send message to yourself",
       });
@@ -286,22 +305,12 @@ io.on("connection", (socket) => {
         senderId: savedMessage.senderId,
         receiverId: savedMessage.receiverId,
         content: savedMessage.content,
+        isRead: false,
         createdAt: savedMessage.createdAt,
       };
 
-      const receiverSockets = onlineUsers.get(receiverId.toString());
-      if (receiverSockets && receiverSockets.size > 0) {
-        receiverSockets.forEach((socketId) => {
-          io.to(socketId).emit("receive-direct-message", messagePayload);
-        });
-        console.log("Direct message sent to receiver:", receiverId);
-      } else {
-        console.log(
-          "Receiver is offline, message saved to database:",
-          receiverId,
-        );
-      }
-
+      // Deliver in real-time to receiver's private user room (all their devices/tabs)
+      io.to(`user:${receiverId}`).emit("receive-direct-message", messagePayload);
       socket.emit("direct-message-sent", messagePayload);
 
       // Asynchronously dispatch DM notification
@@ -329,19 +338,17 @@ io.on("connection", (socket) => {
               receiverId: receiverId.toString(),
             },
           });
-        } catch (err) {
-          console.error("Error creating DM notification:", err);
+        } catch {
         }
       })();
-    } catch (error) {
-      console.error("Error saving message:", error);
+    } catch {
       socket.emit("send-direct-message-error", {
         message: "Failed to send message",
       });
     }
   });
 
-  // ── edit-channel-message ───────────────────────────────────────────────────
+ 
   socket.on("edit-channel-message", async ({ messageId, content } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     if (!messageId || !trimmedContent) {
@@ -384,13 +391,12 @@ io.on("connection", (socket) => {
 
       const room = `channel:${message.channelId}`;
       io.to(room).emit("channel-message-edited", payload);
-    } catch (error) {
-      console.error("Error editing channel message:", error);
+    } catch {
       socket.emit("edit-channel-message-error", { message: "Failed to edit message" });
     }
   });
 
-  // ── delete-channel-message ─────────────────────────────────────────────────
+  
   socket.on("delete-channel-message", async ({ messageId } = {}) => {
     if (!messageId) {
       socket.emit("delete-channel-message-error", { message: "Message ID is required" });
@@ -420,13 +426,11 @@ io.on("connection", (socket) => {
       const payload = { id: message._id, channelId: message.channelId };
       const room = `channel:${message.channelId}`;
       io.to(room).emit("channel-message-deleted", payload);
-    } catch (error) {
-      console.error("Error deleting channel message:", error);
+    } catch {
       socket.emit("delete-channel-message-error", { message: "Failed to delete message" });
     }
   });
 
-  // ── edit-direct-message ────────────────────────────────────────────────────
   socket.on("edit-direct-message", async ({ messageId, content } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     if (!messageId || !trimmedContent) {
@@ -462,21 +466,15 @@ io.on("connection", (socket) => {
         updatedAt: message.updatedAt,
       };
 
-      // Emit to both sender and receiver sockets
-      const senderSockets = onlineUsers.get(message.senderId.toString());
-      const receiverSockets = onlineUsers.get(message.receiverId.toString());
-      const targetSockets = new Set([
-        ...(senderSockets || []),
-        ...(receiverSockets || []),
-      ]);
-      targetSockets.forEach((socketId) => io.to(socketId).emit("direct-message-edited", payload));
-    } catch (error) {
-      console.error("Error editing direct message:", error);
+      // Emit to both sender and receiver user rooms
+      io.to(`user:${message.senderId}`)
+        .to(`user:${message.receiverId}`)
+        .emit("direct-message-edited", payload);
+    } catch {
       socket.emit("edit-direct-message-error", { message: "Failed to edit message" });
     }
   });
 
-  // ── delete-direct-message ──────────────────────────────────────────────────
   socket.on("delete-direct-message", async ({ messageId } = {}) => {
     if (!messageId) {
       socket.emit("delete-direct-message-error", { message: "Message ID is required" });
@@ -503,38 +501,26 @@ io.on("connection", (socket) => {
         receiverId: message.receiverId,
       };
 
-      const senderSockets = onlineUsers.get(message.senderId.toString());
-      const receiverSockets = onlineUsers.get(message.receiverId.toString());
-      const targetSockets = new Set([
-        ...(senderSockets || []),
-        ...(receiverSockets || []),
-      ]);
-      targetSockets.forEach((socketId) => io.to(socketId).emit("direct-message-deleted", payload));
-    } catch (error) {
-      console.error("Error deleting direct message:", error);
+      // Emit to both sender and receiver user rooms
+      io.to(`user:${message.senderId}`)
+        .to(`user:${message.receiverId}`)
+        .emit("direct-message-deleted", payload);
+    } catch {
       socket.emit("delete-direct-message-error", { message: "Failed to delete message" });
     }
   });
 
-  socket.on("disconnect", () => {
-    const sockets = onlineUsers.get(socket.userId);
-    sockets?.delete(socket.id);
-    if (!sockets || sockets.size === 0) {
-      onlineUsers.delete(socket.userId);
+  socket.on("disconnect", async () => {
+    // Check if the user has any remaining active sockets in their user room
+    const remainingSockets = await io.in(`user:${socket.userId}`).fetchSockets();
+    if (remainingSockets.length === 0) {
+      io.emit("user-offline", { userId: socket.userId });
     }
-    console.log("Socket disconnected:", socket.id);
   });
 });
 
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected");
-  })
-  .catch((error) => {
-    console.error("MongoDB connection failed:", error.message);
-  });
+  .catch(() => {});
 
 
-server.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+server.listen(port);

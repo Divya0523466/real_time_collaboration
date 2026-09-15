@@ -1,6 +1,15 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
-import socket, { connectSocket } from "../services/socket";
+import socket, {
+  connectSocket,
+  onOnlineUsers,
+  offOnlineUsers,
+  onUserOnline,
+  offUserOnline,
+  onUserOffline,
+  offUserOffline,
+  requestOnlineUsers,
+} from "../services/socket";
 import {
   fetchNotifications as apiFetchNotifications,
   fetchUnreadCount as apiFetchUnreadCount,
@@ -46,6 +55,7 @@ export const WorkspaceProvider = ({ children }) => {
   const [invitations, setInvitations] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -115,7 +125,7 @@ export const WorkspaceProvider = ({ children }) => {
       setNotifications((prev) => [newNotif, ...prev]);
       setUnreadNotificationsCount((prev) => prev + 1);
       toast.info(newNotif.title, {
-        icon: "🔔",
+        icon: <i className="fa-solid fa-bell text-[#395B64]" />,
       });
     };
 
@@ -139,14 +149,44 @@ export const WorkspaceProvider = ({ children }) => {
       });
     };
 
+    const handleOnlineUsers = (userIds) => {
+      setOnlineUsers(new Set(Array.isArray(userIds) ? userIds.map(String) : []));
+    };
+
+    const handleUserOnline = ({ userId }) => {
+      if (!userId) return;
+      setOnlineUsers((prev) => {
+        const next = new Set(prev);
+        next.add(userId.toString());
+        return next;
+      });
+    };
+
+    const handleUserOffline = ({ userId }) => {
+      if (!userId) return;
+      setOnlineUsers((prev) => {
+        const next = new Set(prev);
+        next.delete(userId.toString());
+        return next;
+      });
+    };
+
+    const handleSocketConnect = () => {
+      requestOnlineUsers();
+    };
+
     socket.on("connection-success", handleConnectionSuccess);
     socket.on("receive-direct-message", handleDirectMessage);
     socket.on("receive-notification", handleNotification);
     socket.on("channel-member-removed", handleChannelMemberRemoved);
     socket.on("channel-member-added", handleChannelMemberAdded);
+    socket.on("connect", handleSocketConnect);
+    onOnlineUsers(handleOnlineUsers);
+    onUserOnline(handleUserOnline);
+    onUserOffline(handleUserOffline);
     connectSocket();
 
-    fetchNotifications().catch(console.error);
+    fetchNotifications().catch(() => {});
 
     return () => {
       socket.off("connection-success", handleConnectionSuccess);
@@ -154,6 +194,10 @@ export const WorkspaceProvider = ({ children }) => {
       socket.off("receive-notification", handleNotification);
       socket.off("channel-member-removed", handleChannelMemberRemoved);
       socket.off("channel-member-added", handleChannelMemberAdded);
+      socket.off("connect", handleSocketConnect);
+      offOnlineUsers(handleOnlineUsers);
+      offUserOnline(handleUserOnline);
+      offUserOffline(handleUserOffline);
       socket.disconnect();
     };
   }, [user, fetchNotifications]);
@@ -170,6 +214,7 @@ export const WorkspaceProvider = ({ children }) => {
     setInvitations([]);
     setNotifications([]);
     setUnreadNotificationsCount(0);
+    setOnlineUsers(new Set());
     setError(null);
   }, []);
 
@@ -208,7 +253,6 @@ export const WorkspaceProvider = ({ children }) => {
       return nextInvitations;
     } catch (err) {
       setError(err.message);
-      console.error("Error fetching invitations:", err);
       return [];
     }
   }, [API_URL, user?.email]);
@@ -238,7 +282,6 @@ export const WorkspaceProvider = ({ children }) => {
       return nextWorkspaces;
     } catch (err) {
       setError(err.message);
-      console.error("Error fetching workspaces:", err);
       throw err;
     } finally {
       setLoading(false);
@@ -293,7 +336,6 @@ export const WorkspaceProvider = ({ children }) => {
         setWorkspaceData(null);
         setChannels([]);
         setError(err.message);
-        console.error("Error selecting workspace:", err);
       } finally {
         setLoading(false);
       }
@@ -320,7 +362,6 @@ export const WorkspaceProvider = ({ children }) => {
         }
         return [];
       } catch (err) {
-        console.error("Error refreshing channels:", err);
         return [];
       }
     },
@@ -772,6 +813,11 @@ export const WorkspaceProvider = ({ children }) => {
     }
   }, [API_URL]);
 
+  const isUserOnline = useCallback(
+    (userId) => Boolean(userId && onlineUsers.has(userId.toString())),
+    [onlineUsers]
+  );
+
   const value = {
     user,
     setUser,
@@ -782,6 +828,8 @@ export const WorkspaceProvider = ({ children }) => {
     invitations,
     loading,
     error,
+    onlineUsers,
+    isUserOnline,
     initializeFromAuth,
     clearAuth,
     fetchPendingInvitations,

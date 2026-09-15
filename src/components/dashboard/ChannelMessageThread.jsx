@@ -11,11 +11,10 @@ import socket, {
 } from "../../services/socket"
 import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
+import DateSeparator from "../common/DateSeparator"
+import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
-
-const formatTime = (dateStr) =>
-  new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
 /** Deterministic avatar color from username initial */
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
@@ -189,7 +188,7 @@ const MessageRow = ({
               {isSender ? "You" : username}
             </span>
             <span className="text-[11px] text-[#52656A] leading-none">
-              {formatTime(message.createdAt)}
+              {formatMessageTime(message.createdAt)}
             </span>
             {message.isEdited && !isDeleted && (
               <span className="text-[10px] text-[#52656A] opacity-50 leading-none">(edited)</span>
@@ -612,25 +611,33 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
         {/* ── Message list ──────────────────────────────────────────────────── */}
         {!loading && hasMessages && (
           <div className="py-4 px-2">
-            {rootMessages.map((rootMsg) => {
+            {rootMessages.map((rootMsg, index) => {
               const rootId = rootMsg.id?.toString()
               const replies = repliesMap[rootId] || []
               const replyCount = replies.length
               const isThreadExpanded = expandedThreads.has(rootId)
               const isReplyingToThis = replyingToId === rootId
 
+              const prevMsg = index > 0 ? rootMessages[index - 1] : null
+              const showDateSeparator = !prevMsg || !isSameDay(prevMsg.createdAt, rootMsg.createdAt)
+              const dateLabel = showDateSeparator ? formatMessageDate(rootMsg.createdAt) : null
+
               // A thread section is shown when there are actual replies OR when
               // the user has just clicked Reply (to show the inline composer)
               const showThread = isThreadExpanded && (replyCount > 0 || isReplyingToThis)
 
               return (
-                <div key={rootMsg.id} className="mb-1">
-                  {/* ── Root message ─────────────────────────────────────── */}
-                  <MessageRow
-                    message={rootMsg}
-                    {...actionProps}
-                    isReply={false}
-                  />
+                <div key={rootMsg.id}>
+                  {showDateSeparator && dateLabel && (
+                    <DateSeparator label={dateLabel} />
+                  )}
+                  <div className="mb-1">
+                    {/* ── Root message ─────────────────────────────────────── */}
+                    <MessageRow
+                      message={rootMsg}
+                      {...actionProps}
+                      isReply={false}
+                    />
 
                   {/* ── Reply count badge (collapsed state) ───────────────── */}
                   {replyCount > 0 && !isThreadExpanded && (
@@ -690,7 +697,8 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                     </div>
                   )}
                 </div>
-              )
+              </div>
+            )
             })}
 
             <div ref={messagesEndRef} />

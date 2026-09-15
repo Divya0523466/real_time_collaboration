@@ -29,14 +29,10 @@ const GlobalDashboard = () => {
       return
     }
 
-    fetchUserWorkspaces().catch((err) => {
-      console.error("Failed to fetch workspaces:", err)
-    })
+    fetchUserWorkspaces().catch(() => {})
 
     if (user?.email) {
-      fetchPendingInvitations().catch((err) => {
-        console.error("Failed to fetch invitations:", err)
-      })
+      fetchPendingInvitations().catch(() => {})
     }
   }, [clearAuth, fetchUserWorkspaces, fetchPendingInvitations, navigate, user?.email])
 
@@ -159,9 +155,8 @@ const GlobalDashboard = () => {
                           type="button"
                           onClick={() => {
                             acceptInvitation(invitation.id).then(() => {
-                              fetchUserWorkspaces().catch((err) => console.error("Failed to refresh workspaces:", err))
-                            }).catch((err) => {
-                              console.error("Failed to accept invitation:", err)
+                              fetchUserWorkspaces().catch(() => {})
+                            }).catch(() => {
                             })
                           }}
                           className="rounded-xl bg-[#395B64] px-3 py-2 text-xs font-semibold text-white hover:bg-[#2C3333] transition"
@@ -171,9 +166,7 @@ const GlobalDashboard = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            declineInvitation(invitation.id).catch((err) => {
-                              console.error("Failed to decline invitation:", err)
-                            })
+                            declineInvitation(invitation.id).catch(() => {})
                           }}
                           className="rounded-xl border border-[#A5C9CA] bg-white px-3 py-2 text-xs font-semibold text-[#2C3333] hover:bg-[#E7F6F2] transition"
                         >

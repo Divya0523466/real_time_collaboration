@@ -9,15 +9,12 @@ const socket = io(SOCKET_URL, {
 })
 
 socket.on("connect", () => {
-  console.log("Socket connected:", socket.id)
 })
 
 socket.on("connect_error", (error) => {
-  console.error("Socket connection error:", error.message)
 })
 
 socket.on("disconnect", (reason) => {
-  console.log("Socket disconnected:", reason)
 })
 
 export const connectSocket = () => {
@@ -29,7 +26,6 @@ export const connectSocket = () => {
   }
 }
 
-// ── Direct Messages ────────────────────────────────────────────────────────
 
 export const sendDirectMessage = (receiverId, content) => {
   socket.emit("send-direct-message", { receiverId, content })
@@ -83,7 +79,21 @@ export const offDirectMessageDeleted = (callback) => {
   socket.off("direct-message-deleted", callback)
 }
 
-// ── Channel Messages ───────────────────────────────────────────────────────
+export const onDirectMessageEditError = (callback) => {
+  socket.on("edit-direct-message-error", callback)
+}
+
+export const offDirectMessageEditError = (callback) => {
+  socket.off("edit-direct-message-error", callback)
+}
+
+export const onDirectMessageDeleteError = (callback) => {
+  socket.on("delete-direct-message-error", callback)
+}
+
+export const offDirectMessageDeleteError = (callback) => {
+  socket.off("delete-direct-message-error", callback)
+}
 
 export const joinChannel = (channelId) => {
   socket.emit("join-channel", { channelId })
@@ -93,7 +103,6 @@ export const leaveChannel = (channelId) => {
   socket.emit("leave-channel", { channelId })
 }
 
-// replyTo is optional — omit or pass null for a normal message
 export const sendChannelMessage = (channelId, content, replyTo = null) => {
   socket.emit("send-channel-message", { channelId, content, replyTo })
 }
@@ -122,7 +131,6 @@ export const offChannelMessageDeleted = (callback) => {
   socket.off("channel-message-deleted", callback)
 }
 
-// ── Notifications ───────────────────────────────────────────────────────────
 
 export const onNotificationReceived = (callback) => {
   socket.on("receive-notification", callback)
@@ -130,6 +138,35 @@ export const onNotificationReceived = (callback) => {
 
 export const offNotificationReceived = (callback) => {
   socket.off("receive-notification", callback)
+}
+
+
+export const onOnlineUsers = (callback) => {
+  socket.on("get-online-users", callback)
+}
+
+export const offOnlineUsers = (callback) => {
+  socket.off("get-online-users", callback)
+}
+
+export const onUserOnline = (callback) => {
+  socket.on("user-online", callback)
+}
+
+export const offUserOnline = (callback) => {
+  socket.off("user-online", callback)
+}
+
+export const onUserOffline = (callback) => {
+  socket.on("user-offline", callback)
+}
+
+export const offUserOffline = (callback) => {
+  socket.off("user-offline", callback)
+}
+
+export const requestOnlineUsers = () => {
+  socket.emit("request-online-users")
 }
 
 export default socket

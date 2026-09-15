@@ -41,8 +41,8 @@ const register = async (req, res) => {
           workspaceId: inv.workspaceId?._id || inv.workspaceId,
         });
       }
-    } catch (inviteErr) {
-      console.error("Error creating pending invite notification on register:", inviteErr);
+    } catch {
+      // Registration should succeed even if the optional invitation notification fails.
     }
 
     return res.status(201).json({ message: "User registered successfully" })

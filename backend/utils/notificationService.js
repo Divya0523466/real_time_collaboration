@@ -1,9 +1,5 @@
 import Notification from "../models/Notification.js";
 
-/**
- * Creates and persists a notification in MongoDB and broadcasts it in real-time
- * via Socket.IO to the recipient's personal room ('user:<userId>').
- */
 export const createAndSendNotification = async (io, {
   recipientId,
   actorId = null,
@@ -46,21 +42,7 @@ export const createAndSendNotification = async (io, {
     }
 
     return populated;
-  } catch (error) {
-    console.error("Error creating/sending notification:", error);
+  } catch {
     return null;
   }
-};
-
-/**
- * Batch version for notifying multiple recipients (e.g. channel broadcasts).
- */
-export const createAndSendBatchNotifications = async (io, notifications) => {
-  if (!Array.isArray(notifications) || notifications.length === 0) return [];
-  const results = [];
-  for (const item of notifications) {
-    const res = await createAndSendNotification(io, item);
-    if (res) results.push(res);
-  }
-  return results;
 };

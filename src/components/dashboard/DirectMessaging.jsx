@@ -9,11 +9,15 @@ import {
   onDirectMessageError,
   onDirectMessageEdited,
   onDirectMessageDeleted,
+  onDirectMessageEditError,
+  onDirectMessageDeleteError,
   offDirectMessageReceived,
   offDirectMessageSent,
   offDirectMessageError,
   offDirectMessageEdited,
   offDirectMessageDeleted,
+  offDirectMessageEditError,
+  offDirectMessageDeleteError,
 } from "../../services/socket"
 import MessageThread from "./MessageThread"
 
@@ -59,8 +63,7 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
         messageIdsRef.current = new Set(
           data.messages.map((msg) => msg.id.toString()),
         )
-      } catch (err) {
-        console.error("Error fetching history:", err)
+      } catch {
         setError("Failed to load message history")
       } finally {
         setLoading(false)
@@ -107,7 +110,6 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
 
   // Handle errors
   const handleDirectMessageError = (error) => {
-    console.error("Message error:", error.message)
     setError(error.message || "Failed to send message")
   }
 
@@ -140,6 +142,8 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
     onDirectMessageError(handleDirectMessageError)
     onDirectMessageEdited(handleDirectMessageEdited)
     onDirectMessageDeleted(handleDirectMessageDeleted)
+    onDirectMessageEditError(handleDirectMessageError)
+    onDirectMessageDeleteError(handleDirectMessageError)
 
     return () => {
       offDirectMessageReceived(handleDirectMessageReceived)
@@ -147,6 +151,8 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
       offDirectMessageError(handleDirectMessageError)
       offDirectMessageEdited(handleDirectMessageEdited)
       offDirectMessageDeleted(handleDirectMessageDeleted)
+      offDirectMessageEditError(handleDirectMessageError)
+      offDirectMessageDeleteError(handleDirectMessageError)
     }
   }, [currentSelectedUser])
 
@@ -157,8 +163,7 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
 
     try {
       sendDirectMessage(currentSelectedUser.id, content)
-    } catch (err) {
-      console.error("Error sending message:", err)
+    } catch {
       setError("Failed to send message")
     }
   }

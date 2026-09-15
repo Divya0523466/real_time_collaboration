@@ -25,9 +25,16 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isRead: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: true },
 )
+
+messageSchema.index({ receiverId: 1, isRead: 1, senderId: 1 })
 
 const Message = mongoose.model("Message", messageSchema)
 
