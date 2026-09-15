@@ -8,17 +8,16 @@ const getAuthHeaders = () => {
   };
 };
 
-export const fetchNotifications = async ({ limit = 50, skip = 0, unreadOnly = false } = {}) => {
+export const fetchNotifications = async ({ unreadOnly = false } = {}) => {
   const token = localStorage.getItem("worknestToken");
   if (!token) return { notifications: [], totalCount: 0, unreadCount: 0 };
 
   const queryParams = new URLSearchParams({
-    limit: String(limit),
-    skip: String(skip),
     ...(unreadOnly ? { unreadOnly: "true" } : {}),
   });
 
-  const response = await fetch(`${API_URL}/notifications?${queryParams.toString()}`, {
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
+  const response = await fetch(`${API_URL}/notifications${queryString}`, {
     method: "GET",
     headers: getAuthHeaders(),
   });

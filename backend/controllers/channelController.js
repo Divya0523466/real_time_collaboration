@@ -330,18 +330,8 @@ const removeChannelMember = async (req, res) => {
     await channel.save()
 
     const io = req.app.get("io")
-    const onlineUsers = req.app.get("onlineUsers")
-
-    if (io && onlineUsers) {
-      const userSockets = onlineUsers.get(memberId.toString())
-      if (userSockets) {
-        userSockets.forEach((socketId) => {
-          const sock = io.sockets.sockets.get(socketId)
-          if (sock) {
-            sock.leave(`channel:${channel._id}`)
-          }
-        })
-      }
+    if (io) {
+      io.in(`user:${memberId}`).socketsLeave(`channel:${channel._id}`)
     }
 
     createAndSendNotification(io, {

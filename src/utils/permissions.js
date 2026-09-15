@@ -40,11 +40,7 @@ const ROLE_PERMISSIONS = {
   },
 }
 
-/**
- * Get permissions for a given role
- * @param {string} role - User's role in workspace (OWNER, ADMIN, MEMBER)
- * @returns {object} Permissions object
- */
+
 export const getPermissions = (role) => {
   if (!role || !ROLE_PERMISSIONS[role]) {
     return ROLE_PERMISSIONS.MEMBER

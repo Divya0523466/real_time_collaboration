@@ -30,7 +30,6 @@ export const uploadFile = async (req, res) => {
       file: savedFile,
     });
   } catch (error) {
-    console.error("Upload controller error:", error.message);
     return res.status(500).json({
       message: error.message || "Failed to upload file. Please try again later.",
     });
@@ -44,8 +43,7 @@ export const getUserFiles = async (req, res) => {
       .lean();
 
     return res.status(200).json({ success: true, files });
-  } catch (error) {
-    console.error("Get user files error:", error);
+  } catch {
     return res.status(500).json({ message: "Failed to fetch files" });
   }
 };
@@ -58,8 +56,7 @@ export const getFileById = async (req, res) => {
     }
 
     return res.status(200).json({ success: true, file });
-  } catch (error) {
-    console.error("Get file error:", error);
+  } catch {
     return res.status(500).json({ message: "Failed to fetch file details" });
   }
 };
@@ -82,8 +79,7 @@ export const deleteFile = async (req, res) => {
       success: true,
       message: "File deleted successfully",
     });
-  } catch (error) {
-    console.error("Delete file error:", error);
+  } catch {
     return res.status(500).json({ message: "Failed to delete file" });
   }
 };

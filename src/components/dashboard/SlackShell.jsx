@@ -15,6 +15,11 @@ import DeleteWorkspaceModal from "./DeleteWorkspaceModal"
 import DirectMessaging from "./DirectMessaging"
 import ChannelMessageThread from "./ChannelMessageThread"
 import NotificationPanel from "./NotificationPanel"
+import {
+  fetchUnreadMessageCounts,
+  markChannelAsRead,
+  markDirectMessagesAsRead,
+} from "../../services/messageService"
 
 export const getWorkspaceInitials = (name) => {
   if (!name || typeof name !== "string") return "W"
@@ -24,15 +29,6 @@ export const getWorkspaceInitials = (name) => {
     return words[0].charAt(0).toUpperCase()
   }
   return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
-}
-
-const readUnreadCounts = (key) => {
-  try {
-    const storedCounts = localStorage.getItem(key)
-    return storedCounts ? JSON.parse(storedCounts) : {}
-  } catch {
-    return {}
-  }
 }
 
 const SlackShell = () => {
@@ -51,6 +47,7 @@ const SlackShell = () => {
     removeChannelMember,
     removeMember,
     unreadNotificationsCount,
+    isUserOnline,
     loading,
     error,
   } = useWorkspace()
@@ -83,12 +80,6 @@ const SlackShell = () => {
   const [unreadDMCounts, setUnreadDMCounts] = useState({})
   const [unreadChannelCounts, setUnreadChannelCounts] = useState({})
   const joinedChannelIdsRef = useRef(new Set())
-  const hydratedUnreadKeyRef = useRef(null)
-  const skipUnreadPersistRef = useRef(false)
-
-  const unreadStorageKey = user?.id && workspaceId
-    ? `worknestUnread:${user.id}:${workspaceId}`
-    : null
 
   useEffect(() => {
     if (!workspaceId) return
@@ -246,28 +237,51 @@ const SlackShell = () => {
   }, [channels, currentChannel?.id, user?.id])
 
   useEffect(() => {
-    if (!unreadStorageKey) return
+    if (!workspaceId) return
 
-    const storedCounts = readUnreadCounts(unreadStorageKey)
-    skipUnreadPersistRef.current = true
-    setUnreadDMCounts(storedCounts.dms || {})
-    setUnreadChannelCounts(storedCounts.channels || {})
-    hydratedUnreadKeyRef.current = unreadStorageKey
+    let cancelled = false
     setSelectedDMUser(null)
-  }, [unreadStorageKey])
 
-  useEffect(() => {
-    if (!unreadStorageKey || hydratedUnreadKeyRef.current !== unreadStorageKey) return
-    if (skipUnreadPersistRef.current) {
-      skipUnreadPersistRef.current = false
-      return
+    // Fetch persistent unread counts directly from database
+    fetchUnreadMessageCounts(workspaceId)
+      .then((serverCounts) => {
+        if (!cancelled && serverCounts) {
+          setUnreadDMCounts(serverCounts.dms || {})
+          setUnreadChannelCounts(serverCounts.channels || {})
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
     }
+  }, [workspaceId])
 
-    localStorage.setItem(
-      unreadStorageKey,
-      JSON.stringify({ dms: unreadDMCounts, channels: unreadChannelCounts }),
-    )
-  }, [unreadStorageKey, unreadDMCounts, unreadChannelCounts])
+  // Clear unread count for the active channel
+  useEffect(() => {
+    if (!currentChannel?.id) return
+    const chanIdStr = currentChannel.id.toString()
+    setUnreadChannelCounts((counts) => {
+      if (!counts[chanIdStr]) return counts
+      const nextCounts = { ...counts }
+      delete nextCounts[chanIdStr]
+      return nextCounts
+    })
+    markChannelAsRead(currentChannel.id).catch(() => {})
+  }, [currentChannel?.id])
+
+  // Clear unread count for the active direct message conversation
+  useEffect(() => {
+    if (!selectedDMUser?.id) return
+    const senderIdStr = selectedDMUser.id.toString()
+    setUnreadDMCounts((counts) => {
+      if (!counts[senderIdStr]) return counts
+      const nextCounts = { ...counts }
+      delete nextCounts[senderIdStr]
+      return nextCounts
+    })
+    markDirectMessagesAsRead(selectedDMUser.id).catch(() => {})
+  }, [selectedDMUser?.id])
 
   const handleSelectWorkspace = async (id) => {
     if (!id || id === workspaceId) return
@@ -282,6 +296,7 @@ const SlackShell = () => {
       delete nextCounts[chan.id.toString()]
       return nextCounts
     })
+    markChannelAsRead(chan.id).catch(() => {})
     setActiveChannelMenuId(null)
     navigate(`/app/workspace/${workspaceId}/channel/${chan.id}`)
   }
@@ -827,6 +842,7 @@ const SlackShell = () => {
                             delete nextCounts[member.id?.toString()]
                             return nextCounts
                           })
+                          markDirectMessagesAsRead(member.id).catch(() => {})
                           setActiveChannelMenuId(null)
                         }}
                         className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
@@ -835,8 +851,16 @@ const SlackShell = () => {
                             : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
                         }`}
                       >
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
-                          {member.username?.charAt(0)?.toUpperCase() || "U"}
+                        <span className="relative flex-shrink-0">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
+                            {member.username?.charAt(0)?.toUpperCase() || "U"}
+                          </span>
+                          <span
+                            className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${
+                              isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"
+                            }`}
+                            title={isUserOnline(member.id) ? "Online" : "Offline"}
+                          />
                         </span>
                         <span className="min-w-0 flex-1 truncate">
                           {member.username}
@@ -867,7 +891,19 @@ const SlackShell = () => {
         <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] bg-white px-6 shadow-xs select-none">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              {currentChannel?.type === "PRIVATE" ? (
+              {selectedDMUser ? (
+                <div className="relative flex-shrink-0">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
+                    {selectedDMUser.username?.charAt(0)?.toUpperCase() || "U"}
+                  </div>
+                  <span
+                    className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-2 ring-white ${
+                      isUserOnline(selectedDMUser.id) ? "bg-emerald-500" : "bg-gray-300"
+                    }`}
+                    title={isUserOnline(selectedDMUser.id) ? "Online" : "Offline"}
+                  />
+                </div>
+              ) : currentChannel?.type === "PRIVATE" ? (
                 <i className="fa-solid fa-lock text-sm text-[#395B64]" />
               ) : (
                 <span className="text-lg font-bold text-[#395B64]">#</span>
@@ -875,6 +911,22 @@ const SlackShell = () => {
               <h1 className="truncate text-base font-bold text-[#2C3333]">
                 {selectedDMUser ? `@${selectedDMUser.username}` : currentChannel?.name || "general"}
               </h1>
+              {selectedDMUser && (
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
+                    isUserOnline(selectedDMUser.id)
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-gray-100 text-gray-500 border border-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      isUserOnline(selectedDMUser.id) ? "bg-emerald-500" : "bg-gray-400"
+                    }`}
+                  />
+                  {isUserOnline(selectedDMUser.id) ? "Online" : "Offline"}
+                </span>
+              )}
             </div>
 
             <button
@@ -1035,8 +1087,16 @@ const SlackShell = () => {
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {activeChannel?.members?.map((m) => (
                       <div key={m.id} className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-[#F8FAFB]">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#395B64] text-[10px] font-bold text-white">
-                          {m.username?.charAt(0)?.toUpperCase() || "U"}
+                        <div className="relative flex-shrink-0">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#395B64] text-[10px] font-bold text-white">
+                            {m.username?.charAt(0)?.toUpperCase() || "U"}
+                          </div>
+                          <span
+                            className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-1 ring-white ${
+                              isUserOnline(m.id) ? "bg-emerald-500" : "bg-gray-300"
+                            }`}
+                            title={isUserOnline(m.id) ? "Online" : "Offline"}
+                          />
                         </div>
                         <span className="truncate text-xs font-medium text-[#2C3333] flex-1">{m.username}</span>
                         <span className="rounded bg-[#E7F6F2] px-1.5 py-0.5 text-[9px] font-semibold text-[#395B64]">
@@ -1058,13 +1118,7 @@ const SlackShell = () => {
                   </div>
                 </div>
 
-                {/* Pinned Items */}
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] mb-2">Pinned</h4>
-                  <div className="rounded-xl border border-dashed border-[#A5C9CA] p-3 text-center text-xs text-[#52656A]">
-                    No pinned items yet
-                  </div>
-                </div>
+                
               </div>
             </aside>
           )}
@@ -1212,8 +1266,16 @@ const SlackShell = () => {
                     key={member.id}
                     className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] bg-white p-3 hover:border-[#A5C9CA] transition shadow-xs"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white flex-shrink-0">
-                      {member.username?.charAt(0)?.toUpperCase() || "U"}
+                    <div className="relative flex-shrink-0">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
+                        {member.username?.charAt(0)?.toUpperCase() || "U"}
+                      </div>
+                      <span
+                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white ${
+                          isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-300"
+                        }`}
+                        title={isUserOnline(member.id) ? "Online" : "Offline"}
+                      />
                     </div>
 
                     <div className="min-w-0 flex-1">
