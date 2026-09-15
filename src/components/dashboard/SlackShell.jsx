@@ -837,6 +837,7 @@ const SlackShell = () => {
                         type="button"
                         onClick={() => {
                           setSelectedDMUser(member)
+                          setShowDetailsPane(false)
                           setUnreadDMCounts((counts) => {
                             const nextCounts = { ...counts }
                             delete nextCounts[member.id?.toString()]
@@ -888,7 +889,8 @@ const SlackShell = () => {
 
 
       <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB]">
-        <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] bg-white px-6 shadow-xs select-none">
+        {!selectedDMUser && (
+          <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] bg-white px-6 shadow-xs select-none">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {selectedDMUser ? (
@@ -896,12 +898,6 @@ const SlackShell = () => {
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
                     {selectedDMUser.username?.charAt(0)?.toUpperCase() || "U"}
                   </div>
-                  <span
-                    className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-2 ring-white ${
-                      isUserOnline(selectedDMUser.id) ? "bg-emerald-500" : "bg-gray-300"
-                    }`}
-                    title={isUserOnline(selectedDMUser.id) ? "Online" : "Offline"}
-                  />
                 </div>
               ) : currentChannel?.type === "PRIVATE" ? (
                 <i className="fa-solid fa-lock text-sm text-[#395B64]" />
@@ -911,31 +907,7 @@ const SlackShell = () => {
               <h1 className="truncate text-base font-bold text-[#2C3333]">
                 {selectedDMUser ? `@${selectedDMUser.username}` : currentChannel?.name || "general"}
               </h1>
-              {selectedDMUser && (
-                <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
-                    isUserOnline(selectedDMUser.id)
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-gray-100 text-gray-500 border border-gray-200"
-                  }`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      isUserOnline(selectedDMUser.id) ? "bg-emerald-500" : "bg-gray-400"
-                    }`}
-                  />
-                  {isUserOnline(selectedDMUser.id) ? "Online" : "Offline"}
-                </span>
-              )}
             </div>
-
-            <button
-              type="button"
-              className="text-[#A5C9CA] hover:text-amber-500 transition text-xs"
-              title="Star channel"
-            >
-              <i className="fa-regular fa-star" />
-            </button>
 
             {!selectedDMUser && currentChannel && (selectedRole === "OWNER" || selectedRole === "ADMIN") && (
               <button
@@ -958,32 +930,34 @@ const SlackShell = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setShowMembersPanel(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/40 bg-[#F8FAFB] px-2.5 py-1.5 text-xs font-semibold text-[#395B64] hover:bg-[#E7F6F2] transition"
-              title="View members"
-            >
-              <i className="fa-solid fa-users text-xs" />
-              <span>{workspaceMembers.length}</span>
-            </button>
+          {!selectedDMUser && (
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowMembersPanel(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/40 bg-[#F8FAFB] px-2.5 py-1.5 text-xs font-semibold text-[#395B64] hover:bg-[#E7F6F2] transition"
+                title="View members"
+              >
+                <i className="fa-solid fa-users text-xs" />
+                <span>{workspaceMembers.length}</span>
+              </button>
 
-            {/* Details panel toggle */}
-            <button
-              type="button"
-              onClick={() => setShowDetailsPane((prev) => !prev)}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
-                showDetailsPane
-                  ? "border-[#395B64] bg-[#E7F6F2] text-[#395B64]"
-                  : "border-[#A5C9CA]/40 text-[#52656A] hover:bg-[#F8FAFB] hover:text-[#2C3333]"
-              }`}
-              title="Channel details"
-            >
-              <i className="fa-solid fa-circle-info text-sm" />
-            </button>
-          </div>
-        </header>
+              <button
+                type="button"
+                onClick={() => setShowDetailsPane((prev) => !prev)}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                  showDetailsPane
+                    ? "border-[#395B64] bg-[#E7F6F2] text-[#395B64]"
+                    : "border-[#A5C9CA]/40 text-[#52656A] hover:bg-[#F8FAFB] hover:text-[#2C3333]"
+                }`}
+                title="Channel details"
+              >
+                <i className="fa-solid fa-circle-info text-sm" />
+              </button>
+            </div>
+          )}
+          </header>
+        )}
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {selectedDMUser ? (
@@ -992,7 +966,7 @@ const SlackShell = () => {
             <ChannelMessageThread channel={activeChannel || currentChannel} currentUserId={user?.id} />
           )}
 
-          {showDetailsPane && (
+          {showDetailsPane && !selectedDMUser && (
             <aside className="w-80 border-l border-[#E0E7E6] bg-white flex flex-col h-full overflow-y-auto z-10 shadow-lg">
               <div className="flex items-center justify-between border-b border-[#E0E7E6] px-5 py-4">
                 <h3 className="text-base font-bold text-[#2C3333]">Channel Details</h3>

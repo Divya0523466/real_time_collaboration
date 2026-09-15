@@ -163,8 +163,6 @@ export const WorkspaceProvider = ({ children }) => {
       requestOnlineUsers();
     };
 
-    socket.on("connection-success", handleConnectionSuccess);
-    socket.on("receive-direct-message", handleDirectMessage);
     socket.on("receive-notification", handleNotification);
     socket.on("channel-member-removed", handleChannelMemberRemoved);
     socket.on("channel-member-added", handleChannelMemberAdded);
@@ -177,8 +175,6 @@ export const WorkspaceProvider = ({ children }) => {
     fetchNotifications().catch(() => {});
 
     return () => {
-      socket.off("connection-success", handleConnectionSuccess);
-      socket.off("receive-direct-message", handleDirectMessage);
       socket.off("receive-notification", handleNotification);
       socket.off("channel-member-removed", handleChannelMemberRemoved);
       socket.off("channel-member-added", handleChannelMemberAdded);
