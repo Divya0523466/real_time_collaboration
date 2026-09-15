@@ -24,7 +24,7 @@ const inviteMembers = async (req, res) => {
 
     const normalized = [...new Set(
       emails
-        .map((email) => String(email).trim().toLowerCase())
+        .map((email) => String(email).trim())
         .filter(Boolean)
         .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
     )]
