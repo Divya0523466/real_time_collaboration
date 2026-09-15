@@ -13,8 +13,8 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "Username, email and password are required" })
     }
 
-    const normalizedEmail = email.trim();
-    const existingUser = await User.findOne({ email: normalizedEmail })
+    const enteredEmail = email.trim();
+    const existingUser = await User.findOne({ email: enteredEmail })
 
     if (existingUser) {
       return res.status(400).json({ message: "Email already exists" })
@@ -24,13 +24,13 @@ const register = async (req, res) => {
 
     const newUser = await User.create({
       username: username.trim(),
-      email: normalizedEmail,
+      email: enteredEmail,
       password: hashedPassword,
     })
 
     // Check for pending workspace invitations and notify new user
     try {
-      const pendingInvites = await Invitation.find({ email: normalizedEmail, status: "PENDING" }).populate("workspaceId", "name");
+      const pendingInvites = await Invitation.find({ email: enteredEmail, status: "PENDING" }).populate("workspaceId", "name");
       for (const inv of pendingInvites) {
         await createAndSendNotification(null, {
           recipientId: newUser._id,

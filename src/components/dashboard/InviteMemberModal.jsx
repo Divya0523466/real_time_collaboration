@@ -9,12 +9,12 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    const cleaned = emails
+    const invitationEmails = emails
       .split(",")
       .map((email) => email.trim())
       .filter(Boolean)
 
-    if (cleaned.length === 0) {
+    if (invitationEmails.length === 0) {
       toast.error("Please provide at least one valid email address")
       return
     }
@@ -29,7 +29,7 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          emails: cleaned,
+          emails: invitationEmails,
           role,
           message: message.trim(),
         }),

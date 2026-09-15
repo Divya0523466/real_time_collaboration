@@ -22,19 +22,19 @@ const inviteMembers = async (req, res) => {
       return res.status(403).json({ message: "Only workspace owners can invite members" })
     }
 
-    const normalized = [...new Set(
+    const invitationEmails = [...new Set(
       emails
         .map((email) => String(email).trim())
         .filter(Boolean)
         .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
     )]
 
-    if (normalized.length === 0) {
+    if (invitationEmails.length === 0) {
       return res.status(400).json({ message: "No valid email addresses were provided" })
     }
 
     const createdInvites = []
-    for (const email of normalized) {
+    for (const email of invitationEmails) {
       const existingUser = await User.findOne({ email })
       if (existingUser) {
         const alreadyMember = await WorkspaceMembership.findOne({ workspaceId, userId: existingUser._id })

@@ -354,7 +354,7 @@ const SlackShell = () => {
     return workspaceMembers.filter(
       (m) =>
         m.username?.toLowerCase().includes(q) ||
-        m.email?.toLowerCase().includes(q) ||
+        m.email.includes(q) ||
         m.role?.toLowerCase().includes(q),
     )
   }, [workspaceMembers, memberSearchQuery])
