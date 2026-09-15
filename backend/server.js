@@ -45,6 +45,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 
 
+
 //socket io authentication middleware
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
@@ -520,7 +521,13 @@ io.on("connection", async (socket) => {
 });
 
 mongoose.connect(process.env.MONGO_URI)
-  .catch(() => {});
+  .then(() => {
+    console.log("MongoDB connected");
+  })
+  .catch(() => {
+    console.error("MongoDB connection failed. Check MONGO_URI and network access.");
+  });
 
-
-server.listen(port);
+server.listen(port, () => {
+  console.log(`Backend listening on port ${port}`);
+});
