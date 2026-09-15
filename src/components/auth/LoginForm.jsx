@@ -54,38 +54,37 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
 
   return (
     <form
-      className="mt-6 grid gap-4"
+      className="mt-2 grid gap-3"
       onSubmit={handleSubmit}
       noValidate
     >
-      <label className="grid gap-1.5 text-md font-semibold text-[#2C3333]">
-        Email
-
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@example.com"
-          autoComplete="email"
-          className="w-full rounded-lg border border-[#A5C9CA] bg-white px-4 py-3 font-normal text-[#2C3333] outline-none transition placeholder:text-[#52656A]/55 focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
-        />
+      <label className="text-[14px] font-bold uppercase tracking-[0.12em] text-[#52656A]">
+        Email address</label>
+       
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
+            className="h-11 w-full rounded-xl border border-[#D5E1E0] bg-[#F8FAFB] p-3 font-normal tracking-normal text-[#2C3333] outline-none transition placeholder:text-[#8A999B] hover:border-[#A5C9CA] focus:border-[#395B64]"
+          />
+       
+      
+      <label className=" text-[14px] font-bold uppercase tracking-[0.12em] text-[#52656A]">
+        Password  
       </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Enter your password"
+            className="h-11 w-full rounded-xl border border-[#D5E1E0] bg-[#F8FAFB] p-3 text-lg font-normal tracking-normal text-[#2C3333] outline-none transition placeholder:text-[#8A999B] hover:border-[#A5C9CA] focus:border-[#395B64] "
+          />
 
-      <label className="grid gap-1.5 text-md font-semibold text-[#2C3333]">
-        Password
-
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="Enter your password"
-          autoComplete="current-password"
-          className="w-full rounded-lg border border-[#A5C9CA] bg-white px-4 py-3 font-normal text-[#2C3333] outline-none transition placeholder:text-[#52656A]/55 focus:border-[#395B64] focus:ring-2 focus:ring-[#E7F6F2]"
-        />
-      </label>
 
       {error && (
-        <p className="text-xs text-[#9B4D4D]">
+        <p role="alert" className="flex items-start gap-2 rounded-xl border border-[#E8CACA] bg-[#FFF7F7] px-3 py-2.5 text-xs leading-5 text-[#9B4D4D]">
+          <i className="fa-solid fa-circle-exclamation mt-0.5" aria-hidden="true" />
           {error}
         </p>
       )}
@@ -93,12 +92,13 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full cursor-pointer rounded-full bg-[#395B64] px-6 py-3 font-semibold text-white shadow-[0_10px_20px_rgba(57,91,100,0.18)] transition hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-70"
+        className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#395B64] px-6 text-sm font-bold text-white shadow-[0_10px_20px_rgba(57,91,100,0.18)] transition hover:bg-[#2C3333] hover:shadow-[0_12px_24px_rgba(44,51,51,0.2)] disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {isLoading ? "Signing In..." : "Sign In"}
+        {isLoading ? "Signing in..." : "Sign in"}
+        {!isLoading && <i className="fa-solid fa-arrow-right text-xs" aria-hidden="true" />}
       </button>
 
-      <p className="text-center text-sm text-[#52656A]">
+      <p className="border-t border-[#E6EEED] pt-3 text-center text-sm text-[#52656A]">
         Don't have an account?{" "}
         <button
           type="button"

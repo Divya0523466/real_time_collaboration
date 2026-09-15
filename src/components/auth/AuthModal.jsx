@@ -31,35 +31,20 @@ const AuthModal = ({ mode, onClose, onSwitchMode, onLoginSuccess }) => {
       }}
     >
       <div
-        className="m-auto w-full max-w-115 animate-[auth-modal-in_240ms_ease-out] rounded-2xl bg-white p-6 shadow-[0_24px_70px_rgba(44,51,51,0.3)] sm:p-8"
+        className="m-auto w-full max-w-115 animate-[auth-modal-in_240ms_ease-out] rounded-2xl bg-white p-5 shadow-[0_24px_70px_rgba(44,51,51,0.3)] sm:p-8"
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-title"
       >
-        <div className="flex justify-end">
-          <button
-            ref={closeButton}
-            type="button"
-            aria-label="Close authentication dialog"
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-xl text-[#395B64] transition hover:bg-[#E7F6F2]"
-            onClick={onClose}
-          >
-            <i className="fa-solid fa-xmark" aria-hidden="true" />
-          </button>
-        </div>
+       
 
-        <div className="text-center">
+        <div className="text-left">
           <h2
             id="auth-title"
-            className="mt-1 text-2xl font-semibold tracking-tight text-[#2C3333]"
+            className="text-[1.7rem] font-bold tracking-[-0.02em] text-[#2C3333]"
           >
-            {mode === "login" ? "Welcome back" : "Create your WorkNest account"}
+            {mode === "login" ? "Welcome back" : "Create your account"}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-[#52656A]">
-            {mode === "login"
-              ? "Sign in to continue to your WorkNest workspace."
-              : "Bring your team together and start collaborating in real time."}
-          </p>
         </div>
 
         {mode === "login" ? (
