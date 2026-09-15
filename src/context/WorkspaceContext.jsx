@@ -68,7 +68,6 @@ export const WorkspaceProvider = ({ children }) => {
       setUnreadNotificationsCount(data.unreadCount || 0);
       return data;
     } catch (err) {
-      console.error("Failed to load notifications:", err);
       return { notifications: [], totalCount: 0, unreadCount: 0 };
     }
   }, []);
@@ -81,7 +80,6 @@ export const WorkspaceProvider = ({ children }) => {
       );
       setUnreadNotificationsCount((prev) => (res.unreadCount !== undefined ? res.unreadCount : Math.max(0, prev - 1)));
     } catch (err) {
-      console.error("Failed to mark notification read:", err);
     }
   }, []);
 
@@ -91,7 +89,6 @@ export const WorkspaceProvider = ({ children }) => {
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadNotificationsCount(0);
     } catch (err) {
-      console.error("Failed to mark all notifications read:", err);
     }
   }, []);
 
@@ -103,7 +100,6 @@ export const WorkspaceProvider = ({ children }) => {
         setUnreadNotificationsCount(res.unreadCount);
       }
     } catch (err) {
-      console.error("Failed to delete notification:", err);
     }
   }, []);
 
@@ -112,14 +108,6 @@ export const WorkspaceProvider = ({ children }) => {
       socket.disconnect();
       return undefined;
     }
-
-    const handleConnectionSuccess = (data) => {
-      console.log("Socket:", data);
-    };
-
-    const handleDirectMessage = (data) => {
-      console.log("Direct message received:", data);
-    };
 
     const handleNotification = (newNotif) => {
       setNotifications((prev) => [newNotif, ...prev]);
