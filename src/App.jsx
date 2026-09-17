@@ -21,7 +21,7 @@ const LandingPage = () => {
   const { initializeFromAuth } = useWorkspace()
 
   return (
-    <div id="top">
+    <div id="top" className="min-h-screen bg-white dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors duration-200">
       <Navbar onOpenAuth={setAuthMode} /> 
       <Hero onOpenAuth={setAuthMode} />
       <Features />

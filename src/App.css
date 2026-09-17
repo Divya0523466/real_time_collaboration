@@ -6,12 +6,22 @@ html {
   background: #2C3333;
 } 
 
+html.dark {
+  background: #121717;
+  color-scheme: dark;
+}
+
 body {
   min-width: 320px;
   margin: 0;
   font-family: "Inter", "Segoe UI", sans-serif;
   color: #2C3333;
   background: #F8FAFB;
+}
+
+html.dark body {
+  color: #E7F6F2;
+  background: #121717;
 }
 
 button,

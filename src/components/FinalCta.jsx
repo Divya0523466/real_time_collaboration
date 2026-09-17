@@ -1,18 +1,18 @@
 const FinalCta = ({ onOpenAuth }) => { 
   return (
-    <section className="site-cta w-full bg-[#395B64] px-4 py-8 text-center md:px-8 md:py-10">
+    <section className="site-cta w-full bg-[#395B64] dark:bg-[#182325] px-4 py-8 text-center md:px-8 md:py-10 transition-colors">
       <div className="mx-auto max-w-220">
         <h2 className="text-3xl font-extrabold leading-tight text-white md:text-4xl">
           Ready to bring your team together?
         </h2>
-        <p className="mx-auto mt-3 max-w-150 text-lg leading-7 text-[#E7F6F2]">
+        <p className="mx-auto mt-3 max-w-150 text-lg leading-7 text-[#E7F6F2] dark:text-[#A5C9CA]">
           Communicate, share files, and keep your team connected from one
           collaborative workspace.
         </p>
         <button
           type="button"
           onClick={() => onOpenAuth("register")}
-          className="mt-5 cursor-pointer rounded-full bg-[#E7F6F2] px-7 py-3 font-semibold text-[#2C3333] transition hover:bg-white"
+          className="mt-5 cursor-pointer rounded-full bg-[#E7F6F2] px-7 py-3 font-semibold text-[#2C3333] transition hover:bg-white shadow-md"
         >
           Get Started Now
         </button>

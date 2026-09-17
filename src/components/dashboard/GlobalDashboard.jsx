@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom"
+import { FiSun, FiMoon } from "react-icons/fi"
 import { useWorkspace } from "../../context/WorkspaceContext"
+import { useTheme } from "../../context/ThemeContext"
 import { useState, useEffect } from "react"
 import CreateWorkspaceModal from "./CreateWorkspaceModal"
 import GlobalNav from "./GlobalNav"
@@ -20,6 +22,7 @@ const GlobalDashboard = () => {
     loading,
     error,
   } = useWorkspace()
+  const { toggleTheme, isDark } = useTheme()
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
@@ -42,7 +45,7 @@ const GlobalDashboard = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFB] text-[#2C3333]">
+    <div className="flex min-h-screen bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
       <aside className="w-17 border-r border-[#2C3333]/30 bg-[#2C3333] text-white flex flex-col items-center py-3.5 select-none">
         <button
           type="button"
@@ -79,25 +82,40 @@ const GlobalDashboard = () => {
         </div>
       </aside>
 
-      <aside className="w-64 border-r border-[#E0E7E6] bg-[#1E2525]">
+      <aside className="w-64 border-r border-[#E0E7E6] dark:border-[#2C3333] bg-[#1E2525]">
         <GlobalNav user={user} />
       </aside>
 
 
       <main className="flex-1 p-10 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-8">
-            <h1 className="mt-3 text-3xl font-bold text-[#2C3333]">
-              Welcome back, {user?.username || "there"}
-            </h1>
-            <p className="mt-1.5 text-sm text-[#52656A]">
-              Select a workspace below or create a new one to start collaborating.
-            </p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="mt-3 text-3xl font-bold text-[#2C3333] dark:text-white">
+                Welcome back, {user?.username || "there"}
+              </h1>
+              <p className="mt-1.5 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+                Select a workspace below or create a new one to start collaborating.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs"
+              title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+            >
+              {isDark ? (
+                <FiSun className="text-base text-amber-400" />
+              ) : (
+                <FiMoon className="text-base text-[#395B64]" />
+              )}
+            </button>
           </div>
 
 
           {loading && (
-            <div className="rounded-2xl border border-dashed border-[#A5C9CA] bg-white p-8 text-center text-sm text-[#52656A]">
+            <div className="rounded-2xl border border-dashed border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] p-8 text-center text-sm text-[#52656A] dark:text-[#A5C9CA]">
               <i className="fa-solid fa-spinner animate-spin text-xl text-[#395B64] mb-2 block" />
               Loading workspaces...
             </div>
@@ -120,33 +138,33 @@ const GlobalDashboard = () => {
           )}
 
           {invitations.length > 0 && (
-            <section className="mb-8 rounded-3xl border border-[#A5C9CA] bg-white p-5 shadow-xs">
+            <section className="mb-8 rounded-3xl border border-[#A5C9CA] dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] p-5 shadow-xs transition-colors">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#395B64]">Invitations</p>
-                  <h2 className="mt-1 text-xl font-bold text-[#2C3333]">Pending Invitations</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#395B64] dark:text-[#A5C9CA]">Invitations</p>
+                  <h2 className="mt-1 text-xl font-bold text-[#2C3333] dark:text-white">Pending Invitations</h2>
                 </div>
-                <span className="rounded-full bg-[#E7F6F2] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#395B64]">
+                <span className="rounded-full bg-[#E7F6F2] dark:bg-[#395B64]/40 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#395B64] dark:text-[#A5C9CA]">
                   {invitations.length} pending
                 </span>
               </div>
 
               <div className="space-y-3">
                 {invitations.map((invitation) => (
-                  <div key={invitation.id} className="rounded-2xl border border-[#E0E7E6] bg-[#F8FAFB] p-4">
+                  <div key={invitation.id} className="rounded-2xl border border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#242D2D] p-4 transition-colors">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <div className="text-sm font-bold text-[#2C3333]">
-                          Workspace: <span className="text-[#395B64]">{invitation.workspaceName}</span>
+                        <div className="text-sm font-bold text-[#2C3333] dark:text-white">
+                          Workspace: <span className="text-[#395B64] dark:text-[#A5C9CA]">{invitation.workspaceName}</span>
                         </div>
-                        <div className="mt-1 text-xs text-[#52656A]">
+                        <div className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]/80">
                           Invited by: {invitation.inviter?.username || invitation.inviter?.email || "Someone"}
                         </div>
-                        <div className="mt-1 text-xs text-[#52656A]">
-                          Role: <span className="font-semibold text-[#2C3333]">{invitation.role}</span>
+                        <div className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]/80">
+                          Role: <span className="font-semibold text-[#2C3333] dark:text-white">{invitation.role}</span>
                         </div>
                         {invitation.message && (
-                          <div className="mt-2 text-xs text-[#52656A] italic">"{invitation.message}"</div>
+                          <div className="mt-2 text-xs text-[#52656A] dark:text-[#A5C9CA]/70 italic">"{invitation.message}"</div>
                         )}
                       </div>
 
@@ -168,7 +186,7 @@ const GlobalDashboard = () => {
                           onClick={() => {
                             declineInvitation(invitation.id).catch(() => {})
                           }}
-                          className="rounded-xl border border-[#A5C9CA] bg-white px-3 py-2 text-xs font-semibold text-[#2C3333] hover:bg-[#E7F6F2] transition"
+                          className="rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] px-3 py-2 text-xs font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition"
                         >
                           Decline
                         </button>
@@ -181,12 +199,12 @@ const GlobalDashboard = () => {
           )}
 
           {!loading && !error && workspaces.length === 0 && (
-            <div className="rounded-3xl border border-dashed border-[#A5C9CA] bg-white p-12 text-center max-w-lg mx-auto shadow-xs">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] text-3xl text-[#395B64] mx-auto mb-4">
+            <div className="rounded-3xl border border-dashed border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] p-12 text-center max-w-lg mx-auto shadow-xs">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/40 text-3xl text-[#395B64] dark:text-[#A5C9CA] mx-auto mb-4">
                 <i className="fa-solid fa-layer-group" />
               </div>
-              <h2 className="text-xl font-bold text-[#2C3333]">Create your first workspace</h2>
-              <p className="mt-2 text-sm text-[#52656A]">
+              <h2 className="text-xl font-bold text-[#2C3333] dark:text-white">Create your first workspace</h2>
+              <p className="mt-2 text-sm text-[#52656A] dark:text-[#A5C9CA]">
                 Bring your team together in one place.
               </p>
               <button
@@ -207,26 +225,26 @@ const GlobalDashboard = () => {
                   key={workspace.id}
                   type="button"
                   onClick={() => handleSelectWorkspace(workspace)}
-                  className="group rounded-2xl border border-[#E0E7E6] bg-white p-5 text-left shadow-xs hover:border-[#395B64] hover:shadow-md transition flex flex-col justify-between"
+                  className="group rounded-2xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 text-left shadow-xs hover:border-[#395B64] dark:hover:border-[#395B64] hover:shadow-md transition flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <div className="w-11 h-11 rounded-xl bg-[#E7F6F2] flex items-center justify-center text-[#395B64] font-bold text-sm group-hover:bg-[#395B64] group-hover:text-white transition">
+                      <div className="w-11 h-11 rounded-xl bg-[#E7F6F2] dark:bg-[#395B64]/40 flex items-center justify-center text-[#395B64] dark:text-[#A5C9CA] font-bold text-sm group-hover:bg-[#395B64] group-hover:text-white transition">
                         {getWorkspaceInitials(workspace.name)}
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#E7F6F2] text-[#395B64] text-[10px] font-bold uppercase tracking-wider">
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA] text-[10px] font-bold uppercase tracking-wider">
                         {workspace.role}
                       </span>
                     </div>
-                    <h3 className="text-base font-bold text-[#2C3333] group-hover:text-[#395B64] transition truncate">
+                    <h3 className="text-base font-bold text-[#2C3333] dark:text-white group-hover:text-[#395B64] dark:group-hover:text-[#A5C9CA] transition truncate">
                       {workspace.name}
                     </h3>
-                    <p className="mt-1 text-xs text-[#52656A] line-clamp-2">
+                    <p className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]/80 line-clamp-2">
                       {workspace.description || "No description provided."}
                     </p>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between pt-3 border-t border-[#E0E7E6]/60 text-xs font-semibold text-[#395B64]">
+                  <div className="mt-4 flex items-center justify-between pt-3 border-t border-[#E0E7E6]/60 dark:border-[#2C3333] text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA]">
                     <span>Open workspace</span>
                     <i className="fa-solid fa-arrow-right text-[11px] group-hover:translate-x-1 transition-transform" />
                   </div>
@@ -237,12 +255,12 @@ const GlobalDashboard = () => {
               <button
                 type="button"
                 onClick={() => setShowCreateModal(true)}
-                className="rounded-2xl border-2 border-dashed border-[#A5C9CA] p-5 text-center hover:border-[#395B64] hover:bg-[#E7F6F2]/30 transition flex flex-col items-center justify-center min-h-35"
+                className="rounded-2xl border-2 border-dashed border-[#A5C9CA] dark:border-[#395B64] p-5 text-center hover:border-[#395B64] hover:bg-[#E7F6F2]/30 dark:hover:bg-[#1E2525] transition flex flex-col items-center justify-center min-h-35"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E7F6F2] text-[#395B64] text-sm mb-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA] text-sm mb-2">
                   <i className="fa-solid fa-plus" />
                 </div>
-                <span className="text-xs font-bold text-[#395B64]">Create another workspace</span>
+                <span className="text-xs font-bold text-[#395B64] dark:text-[#A5C9CA]">Create another workspace</span>
               </button>
             </div>
           )}

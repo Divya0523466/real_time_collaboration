@@ -27,7 +27,7 @@ const WhyWorkNest = () => {
   return (
     <section
       id="why"
-      className="why-worknest relative w-full overflow-hidden bg-[#2C3333] px-4 py-14 md:px-8 md:py-18"
+      className="why-worknest relative w-full overflow-hidden bg-[#2C3333] dark:bg-[#161D1D] px-4 py-14 md:px-8 md:py-18 transition-colors"
     >
       <div className="relative z-10 mx-auto w-full max-w-300">
         <header className="mx-auto max-w-190 text-center">
@@ -42,8 +42,8 @@ const WhyWorkNest = () => {
 
         <div className="mt-12 grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
           <div className="order-1">
-            <div className="overflow-hidden rounded-2xl border border-[rgba(165,201,202,0.2)] bg-[#E7F6F2] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.2)]">
-              <div className="overflow-hidden rounded-xl bg-white">
+            <div className="overflow-hidden rounded-2xl border border-[rgba(165,201,202,0.2)] dark:border-[#395B64]/50 bg-[#E7F6F2] dark:bg-[#1E2525] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.2)]">
+              <div className="overflow-hidden rounded-xl bg-white dark:bg-[#161D1D]">
                 <img
                   src={whyWorkNestImage}
                   alt="WorkNest team collaboration"

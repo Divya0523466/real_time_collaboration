@@ -118,39 +118,39 @@ const NotificationPanel = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#2C3333]/60 backdrop-blur-xs flex justify-end">
-      <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl animate-[fadeIn_0.15s_ease-out]">
+      <div className="flex h-full w-full max-w-md flex-col bg-white dark:bg-[#1A2121] dark:border-l dark:border-[#2C3333] shadow-2xl animate-[fadeIn_0.15s_ease-out] transition-colors">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#E0E7E6] px-6 py-4 bg-[#F8FAFB]">
+        <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-6 py-4 bg-[#F8FAFB] dark:bg-[#1E2525]">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-[#2C3333]">Notifications</h3>
+              <h3 className="text-base font-bold text-[#2C3333] dark:text-white">Notifications</h3>
               {unreadNotificationsCount > 0 && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#395B64] text-white">
                   {unreadNotificationsCount} new
                 </span>
               )}
             </div>
-            <p className="text-xs text-[#52656A] mt-0.5">Stay updated on your team's activity</p>
+            <p className="text-xs text-[#52656A] dark:text-[#A5C9CA] mt-0.5">Stay updated on your team's activity</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] transition"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white transition"
           >
             <i className="fa-solid fa-xmark text-sm" />
           </button>
         </div>
 
         {/* Toolbar: Filters & Mark all as read */}
-        <div className="flex items-center justify-between px-6 py-2.5 border-b border-[#E0E7E6] bg-white text-xs">
-          <div className="flex items-center gap-1.5 bg-[#F8FAFB] p-0.5 rounded-lg border border-[#E0E7E6]">
+        <div className="flex items-center justify-between px-6 py-2.5 border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] text-xs">
+          <div className="flex items-center gap-1.5 bg-[#F8FAFB] dark:bg-[#242D2D] p-0.5 rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50">
             <button
               type="button"
               onClick={() => setFilter("ALL")}
               className={`px-3 py-1 rounded-md font-semibold transition ${
                 filter === "ALL"
-                  ? "bg-white text-[#2C3333] shadow-xs"
-                  : "text-[#52656A] hover:text-[#2C3333]"
+                  ? "bg-white dark:bg-[#1E2525] text-[#2C3333] dark:text-white shadow-xs"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white"
               }`}
             >
               All
@@ -160,8 +160,8 @@ const NotificationPanel = ({
               onClick={() => setFilter("UNREAD")}
               className={`px-3 py-1 rounded-md font-semibold transition ${
                 filter === "UNREAD"
-                  ? "bg-white text-[#2C3333] shadow-xs"
-                  : "text-[#52656A] hover:text-[#2C3333]"
+                  ? "bg-white dark:bg-[#1E2525] text-[#2C3333] dark:text-white shadow-xs"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white"
               }`}
             >
               Unread {unreadNotificationsCount > 0 ? `(${unreadNotificationsCount})` : ""}
@@ -172,7 +172,7 @@ const NotificationPanel = ({
             <button
               type="button"
               onClick={markAllNotificationsAsRead}
-              className="text-[#395B64] hover:text-[#2C3333] font-semibold text-xs transition flex items-center gap-1.5"
+              className="text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white font-semibold text-xs transition flex items-center gap-1.5"
             >
               <i className="fa-solid fa-check-double text-[11px]" />
               <span>Mark all read</span>
@@ -181,16 +181,16 @@ const NotificationPanel = ({
         </div>
 
         {/* Notification list */}
-        <div className="flex-1 overflow-y-auto divide-y divide-[#E0E7E6]/70">
+        <div className="flex-1 overflow-y-auto divide-y divide-[#E0E7E6]/70 dark:divide-[#2C3333]">
           {filteredNotifications.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] text-2xl text-[#395B64] mb-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/30 text-2xl text-[#395B64] dark:text-[#A5C9CA] mb-3">
                 <i className="fa-regular fa-bell" />
               </div>
-              <h4 className="text-base font-bold text-[#2C3333]">
+              <h4 className="text-base font-bold text-[#2C3333] dark:text-white">
                 {filter === "UNREAD" ? "No unread notifications" : "No notifications yet"}
               </h4>
-              <p className="mt-1 text-xs text-[#52656A] max-w-xs">
+              <p className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]/80 max-w-xs">
                 {filter === "UNREAD"
                   ? "You are all caught up! Great job staying on top of things."
                   : "When you receive messages, mentions, or workspace invites, they will appear here."}
@@ -208,8 +208,8 @@ const NotificationPanel = ({
                   onClick={() => handleNotificationClick(notif)}
                   className={`group relative flex items-start gap-3.5 p-4 cursor-pointer transition ${
                     notif.isRead
-                      ? "bg-white hover:bg-[#F8FAFB]"
-                      : "bg-[#F0F7F6] hover:bg-[#E7F6F2]/80"
+                      ? "bg-white dark:bg-[#1A2121] hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D]"
+                      : "bg-[#F0F7F6] dark:bg-[#242D2D]/60 hover:bg-[#E7F6F2]/80 dark:hover:bg-[#242D2D]"
                   }`}
                 >
                   {/* Actor Avatar / Type Icon */}
@@ -218,7 +218,7 @@ const NotificationPanel = ({
                       <img
                         src={actor.avatar}
                         alt={actor.username}
-                        className="w-9 h-9 rounded-full object-cover border border-[#E0E7E6]"
+                        className="w-9 h-9 rounded-full object-cover border border-[#E0E7E6] dark:border-[#395B64]"
                       />
                     ) : (
                       <div className="w-9 h-9 rounded-full bg-[#395B64] text-[#E7F6F2] font-bold text-xs flex items-center justify-center">
@@ -235,18 +235,18 @@ const NotificationPanel = ({
                   {/* Notification Content */}
                   <div className="flex-1 min-w-0 pr-4">
                     <div className="flex items-baseline justify-between gap-1">
-                      <p className="text-xs font-bold text-[#2C3333] truncate">
+                      <p className="text-xs font-bold text-[#2C3333] dark:text-white truncate">
                         {notif.title}
                       </p>
-                      <span className="text-[10px] text-[#52656A] whitespace-nowrap">
+                      <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/80 whitespace-nowrap">
                         {formatRelativeTime(notif.createdAt)}
                       </span>
                     </div>
-                    <p className="text-xs text-[#52656A] line-clamp-2 mt-0.5 break-words">
+                    <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/90 line-clamp-2 mt-0.5 break-words">
                       {notif.message}
                     </p>
                     {notif.channelId?.name && (
-                      <span className="inline-block mt-1.5 text-[10px] font-semibold text-[#395B64] bg-[#E7F6F2] px-1.5 py-0.5 rounded">
+                      <span className="inline-block mt-1.5 text-[10px] font-semibold text-[#395B64] dark:text-[#A5C9CA] bg-[#E7F6F2] dark:bg-[#395B64]/40 px-1.5 py-0.5 rounded">
                         #{notif.channelId.name}
                       </span>
                     )}
@@ -256,7 +256,7 @@ const NotificationPanel = ({
                   <div className="shrink-0 flex items-center gap-1.5 self-center">
                     {!notif.isRead && (
                       <span
-                        className="w-2 h-2 rounded-full bg-[#395B64]"
+                        className="w-2 h-2 rounded-full bg-[#395B64] dark:bg-[#A5C9CA]"
                         title="Unread"
                       />
                     )}
@@ -267,7 +267,7 @@ const NotificationPanel = ({
                         deleteNotification(notif._id);
                       }}
                       title="Delete notification"
-                      className="opacity-0 group-hover:opacity-100 p-1 text-[#52656A] hover:text-rose-600 transition"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-[#52656A] dark:text-[#A5C9CA] hover:text-rose-600 dark:hover:text-rose-400 transition"
                     >
                       <i className="fa-solid fa-trash-can text-xs" />
                     </button>

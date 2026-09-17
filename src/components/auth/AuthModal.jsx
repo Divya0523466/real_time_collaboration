@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { FiX } from "react-icons/fi";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 
@@ -31,20 +32,24 @@ const AuthModal = ({ mode, onClose, onSwitchMode, onLoginSuccess }) => {
       }}
     >
       <div
-        className="m-auto w-full max-w-115 animate-[auth-modal-in_240ms_ease-out] rounded-2xl bg-white p-5 shadow-[0_24px_70px_rgba(44,51,51,0.3)] sm:p-8"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="auth-title"
+        className="m-auto w-full max-w-115 animate-[auth-modal-in_240ms_ease-out] rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-5 shadow-[0_24px_70px_rgba(44,51,51,0.3)] sm:p-8"
       >
-       
-
-        <div className="text-left">
+        <div className="flex items-center justify-between mb-4">
           <h2
             id="auth-title"
-            className="text-[1.7rem] font-bold tracking-[-0.02em] text-[#2C3333]"
+            className="text-[1.7rem] font-bold tracking-[-0.02em] text-[#2C3333] dark:text-[#E7F6F2]"
           >
             {mode === "login" ? "Welcome back" : "Create your account"}
           </h2>
+          <button
+            ref={closeButton}
+            type="button"
+            onClick={onClose}
+            aria-label="Close modal"
+            className="cursor-pointer flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition"
+          >
+            <FiX className="text-xl" />
+          </button>
         </div>
 
         {mode === "login" ? (

@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { FiSun, FiMoon } from "react-icons/fi"
 import { useWorkspace } from "../../context/WorkspaceContext"
+import { useTheme } from "../../context/ThemeContext"
 import { getPermissions, getRoleDisplayName } from "../../utils/permissions"
 import { toast } from "react-toastify"
 import socket, { joinChannel, leaveChannel } from "../../services/socket"
@@ -51,6 +53,7 @@ const SlackShell = () => {
     loading,
     error,
   } = useWorkspace()
+  const { theme, toggleTheme, isDark } = useTheme()
 
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false)
   const [showEditWorkspaceModal, setShowEditWorkspaceModal] = useState(false)
@@ -435,7 +438,7 @@ const SlackShell = () => {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFB] text-[#2C3333]">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
       <aside className="flex w-17 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] z-30 select-none">
        
         <button
@@ -662,7 +665,7 @@ const SlackShell = () => {
             </>
           )}
         </div>
-        <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-0.5">
+        <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-1">
           <button
             type="button"
             onClick={() => setShowActivityPanel(true)}
@@ -888,9 +891,9 @@ const SlackShell = () => {
       </aside>
 
 
-      <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB]">
+      <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB] dark:bg-[#121717] transition-colors">
         {!selectedDMUser && (
-          <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] bg-white px-6 shadow-xs select-none">
+          <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-6 shadow-xs select-none transition-colors">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {selectedDMUser ? (
@@ -900,11 +903,11 @@ const SlackShell = () => {
                   </div>
                 </div>
               ) : currentChannel?.type === "PRIVATE" ? (
-                <i className="fa-solid fa-lock text-sm text-[#395B64]" />
+                <i className="fa-solid fa-lock text-sm text-[#395B64] dark:text-[#A5C9CA]" />
               ) : (
-                <span className="text-lg font-bold text-[#395B64]">#</span>
+                <span className="text-lg font-bold text-[#395B64] dark:text-[#A5C9CA]">#</span>
               )}
-              <h1 className="truncate text-base font-bold text-[#2C3333]">
+              <h1 className="truncate text-base font-bold text-[#2C3333] dark:text-white">
                 {selectedDMUser ? `@${selectedDMUser.username}` : currentChannel?.name || "general"}
               </h1>
             </div>
@@ -913,7 +916,7 @@ const SlackShell = () => {
               <button
                 type="button"
                 onClick={() => setEditingChannel(currentChannel)}
-                className="text-[#52656A] hover:text-[#395B64] p-1 text-xs transition"
+                className="text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white p-1 text-xs transition"
                 title="Edit this channel"
               >
                 <i className="fa-solid fa-pen" />
@@ -923,7 +926,7 @@ const SlackShell = () => {
             {currentChannel?.description && !selectedDMUser && (
               <>
                 <span className="text-[#A5C9CA]">|</span>
-                <span className="truncate text-xs text-[#52656A] max-w-md">
+                <span className="truncate text-xs text-[#52656A] dark:text-[#A5C9CA]/80 max-w-md">
                   {currentChannel.description}
                 </span>
               </>
@@ -935,7 +938,7 @@ const SlackShell = () => {
               <button
                 type="button"
                 onClick={() => setShowMembersPanel(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/40 bg-[#F8FAFB] px-2.5 py-1.5 text-xs font-semibold text-[#395B64] hover:bg-[#E7F6F2] transition"
+                className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] px-2.5 py-1.5 text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition"
                 title="View members"
               >
                 <i className="fa-solid fa-users text-xs" />
@@ -947,12 +950,26 @@ const SlackShell = () => {
                 onClick={() => setShowDetailsPane((prev) => !prev)}
                 className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
                   showDetailsPane
-                    ? "border-[#395B64] bg-[#E7F6F2] text-[#395B64]"
-                    : "border-[#A5C9CA]/40 text-[#52656A] hover:bg-[#F8FAFB] hover:text-[#2C3333]"
+                    ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                    : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D] hover:text-[#2C3333] dark:hover:text-white"
                 }`}
                 title="Channel details"
               >
                 <i className="fa-solid fa-circle-info text-sm" />
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
+                title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+                aria-label="Toggle theme"
+              >
+                {isDark ? (
+                  <FiSun className="text-sm text-amber-400" />
+                ) : (
+                  <FiMoon className="text-sm text-[#395B64]" />
+                )}
               </button>
             </div>
           )}
@@ -967,71 +984,71 @@ const SlackShell = () => {
           )}
 
           {showDetailsPane && !selectedDMUser && (
-            <aside className="w-80 border-l border-[#E0E7E6] bg-white flex flex-col h-full overflow-y-auto z-10 shadow-lg">
-              <div className="flex items-center justify-between border-b border-[#E0E7E6] px-5 py-4">
-                <h3 className="text-base font-bold text-[#2C3333]">Channel Details</h3>
+            <aside className="w-80 border-l border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex flex-col h-full overflow-y-auto z-10 shadow-lg transition-colors">
+              <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-5 py-4">
+                <h3 className="text-base font-bold text-[#2C3333] dark:text-white">Channel Details</h3>
                 <button
                   type="button"
                   onClick={() => setShowDetailsPane(false)}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] transition"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#242D2D] hover:text-[#2C3333] dark:hover:text-white transition"
                 >
                   <i className="fa-solid fa-xmark" />
                 </button>
               </div>
 
-              <div className="p-5 space-y-6 text-sm text-[#2C3333]">
+              <div className="p-5 space-y-6 text-sm text-[#2C3333] dark:text-[#E7F6F2]">
                 {/* Channel Name Card */}
-                <div className="rounded-2xl border border-[#A5C9CA]/50 bg-[#F8FAFB] p-4">
+                <div className="rounded-2xl border border-[#A5C9CA]/50 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] p-4 transition-colors">
                   <div className="flex items-center justify-between">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#395B64]">Channel</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#395B64] dark:text-[#A5C9CA]">Channel</div>
                     {(selectedRole === "OWNER" || selectedRole === "ADMIN") && currentChannel && (
                       <button
                         type="button"
                         onClick={() => setEditingChannel(activeChannel)}
-                        className="text-xs font-semibold text-[#395B64] hover:underline"
+                        className="text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:underline"
                       >
                         Edit
                       </button>
                     )}
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-lg font-bold text-[#2C3333]">
+                  <div className="mt-1 flex items-center gap-2 text-lg font-bold text-[#2C3333] dark:text-white">
                     {currentChannel?.type === "PRIVATE" ? (
-                      <i className="fa-solid fa-lock text-sm text-[#395B64]" />
+                      <i className="fa-solid fa-lock text-sm text-[#395B64] dark:text-[#A5C9CA]" />
                     ) : (
-                      <span className="text-[#395B64]">#</span>
+                      <span className="text-[#395B64] dark:text-[#A5C9CA]">#</span>
                     )}
                     <span>{currentChannel?.name || "general"}</span>
                   </div>
-                  <p className="mt-1 text-xs text-[#52656A]">{currentChannel?.description || "General team discussion"}</p>
+                  <p className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]/80">{currentChannel?.description || "General team discussion"}</p>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] mb-2.5">About</h4>
-                  <div className="space-y-3 rounded-xl border border-[#E0E7E6] p-3 text-xs">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA] mb-2.5">About</h4>
+                  <div className="space-y-3 rounded-xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#242D2D]/60 p-3 text-xs">
                     <div>
-                      <div className="font-semibold text-[#2C3333]">Topic</div>
-                      <div className="text-[#52656A] mt-0.5">{currentChannel?.description || "General team discussion"}</div>
+                      <div className="font-semibold text-[#2C3333] dark:text-white">Topic</div>
+                      <div className="text-[#52656A] dark:text-[#A5C9CA]/80 mt-0.5">{currentChannel?.description || "General team discussion"}</div>
                     </div>
-                    <div className="h-px bg-[#E0E7E6]" />
+                    <div className="h-px bg-[#E0E7E6] dark:bg-[#2C3333]" />
                     <div>
-                      <div className="font-semibold text-[#2C3333]">Type</div>
-                      <div className="text-[#52656A] mt-0.5">{currentChannel?.type || "PUBLIC"}</div>
+                      <div className="font-semibold text-[#2C3333] dark:text-white">Type</div>
+                      <div className="text-[#52656A] dark:text-[#A5C9CA]/80 mt-0.5">{currentChannel?.type || "PUBLIC"}</div>
                     </div>
-                    <div className="h-px bg-[#E0E7E6]" />
+                    <div className="h-px bg-[#E0E7E6] dark:bg-[#2C3333]" />
                     <div>
-                      <div className="font-semibold text-[#2C3333]">Workspace</div>
-                      <div className="text-[#52656A] mt-0.5">{workspaceData.name}</div>
+                      <div className="font-semibold text-[#2C3333] dark:text-white">Workspace</div>
+                      <div className="text-[#52656A] dark:text-[#A5C9CA]/80 mt-0.5">{workspaceData.name}</div>
                     </div>
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-2.5">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A]">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
                       Members ({activeChannel?.members?.length || 0})
                     </h4>
                     {permissions.canManageChannelMembers && activeChannel && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#395B64]">Manage</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#395B64] dark:text-[#A5C9CA]">Manage</span>
                     )}
                   </div>
                   {permissions.canManageChannelMembers && activeChannel && (
@@ -1040,7 +1057,7 @@ const SlackShell = () => {
                         value={memberToAdd}
                         onChange={(event) => setMemberToAdd(event.target.value)}
                         disabled={channelMemberActionLoading || availableChannelMembers.length === 0}
-                        className="min-w-0 flex-1 rounded-lg border border-[#A5C9CA] bg-white px-2 py-1.5 text-xs text-[#2C3333] disabled:opacity-60"
+                        className="min-w-0 flex-1 rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#242D2D] px-2 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] disabled:opacity-60"
                       >
                         <option value="">Add workspace member...</option>
                         {availableChannelMembers.map((member) => (
@@ -1060,7 +1077,7 @@ const SlackShell = () => {
                   )}
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {activeChannel?.members?.map((m) => (
-                      <div key={m.id} className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-[#F8FAFB]">
+                      <div key={m.id} className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D]">
                         <div className="relative flex-shrink-0">
                           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#395B64] text-[10px] font-bold text-white">
                             {m.username?.charAt(0)?.toUpperCase() || "U"}
@@ -1072,8 +1089,8 @@ const SlackShell = () => {
                             title={isUserOnline(m.id) ? "Online" : "Offline"}
                           />
                         </div>
-                        <span className="truncate text-xs font-medium text-[#2C3333] flex-1">{m.username}</span>
-                        <span className="rounded bg-[#E7F6F2] px-1.5 py-0.5 text-[9px] font-semibold text-[#395B64]">
+                        <span className="truncate text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] flex-1">{m.username}</span>
+                        <span className="rounded bg-[#E7F6F2] dark:bg-[#395B64]/40 px-1.5 py-0.5 text-[9px] font-semibold text-[#395B64] dark:text-[#A5C9CA]">
                           {m.role}
                         </span>
                         {permissions.canManageChannelMembers && (
@@ -1183,31 +1200,31 @@ const SlackShell = () => {
       {/* Workspace Members Panel (Slide-Over) */}
       {showMembersPanel && (
         <div className="fixed inset-0 z-50 bg-[#2C3333]/60 backdrop-blur-xs flex justify-end">
-          <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl animate-[fadeIn_0.15s_ease-out]">
-            <div className="flex items-center justify-between border-b border-[#E0E7E6] px-6 py-4 bg-[#F8FAFB]">
+          <div className="flex h-full w-full max-w-md flex-col bg-white dark:bg-[#1A2121] dark:border-l dark:border-[#2C3333] shadow-2xl animate-[fadeIn_0.15s_ease-out] transition-colors">
+            <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-6 py-4 bg-[#F8FAFB] dark:bg-[#1E2525]">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#395B64]">Workspace</p>
-                <h3 className="text-lg font-bold text-[#2C3333]">Manage Members</h3>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#395B64] dark:text-[#A5C9CA]">Workspace</p>
+                <h3 className="text-lg font-bold text-[#2C3333] dark:text-white">Manage Members</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowMembersPanel(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] transition"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white transition"
               >
                 <i className="fa-solid fa-xmark" />
               </button>
             </div>
 
             {/* Search and Invite Action */}
-            <div className="border-b border-[#E0E7E6] p-4 space-y-3">
+            <div className="border-b border-[#E0E7E6] dark:border-[#2C3333] p-4 space-y-3">
               <div className="relative">
-                <i className="fa-solid fa-magnifying-glass absolute left-3 top-3 text-xs text-[#52656A]" />
+                <i className="fa-solid fa-magnifying-glass absolute left-3 top-3 text-xs text-[#52656A] dark:text-[#A5C9CA]" />
                 <input
                   type="text"
                   value={memberSearchQuery}
                   onChange={(e) => setMemberSearchQuery(e.target.value)}
                   placeholder="Search by name, email, or role..."
-                  className="w-full rounded-xl border border-[#A5C9CA] bg-[#F8FAFB] pl-9 pr-3.5 py-2 text-xs text-[#2C3333] placeholder-[#7B8B8F] focus:border-[#395B64] focus:bg-white focus:outline-none transition"
+                  className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#242D2D] pl-9 pr-3.5 py-2 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#242D2D] focus:outline-none transition"
                 />
               </div>
 
@@ -1228,7 +1245,7 @@ const SlackShell = () => {
 
             {/* Members List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              <div className="text-xs font-semibold text-[#52656A] px-1 mb-2">
+              <div className="text-xs font-semibold text-[#52656A] dark:text-[#A5C9CA] px-1 mb-2">
                 {filteredMembers.length} {filteredMembers.length === 1 ? "member" : "members"}
               </div>
 
@@ -1238,14 +1255,14 @@ const SlackShell = () => {
                 return (
                   <div
                     key={member.id}
-                    className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] bg-white p-3 hover:border-[#A5C9CA] transition shadow-xs"
+                    className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#242D2D] p-3 hover:border-[#A5C9CA] dark:hover:border-[#395B64] transition shadow-xs"
                   >
                     <div className="relative flex-shrink-0">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
                         {member.username?.charAt(0)?.toUpperCase() || "U"}
                       </div>
                       <span
-                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white ${
+                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white dark:ring-[#242D2D] ${
                           isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-300"
                         }`}
                         title={isUserOnline(member.id) ? "Online" : "Offline"}
@@ -1254,20 +1271,20 @@ const SlackShell = () => {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-bold text-[#2C3333]">{member.username}</span>
-                        {isSelf && <span className="text-[10px] text-[#52656A] font-medium">(you)</span>}
+                        <span className="truncate text-sm font-bold text-[#2C3333] dark:text-white">{member.username}</span>
+                        {isSelf && <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-medium">(you)</span>}
                       </div>
-                      <div className="truncate text-xs text-[#52656A]">{member.email}</div>
+                      <div className="truncate text-xs text-[#52656A] dark:text-[#A5C9CA]/80">{member.email}</div>
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                           member.role === "OWNER"
-                            ? "bg-amber-100 text-amber-800"
+                            ? "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300"
                             : member.role === "ADMIN"
-                            ? "bg-[#E7F6F2] text-[#395B64]"
-                            : "bg-slate-100 text-slate-700"
+                            ? "bg-[#E7F6F2] dark:bg-[#395B64]/50 text-[#395B64] dark:text-[#A5C9CA]"
+                            : "bg-slate-100 dark:bg-[#2C3333] text-slate-700 dark:text-[#A5C9CA]"
                         }`}
                       >
                         {member.role}
@@ -1281,7 +1298,7 @@ const SlackShell = () => {
                             onClick={() => {
                               setSelectedMemberForRole(member)
                             }}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-[#395B64] hover:bg-[#E7F6F2] transition"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition"
                             title="Change role"
                           >
                             <i className="fa-solid fa-pen-to-square" />
@@ -1289,7 +1306,7 @@ const SlackShell = () => {
                           <button
                             type="button"
                             onClick={() => handleRemoveMember(member.id, member.username)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-rose-500 hover:bg-rose-50 transition"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
                             title="Remove member"
                           >
                             <i className="fa-solid fa-trash-can" />

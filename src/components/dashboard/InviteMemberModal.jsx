@@ -59,19 +59,19 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
       }}
     >
       <div
-        className="m-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-[0_24px_70px_rgba(44,51,51,0.35)] sm:p-8"
+        className="m-auto w-full max-w-lg rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-6 shadow-[0_24px_70px_rgba(44,51,51,0.35)] sm:p-8"
         role="dialog"
         aria-modal="true"
       >
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#395B64]">Workspace Invitation</p>
-            <h2 className="text-xl font-bold text-[#2C3333]">Invite people to {workspaceName}</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#395B64] dark:text-[#A5C9CA]">Workspace Invitation</p>
+            <h2 className="text-xl font-bold text-[#2C3333] dark:text-[#E7F6F2]">Invite people to {workspaceName}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] transition"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition"
             aria-label="Close invite modal"
           >
             <i className="fa-solid fa-xmark" />
@@ -80,7 +80,7 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] dark:text-[#E7F6F2] mb-1.5">
               Email addresses
             </label>
             <textarea
@@ -88,21 +88,21 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
               value={emails}
               onChange={(event) => setEmails(event.target.value)}
               placeholder="person@example.com, colleague@example.com"
-              className="w-full rounded-xl border border-[#A5C9CA] bg-[#F8FAFB] px-3.5 py-2.5 text-sm text-[#2C3333] placeholder-[#7B8B8F] focus:border-[#395B64] focus:bg-white focus:outline-none transition"
+              className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#2C3333] px-3.5 py-2.5 text-sm text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#2C3333] focus:outline-none transition"
             />
-            <p className="mt-1 text-[11px] text-[#52656A]">Separate multiple emails with commas</p>
+            <p className="mt-1 text-[11px] text-[#52656A] dark:text-[#A5C9CA]">Separate multiple emails with commas</p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] mb-2">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] dark:text-[#E7F6F2] mb-2">
               Workspace Role
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label
                 className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${
                   role === "MEMBER"
-                    ? "border-[#395B64] bg-[#E7F6F2]/60 text-[#2C3333]"
-                    : "border-[#E0E0E0] bg-white hover:border-[#A5C9CA]"
+                    ? "border-[#395B64] bg-[#E7F6F2]/60 dark:bg-[#395B64]/20 text-[#2C3333] dark:text-[#E7F6F2]"
+                    : "border-[#E0E0E0] dark:border-[#395B64]/30 bg-white dark:bg-[#2C3333]/50 hover:border-[#A5C9CA] dark:hover:border-[#395B64]"
                 }`}
               >
                 <input
@@ -114,16 +114,16 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
                   className="mt-0.5 text-[#395B64] focus:ring-[#395B64]"
                 />
                 <div>
-                  <div className="text-sm font-semibold text-[#2C3333]">Member</div>
-                  <div className="text-xs text-[#52656A]">Normal chat & channel access</div>
+                  <div className="text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2]">Member</div>
+                  <div className="text-xs text-[#52656A] dark:text-[#A5C9CA]">Normal chat & channel access</div>
                 </div>
               </label>
 
               <label
                 className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition ${
                   role === "ADMIN"
-                    ? "border-[#395B64] bg-[#E7F6F2]/60 text-[#2C3333]"
-                    : "border-[#E0E0E0] bg-white hover:border-[#A5C9CA]"
+                    ? "border-[#395B64] bg-[#E7F6F2]/60 dark:bg-[#395B64]/20 text-[#2C3333] dark:text-[#E7F6F2]"
+                    : "border-[#E0E0E0] dark:border-[#395B64]/30 bg-white dark:bg-[#2C3333]/50 hover:border-[#A5C9CA] dark:hover:border-[#395B64]"
                 }`}
               >
                 <input
@@ -135,15 +135,15 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
                   className="mt-0.5 text-[#395B64] focus:ring-[#395B64]"
                 />
                 <div>
-                  <div className="text-sm font-semibold text-[#2C3333]">Admin</div>
-                  <div className="text-xs text-[#52656A]">Can manage channels & members</div>
+                  <div className="text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2]">Admin</div>
+                  <div className="text-xs text-[#52656A] dark:text-[#A5C9CA]">Can manage channels & members</div>
                 </div>
               </label>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] dark:text-[#E7F6F2] mb-1.5">
               Optional message
             </label>
             <textarea
@@ -151,7 +151,7 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               placeholder="Join our workspace on WorkNest!"
-              className="w-full rounded-xl border border-[#A5C9CA] bg-[#F8FAFB] px-3.5 py-2.5 text-sm text-[#2C3333] placeholder-[#7B8B8F] focus:border-[#395B64] focus:bg-white focus:outline-none transition"
+              className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#2C3333] px-3.5 py-2.5 text-sm text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#2C3333] focus:outline-none transition"
             />
           </div>
 
@@ -159,14 +159,14 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-[#A5C9CA] py-2.5 text-sm font-semibold text-[#2C3333] hover:bg-[#E7F6F2] transition"
+              className="flex-1 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] py-2.5 text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 rounded-xl bg-[#395B64] py-2.5 text-sm font-semibold text-white shadow-md hover:bg-[#2C3333] disabled:opacity-60 transition"
+              className="flex-1 rounded-xl bg-[#395B64] py-2.5 text-sm font-semibold text-white shadow-md hover:bg-[#2C3333] dark:hover:bg-[#4E717B] disabled:opacity-60 transition"
             >
               {isSubmitting ? "Sending..." : "Send invitation"}
             </button>

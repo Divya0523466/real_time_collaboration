@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { FiSun, FiMoon } from "react-icons/fi";
 import logo from "../assets/worknestlogo.png";
+import { useTheme } from "../context/ThemeContext";
 
 const Navbar = ({ onOpenAuth }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { theme, toggleTheme, isDark } = useTheme();
  
   return (
-    <nav className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-y-3 border-b border-[#dbe9e8] bg-white px-4 pb-4 pt-3 lg:flex-nowrap lg:px-8 lg:pb-6">
+    <nav className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-y-3 border-b border-[#dbe9e8] bg-white dark:bg-[#1A2121] dark:border-[#2C3333] px-4 pb-4 pt-3 lg:flex-nowrap lg:px-8 lg:pb-6 transition-colors">
       <div className="flex shrink-0 items-center gap-3">
         <img
           src={logo}
@@ -13,12 +16,12 @@ const Navbar = ({ onOpenAuth }) => {
           className="h-9 w-9 lg:h-10 lg:w-10"
         />
 
-        <p className="text-xl font-bold tracking-tight text-[#395B64] lg:text-2xl">
+        <p className="text-xl font-bold tracking-tight text-[#395B64] dark:text-[#A5C9CA] lg:text-2xl">
           WorkNest
         </p>
       </div>
 
-      <ul className="hidden items-center gap-8 font-medium text-[1rem] text-[#5E6868] lg:flex">
+      <ul className="hidden items-center gap-8 font-medium text-[1rem] text-[#5E6868] dark:text-[#A5C9CA] lg:flex">
         <li>
           <a
             href="#top"
@@ -74,11 +77,25 @@ const Navbar = ({ onOpenAuth }) => {
         </li>
       </ul>
  
-      <div className="flex gap-1 sm:gap-3">
+      <div className="flex items-center gap-1 sm:gap-3">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+          className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-full border border-[#dbe4e4] dark:border-[#395B64] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#f1f7f6] dark:hover:bg-[#2C3333] transition shadow-xs"
+          title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+        >
+          {isDark ? (
+            <FiSun className="text-base text-amber-400 transition-transform duration-200 hover:rotate-45" />
+          ) : (
+            <FiMoon className="text-base text-[#395B64] transition-transform duration-200 hover:-rotate-12" />
+          )}
+        </button>
+
         <button
           type="button"
           onClick={() => onOpenAuth("login")}
-          className="cursor-pointer rounded-full border border-[#dbe4e4] px-3 py-1.5 text-sm font-semibold text-[#303536] transition hover:bg-[#f1f7f6] sm:px-6 sm:py-2 sm:text-base"
+          className="cursor-pointer rounded-full border border-[#dbe4e4] dark:border-[#395B64] px-3 py-1.5 text-sm font-semibold text-[#303536] dark:text-[#E7F6F2] transition hover:bg-[#f1f7f6] dark:hover:bg-[#2C3333] sm:px-6 sm:py-2 sm:text-base"
         >
           Login
         </button>
@@ -86,7 +103,7 @@ const Navbar = ({ onOpenAuth }) => {
         <button
           type="button"
           onClick={() => onOpenAuth("register")}
-          className="cursor-pointer rounded-full bg-[#395B64] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(57,91,100,0.22)] transition hover:bg-[#2C3333] sm:px-6 sm:py-2 sm:text-base"
+          className="cursor-pointer rounded-full bg-[#395B64] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(57,91,100,0.22)] transition hover:bg-[#2C3333] dark:hover:bg-[#4E717B] sm:px-6 sm:py-2 sm:text-base"
         >
           Get Started
         </button>
@@ -97,7 +114,7 @@ const Navbar = ({ onOpenAuth }) => {
         aria-expanded={menuOpen}
         aria-controls="mobile-navigation"
         aria-label="Toggle navigation menu"
-        className="order-last flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-[#dbe4e4] text-[#395B64] lg:hidden"
+        className="order-last flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-[#dbe4e4] dark:border-[#395B64] text-[#395B64] dark:text-[#A5C9CA] lg:hidden"
         onClick={() => setMenuOpen((open) => !open)}
       >
         <i
@@ -109,7 +126,7 @@ const Navbar = ({ onOpenAuth }) => {
       {menuOpen && (
         <ul
           id="mobile-navigation"
-          className="order-last grid w-full gap-3 border-t border-[#dbe9e8] pt-3 font-medium text-[#5E6868] lg:hidden"
+          className="order-last grid w-full gap-3 border-t border-[#dbe9e8] dark:border-[#2C3333] pt-3 font-medium text-[#5E6868] dark:text-[#A5C9CA] lg:hidden"
         >
           <li>
             <a
