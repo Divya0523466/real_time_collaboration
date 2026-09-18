@@ -28,7 +28,7 @@ const register = async (req, res) => {
       password: hashedPassword,
     })
 
-    // Check for pending workspace invitations and notify new user
+    
     try {
       const pendingInvites = await Invitation.find({ email: enteredEmail, status: "PENDING" }).populate("workspaceId", "name");
       for (const inv of pendingInvites) {
@@ -97,8 +97,49 @@ const login = async (req, res) => {
   }
 }
 
+
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" })
+    }
+
+    const user = await User.findOne({ email: email.trim()})
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email" })
+    }
+    return res.status(200).json({message: "OTP sent to email"});
+  } catch {
+    return res.status(500).json({ message: "Server error" })
+  }
+}
+
+const verifyOTP=async(req,res)=>{
+   try {
+    const {otp } = req.body
+
+    if (!otp) {
+      return res.status(400).json({ message: "OTP is required" })
+    }
+
+    //verify otp
+    let isMatched=true;
+
+    if (!isMatched) {
+      return res.status(401).json({ message: "Invalid OTP" })
+    }
+    return res.status(200).json({message: "OTP Verified Successfully"});
+  } catch {
+    return res.status(500).json({ message: "Server error" })
+  }
+}
+
 const logout = (req, res) => {
   return res.json({ message: "Logout successful" })
 }
 
-export { register, login, logout }
+export { register, login, logout,forgotPassword,verifyOTP }

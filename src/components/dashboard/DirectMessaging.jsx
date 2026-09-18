@@ -21,7 +21,7 @@ import {
 } from "../../services/socket"
 import MessageThread from "./MessageThread"
 
-const DirectMessaging = ({ externalSelectedUser = null }) => {
+const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
   const { workspaceData, user } = useWorkspace()
   const [selectedUser, setSelectedUser] = useState(externalSelectedUser)
   const [messages, setMessages] = useState([])
@@ -188,6 +188,7 @@ const DirectMessaging = ({ externalSelectedUser = null }) => {
       onEditMessage={handleEditMessage}
       onDeleteMessage={handleDeleteMessage}
       currentUserId={user?.id}
+      onOpenSidebar={onOpenSidebar}
     />
   )
 }

@@ -13,7 +13,10 @@ import WhyWorkNest from "./components/WhyWorkNest"
 import AuthModal from "./components/auth/AuthModal"
 import GlobalDashboard from "./components/dashboard/GlobalDashboard"
 import SlackShell from "./components/dashboard/SlackShell"
-import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext"
+import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext";
+import ForgotPassword from "./components/ForgotPassword";
+import OTP from "./components/OTP";
+import SetPassword from "./components/SetPassword";
 
 const LandingPage = () => {
   const [authMode, setAuthMode] = useState(null)
@@ -54,6 +57,9 @@ const AppRoutes = () => {
       <Route path="/app/dashboard" element={<GlobalDashboard />} />
       <Route path="/app/workspace/:workspaceId" element={<SlackShell />} />
       <Route path="/app/workspace/:workspaceId/channel/:channelId" element={<SlackShell />} />
+      <Route path="/forgot-password" element={<ForgotPassword/>} />
+      <Route path="/enter-otp" element={<OTP/>} />
+      <Route path="/set-password" element={<SetPassword/>} />
     </Routes>
   )
 }

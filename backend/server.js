@@ -21,6 +21,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
 
+
 const app = express();
 const port = process.env.PORT || 5000;
 const server = http.createServer(app);
@@ -519,6 +520,10 @@ io.on("connection", async (socket) => {
     }
   });
 });
+
+
+
+
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {

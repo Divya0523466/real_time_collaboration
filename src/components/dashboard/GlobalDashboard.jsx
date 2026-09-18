@@ -44,9 +44,102 @@ const GlobalDashboard = () => {
     navigate(`/app/workspace/${workspace.id}`)
   }
 
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+
   return (
-    <div className="flex min-h-screen bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
-      <aside className="w-17 border-r border-[#2C3333]/30 bg-[#2C3333] text-white flex flex-col items-center py-3.5 select-none">
+    <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
+
+      {/* ── Mobile top bar (fixed structure) ─────────────────────────────── */}
+      <header className="flex md:hidden items-center justify-between h-14 px-4 border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition"
+            aria-label="Open sidebar"
+          >
+            <i className="fa-solid fa-bars text-lg" />
+          </button>
+          <span className="text-base font-bold text-[#2C3333] dark:text-white">WorkNest</span>
+        </div>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition"
+          title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+        >
+          {isDark ? <FiSun className="text-base text-amber-400" /> : <FiMoon className="text-base text-[#395B64]" />}
+        </button>
+      </header>
+
+      {/* ── Mobile sidebar backdrop ──────────────────────────────────────── */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Mobile sidebar drawer ────────────────────────────────────────── */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 md:hidden ${
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Icon rail */}
+        <div className="flex w-14 flex-col items-center bg-[#2C3333] py-3.5 text-white select-none">
+          <button
+            type="button"
+            onClick={() => { navigate("/app/dashboard"); setIsMobileSidebarOpen(false) }}
+            className="w-11 h-11 rounded-xl bg-[#395B64] flex items-center justify-center font-bold mb-4 text-[#E7F6F2] hover:bg-[#A5C9CA] hover:text-[#2C3333] transition shadow-md"
+            title="WorkNest Dashboard"
+          >
+            <i className="fa-solid fa-layer-group text-lg" />
+          </button>
+          <div className="w-8 h-px bg-[#395B64]/50 mb-3" />
+          <div className="flex flex-col gap-2.5 w-full items-center">
+            {workspaces.map((workspace) => (
+              <button
+                key={workspace.id}
+                type="button"
+                title={workspace.name}
+                onClick={() => { handleSelectWorkspace(workspace); setIsMobileSidebarOpen(false) }}
+                className="w-11 h-11 rounded-xl bg-[#374242] hover:bg-[#395B64] hover:text-white text-[#E7F6F2] transition flex items-center justify-center font-bold text-xs"
+              >
+                {getWorkspaceInitials(workspace.name)}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => { setShowCreateModal(true); setIsMobileSidebarOpen(false) }}
+              className="w-11 h-11 rounded-xl border border-dashed border-[#52656A] text-[#A5C9CA] hover:border-[#E7F6F2] hover:bg-[#395B64]/40 hover:text-white transition flex items-center justify-center text-xs"
+              title="Create Workspace"
+            >
+              <i className="fa-solid fa-plus" />
+            </button>
+          </div>
+        </div>
+
+        {/* GlobalNav sidebar */}
+        <div className="w-64 bg-[#1E2525] flex flex-col">
+          <div className="flex items-center justify-between px-3 pt-3">
+            <span className="text-xs font-bold text-[#A5C9CA] uppercase tracking-widest">Menu</span>
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+              aria-label="Close sidebar"
+            >
+              <i className="fa-solid fa-xmark text-sm" />
+            </button>
+          </div>
+          <GlobalNav user={user} />
+        </div>
+      </div>
+
+      {/* ── Desktop: Icon rail (hidden on mobile) ────────────────────────── */}
+      <aside className="hidden md:flex w-17 border-r border-[#2C3333]/30 bg-[#2C3333] text-white flex-col items-center py-3.5 select-none flex-shrink-0">
         <button
           type="button"
           onClick={() => navigate("/app/dashboard")}
@@ -82,16 +175,19 @@ const GlobalDashboard = () => {
         </div>
       </aside>
 
-      <aside className="w-64 border-r border-[#E0E7E6] dark:border-[#2C3333] bg-[#1E2525]">
+      {/* ── Desktop: GlobalNav sidebar (hidden on mobile) ─────────────────── */}
+      <aside className="hidden md:block w-64 border-r border-[#E0E7E6] dark:border-[#2C3333] bg-[#1E2525] flex-shrink-0">
         <GlobalNav user={user} />
       </aside>
 
 
-      <main className="flex-1 p-10 overflow-y-auto">
+      {/* ── Main content ──────────────────────────────────────────────────── */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-10 overflow-y-auto min-w-0">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-8 flex items-start justify-between gap-4">
+
+          <div className="mb-6 sm:mb-8 flex items-start justify-between gap-4">
             <div>
-              <h1 className="mt-3 text-3xl font-bold text-[#2C3333] dark:text-white">
+              <h1 className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-bold text-[#2C3333] dark:text-white">
                 Welcome back, {user?.username || "there"}
               </h1>
               <p className="mt-1.5 text-sm text-[#52656A] dark:text-[#A5C9CA]">
@@ -102,7 +198,7 @@ const GlobalDashboard = () => {
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs"
+              className="hidden md:flex flex-shrink-0 h-9 w-9 items-center justify-center rounded-xl border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs"
               title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
             >
               {isDark ? (
@@ -138,11 +234,11 @@ const GlobalDashboard = () => {
           )}
 
           {invitations.length > 0 && (
-            <section className="mb-8 rounded-3xl border border-[#A5C9CA] dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] p-5 shadow-xs transition-colors">
+            <section className="mb-8 rounded-3xl border border-[#A5C9CA] dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] p-4 sm:p-5 shadow-xs transition-colors">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#395B64] dark:text-[#A5C9CA]">Invitations</p>
-                  <h2 className="mt-1 text-xl font-bold text-[#2C3333] dark:text-white">Pending Invitations</h2>
+                  <h2 className="mt-1 text-lg sm:text-xl font-bold text-[#2C3333] dark:text-white">Pending Invitations</h2>
                 </div>
                 <span className="rounded-full bg-[#E7F6F2] dark:bg-[#395B64]/40 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#395B64] dark:text-[#A5C9CA]">
                   {invitations.length} pending
@@ -152,7 +248,7 @@ const GlobalDashboard = () => {
               <div className="space-y-3">
                 {invitations.map((invitation) => (
                   <div key={invitation.id} className="rounded-2xl border border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#242D2D] p-4 transition-colors">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <div className="text-sm font-bold text-[#2C3333] dark:text-white">
                           Workspace: <span className="text-[#395B64] dark:text-[#A5C9CA]">{invitation.workspaceName}</span>
@@ -199,7 +295,7 @@ const GlobalDashboard = () => {
           )}
 
           {!loading && !error && workspaces.length === 0 && (
-            <div className="rounded-3xl border border-dashed border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] p-12 text-center max-w-lg mx-auto shadow-xs">
+            <div className="rounded-3xl border border-dashed border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] p-8 sm:p-12 text-center max-w-lg mx-auto shadow-xs">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/40 text-3xl text-[#395B64] dark:text-[#A5C9CA] mx-auto mb-4">
                 <i className="fa-solid fa-layer-group" />
               </div>
@@ -219,7 +315,7 @@ const GlobalDashboard = () => {
 
   
           {!loading && workspaces.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {workspaces.map((workspace) => (
                 <button
                   key={workspace.id}

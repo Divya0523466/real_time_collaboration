@@ -120,7 +120,7 @@ const NotificationPanel = ({
     <div className="fixed inset-0 z-50 bg-[#2C3333]/60 backdrop-blur-xs flex justify-end">
       <div className="flex h-full w-full max-w-md flex-col bg-white dark:bg-[#1A2121] dark:border-l dark:border-[#2C3333] shadow-2xl animate-[fadeIn_0.15s_ease-out] transition-colors">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-6 py-4 bg-[#F8FAFB] dark:bg-[#1E2525]">
+        <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-4 sm:px-6 py-4 bg-[#F8FAFB] dark:bg-[#1E2525]">
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-[#2C3333] dark:text-white">Notifications</h3>
@@ -142,7 +142,7 @@ const NotificationPanel = ({
         </div>
 
         {/* Toolbar: Filters & Mark all as read */}
-        <div className="flex items-center justify-between px-6 py-2.5 border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] text-xs">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] text-xs">
           <div className="flex items-center gap-1.5 bg-[#F8FAFB] dark:bg-[#242D2D] p-0.5 rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50">
             <button
               type="button"
@@ -206,7 +206,7 @@ const NotificationPanel = ({
                 <div
                   key={notif._id}
                   onClick={() => handleNotificationClick(notif)}
-                  className={`group relative flex items-start gap-3.5 p-4 cursor-pointer transition ${
+                  className={`group relative flex items-start gap-3 sm:gap-3.5 px-4 sm:px-4 py-3.5 cursor-pointer transition ${
                     notif.isRead
                       ? "bg-white dark:bg-[#1A2121] hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D]"
                       : "bg-[#F0F7F6] dark:bg-[#242D2D]/60 hover:bg-[#E7F6F2]/80 dark:hover:bg-[#242D2D]"

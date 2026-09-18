@@ -172,26 +172,26 @@ const MessageRow = ({
   const showOrphanRef = !isReply && !!message.replyToMessage
 
   return (
-    <div className={`group flex gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[#F8FAFB] dark:hover:bg-[#1E2525]/60 ${isReply ? "py-1.5" : ""}`}>
+    <div tabIndex="0" className={`group focus:outline-none flex gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[#F8FAFB] focus:bg-[#F8FAFB] dark:hover:bg-[#1E2525]/60 dark:focus:bg-[#1E2525]/60 ${isReply ? "py-1.5" : ""}`}>
       {/* Avatar */}
       <div className="flex-shrink-0 pt-0.5">
         <Avatar username={username} small={isReply} />
       </div>
 
       {/* Content & Actions wrapper */}
-      <div className="flex items-start gap-3 min-w-0 max-w-full">
+      <div className="flex items-start justify-start gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
         {/* Content column */}
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col min-w-0 max-w-full">
           {/* Header row */}
-          <div className="flex items-baseline gap-2 mb-1">
+          <div className="flex items-baseline gap-2 mb-1 flex-wrap">
             <span className={`font-semibold text-[#2C3333] dark:text-white leading-none ${isReply ? "text-[12px]" : "text-sm"}`}>
               {isSender ? "You" : username}
             </span>
-            <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA] leading-none">
+            <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA] leading-none whitespace-nowrap">
               {formatMessageTime(message.createdAt)}
             </span>
             {message.isEdited && !isDeleted && (
-              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50 leading-none">(edited)</span>
+              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50 leading-none whitespace-nowrap">(edited)</span>
             )}
           </div>
 
@@ -246,24 +246,24 @@ const MessageRow = ({
           ) : isDeleted ? (
             <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
           ) : (
-            <MessageContent content={message.content} isSender={isSender} className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed" />
+            <MessageContent content={message.content} isSender={isSender} className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed break-words" />
           )}
         </div>
 
         {/* Hover action buttons — positioned inline next to the content */}
         {!isBeingEdited && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 -mt-0.5">
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 focus-within:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 -mt-0.5 self-start">
             {!isDeleted && (
               <div className="group/tip relative">
                 <button
                   type="button"
                   onClick={() => onStartReply(message)}
                   aria-label="Reply"
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+                  className="flex h-6 w-6 sm:h-6 sm:w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
                 >
                   <i className="fa-solid fa-reply text-[10px]" />
                 </button>
-                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                   Reply
                 </span>
               </div>
@@ -282,7 +282,7 @@ const MessageRow = ({
                       >
                         <i className="fa-solid fa-pen text-[10px]" />
                       </button>
-                      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                         Edit
                       </span>
                     </div>
@@ -297,7 +297,7 @@ const MessageRow = ({
                   >
                     <i className="fa-solid fa-trash text-[10px]" />
                   </button>
-                  <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                  <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                     Delete
                   </span>
                 </div>
@@ -569,7 +569,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
       <div className="flex-1 overflow-y-auto">
 
         {/* Channel intro header */}
-        <div className="px-6 pt-8 pb-4 border-b border-[#E0E7E6] dark:border-[#2C3333]">
+        <div className="px-4 sm:px-6 pt-5 sm:pt-8 pb-4 border-b border-[#E0E7E6] dark:border-[#2C3333]">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/30 text-xl text-[#395B64] dark:text-[#A5C9CA] mb-3">
             {channel.type === "PRIVATE"
               ? <i className="fa-solid fa-lock" />
@@ -583,7 +583,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
 
         {/* Error banner */}
         {error && (
-          <div className="mx-6 mt-4 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-900/60 px-4 py-3 text-sm text-rose-700 dark:text-rose-400">
+          <div className="mx-4 sm:mx-6 mt-4 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-900/60 px-4 py-3 text-sm text-rose-700 dark:text-rose-400">
             <i className="fa-solid fa-circle-exclamation flex-shrink-0" />
             {error}
           </div>

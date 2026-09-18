@@ -69,13 +69,6 @@ const GlobalNav = ({ user }) => {
             </span>
           )}
         </button>
-        <button
-          type="button"
-          onClick={() => setShowNotifications(true)}
-          className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition flex items-center gap-2.5"
-        >
-          <i className="fa-solid fa-chart-line w-4 text-center text-[#A5C9CA]" /> Activity
-        </button>
       </nav>
 
    

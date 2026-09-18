@@ -88,6 +88,11 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
           {error}
         </p>
       )}
+      <p className="mb-3 text-right text-sm text-[#364042] dark:text-[#A5C9CA]">
+       <a href="/forgot-password" className="underline underline-offset-4">
+          Forgot Password?
+        </a>
+      </p>
 
       <button
         type="submit"
@@ -97,6 +102,7 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
         {isLoading ? "Signing in..." : "Sign in"}
         {!isLoading && <i className="fa-solid fa-arrow-right text-xs" aria-hidden="true" />}
       </button>
+  
 
       <p className="border-t border-[#E6EEED] dark:border-[#2C3333] pt-3 text-center text-sm text-[#52656A] dark:text-[#A5C9CA]">
         Don't have an account?{" "}

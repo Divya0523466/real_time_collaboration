@@ -124,7 +124,7 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
         className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#395B64] px-6 text-sm font-bold text-white shadow-[0_10px_20px_rgba(57,91,100,0.18)] transition hover:bg-[#2C3333] dark:hover:bg-[#4E717B] hover:shadow-[0_12px_24px_rgba(44,51,51,0.2)] disabled:cursor-not-allowed disabled:opacity-70"
       >
         {isLoading ? "Creating account..." : "Create account"}
-        {!isLoading && <i className="fa-solid fa-arrow-right text-xs" aria-hidden="true" />}
+        {!isLoading && <i className="fa-solid fa-arrow-right text-xs" />}
       </button>
 
       <p className="border-t border-[#E6EEED] dark:border-[#2C3333] pt-4 text-center text-sm text-[#52656A] dark:text-[#A5C9CA]">

@@ -34,10 +34,9 @@ const getFileNameFromUrl = (url) => {
 const MessageContent = ({ content = "", isSender = false, className = "" }) => {
   if (!content) return null;
 
-  // Split content by whitespace / lines to find URLs
+  
   const tokens = content.split(/(\s+)/);
 
-  // Check if entire content is a single URL
   const trimmed = content.trim();
   const isSingleUrl = isUrl(trimmed);
 
@@ -49,7 +48,7 @@ const MessageContent = ({ content = "", isSender = false, className = "" }) => {
             href={trimmed}
             target="_blank"
             rel="noopener noreferrer"
-            className="block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
+            className="inline-block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
           >
             <img
               src={trimmed}
@@ -123,7 +122,7 @@ const MessageContent = ({ content = "", isSender = false, className = "" }) => {
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
+              className="inline-block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
             >
               <img
                 src={url}

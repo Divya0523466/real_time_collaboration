@@ -26,6 +26,7 @@ const MessageThread = ({
   onEditMessage = () => {},
   onDeleteMessage = () => {},
   currentUserId = null,
+  onOpenSidebar = () => {},
 }) => {
   const { isUserOnline } = useWorkspace()
   const { toggleTheme, isDark } = useTheme()
@@ -90,8 +91,18 @@ const MessageThread = ({
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-[#121717] transition-colors">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121] px-6 py-3.5 transition-colors">
+      <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121] px-4 sm:px-6 py-3.5 transition-colors">
         <div className="flex items-center gap-3">
+          {/* Hamburger — mobile only */}
+          <button
+            type="button"
+            onClick={onOpenSidebar}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F1F5F4] dark:hover:bg-[#2C3333] transition md:hidden"
+            aria-label="Open sidebar"
+          >
+            <i className="fa-solid fa-bars text-sm" />
+          </button>
+          
           <div className="relative flex-shrink-0">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white shadow-xs">
               {selectedUser.username?.charAt(0)?.toUpperCase() || "U"}
@@ -174,13 +185,14 @@ const MessageThread = ({
                   <DateSeparator label={dateLabel} />
                 )}
                 <div
-                  className={`group flex items-end gap-1.5 ${
+                  tabIndex="0"
+                  className={`group focus:outline-none flex items-end gap-1.5 ${
                     isSender ? "justify-end" : "justify-start"
                   }`}
                 >
                   {/* Hover action toolbar for sender — floats beside bubble */}
                   {isSender && !isDeleted && !isBeingEdited && (
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-1">
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 focus-within:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-1">
                       {!isImageOrFileMessage(message.content) && (
                         <div className="group/tip relative">
                           <button
@@ -191,7 +203,7 @@ const MessageThread = ({
                           >
                             <i className="fa-solid fa-pen text-[10px]" />
                           </button>
-                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                             Edit
                           </span>
                         </div>
@@ -205,7 +217,7 @@ const MessageThread = ({
                         >
                           <i className="fa-solid fa-trash text-[10px]" />
                         </button>
-                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                           Delete
                         </span>
                       </div>
@@ -269,7 +281,7 @@ const MessageThread = ({
                     </div>
                   ) : (
                     <div
-                      className={`rounded-lg px-3 py-1.5 max-w-xs sm:max-w-md ${
+                      className={`rounded-lg px-3 py-1.5 max-w-xs sm:max-w-md break-words ${
                         isSender
                           ? "bg-[#395B64] text-white"
                           : "bg-[#F1F5F4] dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2]"
@@ -359,9 +371,10 @@ const MessageThread = ({
             type="button"
             onClick={handleSendClick}
             disabled={!inputValue.trim() && !attachedFile}
-            className="rounded-lg bg-[#395B64] px-4 py-2 font-medium text-white transition hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-[#395B64] px-3 sm:px-4 py-2 font-medium text-white transition hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0"
           >
-            Send
+            <i className="fa-solid fa-paper-plane text-sm sm:text-xs" />
+            <span className="hidden sm:inline">Send</span>
           </button>
         </div>
       </div>

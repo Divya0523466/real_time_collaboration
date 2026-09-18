@@ -40,7 +40,7 @@ const CreateWorkspaceModal = ({ onClose, onSuccess }) => {
       }}
     >
       <div
-        className="m-auto w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-6 shadow-[0_24px_70px_rgba(44,51,51,0.35)] sm:p-8"
+        className="m-auto w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-5 sm:p-8 shadow-[0_24px_70px_rgba(44,51,51,0.35)]"
         role="dialog"
         aria-modal="true"
       >
@@ -87,7 +87,7 @@ const CreateWorkspaceModal = ({ onClose, onSuccess }) => {
 
           {error && <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>}
 
-          <div className="flex gap-3 pt-3">
+          <div className="flex flex-col sm:flex-row gap-3 pt-3">
             <button
               type="button"
               onClick={onClose}

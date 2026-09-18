@@ -61,6 +61,7 @@ const SlackShell = () => {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false)
   const [editingChannel, setEditingChannel] = useState(null)
@@ -301,6 +302,7 @@ const SlackShell = () => {
     })
     markChannelAsRead(chan.id).catch(() => {})
     setActiveChannelMenuId(null)
+    setIsMobileSidebarOpen(false)
     navigate(`/app/workspace/${workspaceId}/channel/${chan.id}`)
   }
 
@@ -439,8 +441,307 @@ const SlackShell = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
-      <aside className="flex w-17 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] z-30 select-none">
-       
+
+      {/* ── Mobile sidebar backdrop ─────────────────────────────────────────── */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Mobile sidebar drawer ───────────────────────────────────────────── */}
+      {/* On mobile this is a slide-in overlay. On md+ it is always rendered
+          inline (the two aside elements below take over). */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 md:hidden ${
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Icon rail — merged into mobile drawer */}
+        <div className="flex w-14 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] select-none">
+          <button
+            type="button"
+            onClick={() => { navigate("/app/dashboard"); setIsMobileSidebarOpen(false) }}
+            className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#395B64] text-base font-bold text-[#E7F6F2] shadow-md transition hover:bg-[#A5C9CA] hover:text-[#2C3333]"
+            title="WorkNest Dashboard"
+          >
+            <i className="fa-solid fa-layer-group text-lg" />
+          </button>
+          <div className="w-8 h-px bg-[#395B64]/50 mb-3" />
+          <div className="flex w-full flex-1 flex-col items-center gap-2.5 overflow-y-auto px-2">
+            {workspaces.map((ws) => {
+              const active = ws.id === workspaceId
+              const initials = getWorkspaceInitials(ws.name)
+              return (
+                <button
+                  key={ws.id}
+                  type="button"
+                  onClick={() => { handleSelectWorkspace(ws.id); setIsMobileSidebarOpen(false) }}
+                  title={`${ws.name} (${ws.role || "Member"})`}
+                  className={`group relative flex h-11 w-11 items-center justify-center rounded-xl text-xs font-bold tracking-wider transition-all ${
+                    active
+                      ? "bg-[#395B64] text-white shadow-lg ring-2 ring-[#A5C9CA] ring-offset-2 ring-offset-[#2C3333]"
+                      : "bg-[#374242] text-[#E7F6F2] hover:bg-[#395B64] hover:text-white"
+                  }`}
+                >
+                  {initials}
+                  {active && (
+                    <span className="absolute -left-2 h-6 w-1 rounded-r-full bg-[#A5C9CA]" />
+                  )}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => { setShowCreateWorkspaceModal(true); setIsMobileSidebarOpen(false) }}
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-[#52656A] text-lg text-[#A5C9CA] transition hover:border-[#E7F6F2] hover:bg-[#395B64]/40 hover:text-white"
+              title="Create new workspace"
+            >
+              <i className="fa-solid fa-plus text-xs" />
+            </button>
+          </div>
+          <div className="relative mt-auto w-full px-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowProfileMenu((prev) => !prev)}
+              className="relative mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#52656A] bg-[#395B64] text-xs font-bold text-white shadow-sm transition hover:border-[#A5C9CA]"
+              title="Your Profile"
+            >
+              {user?.username?.charAt(0)?.toUpperCase() || "U"}
+              <span className="absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-[#2C3333]" />
+            </button>
+
+            {/* Profile Menu Popover (Mobile Icon Rail) */}
+            {showProfileMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowProfileMenu(false)}
+                />
+                <div className="absolute bottom-2 left-16 z-50 w-64 rounded-2xl border border-[#395B64] bg-[#1E2525] p-3 text-left text-[#E7F6F2] shadow-2xl max-h-[80vh] overflow-y-auto">
+                  <div className="mb-3 flex items-center gap-3 rounded-xl bg-[#2C3333] p-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-[#E7F6F2]">
+                      {user?.username?.charAt(0)?.toUpperCase() || "U"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold text-white">{user?.username || "User"}</div>
+                      <div className="truncate text-xs text-[#A5C9CA]">{user?.email || ""}</div>
+                    </div>
+                  </div>
+
+                  <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[#A5C9CA]">
+                    Workspace Memberships
+                  </div>
+                  <div className="max-h-36 overflow-y-auto space-y-1 mb-3 px-1">
+                    {workspaces.map((ws) => (
+                      <div
+                        key={ws.id}
+                        className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs bg-[#2C3333]/50"
+                      >
+                        <span className="truncate font-medium text-[#E7F6F2]">{ws.name}</span>
+                        <span className="rounded bg-[#395B64] px-1.5 py-0.5 text-[10px] font-semibold text-[#A5C9CA]">
+                          {ws.role}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="h-px bg-[#395B64]/50 my-2" />
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-400 hover:bg-rose-950/40 transition"
+                  >
+                    <i className="fa-solid fa-arrow-right-from-bracket text-xs" />
+                    Sign out of WorkNest
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Workspace sidebar — inside mobile drawer */}
+        <div className="flex w-64 flex-col bg-[#1E2525] text-[#E7F6F2] border-r border-[#2C3333]/60 select-none">
+          {/* Close button */}
+          <div className="flex items-center justify-between px-3 pt-3">
+            <span className="text-xs font-bold text-[#A5C9CA] uppercase tracking-widest">Menu</span>
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+              aria-label="Close sidebar"
+            >
+              <i className="fa-solid fa-xmark text-sm" />
+            </button>
+          </div>
+          {/* Workspace Name & Role Header */}
+          <div className="relative border-b border-[#2C3333] px-3.5 py-3 bg-[#1E2525] mt-1">
+            <button
+              type="button"
+              onClick={() => setShowWorkspaceMenu((prev) => !prev)}
+              className="flex w-full items-center justify-between rounded-xl p-1.5 text-left hover:bg-[#2C3333] transition"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64] text-xs font-bold tracking-wider text-white flex-shrink-0 shadow-xs">
+                  {getWorkspaceInitials(workspaceData.name)}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-bold text-white">{workspaceData.name}</div>
+                  <div className="text-[10px] font-semibold tracking-wider text-[#A5C9CA]">
+                    {getRoleDisplayName(selectedRole)}
+                  </div>
+                </div>
+              </div>
+              <i className={`fa-solid fa-chevron-down text-xs text-[#A5C9CA] transition-transform ${showWorkspaceMenu ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+          <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-1">
+            <button
+              type="button"
+              onClick={() => { setShowActivityPanel(true); setIsMobileSidebarOpen(false) }}
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+            >
+              <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
+              <span className="flex-1 text-left">Notifications</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+            {/* Channels */}
+            <div>
+              <div className="flex items-center justify-between px-2 pb-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsChannelsCollapsed((prev) => !prev)}
+                  className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#A5C9CA] hover:text-white transition"
+                >
+                  <i className={`fa-solid fa-chevron-${isChannelsCollapsed ? "right" : "down"} text-[9px] w-3`} />
+                  <span>Channels</span>
+                </button>
+                {permissions.canCreateChannels && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowCreateChannelModal(true); setIsMobileSidebarOpen(false) }}
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
+                    title="Create channel"
+                  >
+                    <i className="fa-solid fa-plus" />
+                  </button>
+                )}
+              </div>
+              {!isChannelsCollapsed && (
+                <div className="space-y-0.5 pt-1">
+                  {channels.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                      No channels yet
+                    </div>
+                  ) : (
+                    channels.map((chan) => {
+                      const isActive = currentChannel?.id === chan.id && !selectedDMUser
+                      return (
+                        <div
+                          key={chan.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleSelectChannel(chan)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectChannel(chan) } }}
+                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                            isActive
+                              ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                              : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                          }`}
+                        >
+                          {chan.type === "PRIVATE" ? (
+                            <i className="fa-solid fa-lock text-[10px] text-[#A5C9CA] w-3.5" />
+                          ) : (
+                            <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center">#</span>
+                          )}
+                          <span className="min-w-0 flex-1 truncate">{chan.name}</span>
+                          {unreadChannelCounts[chan.id.toString()] > 0 && (
+                            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                              {unreadChannelCounts[chan.id.toString()] > 99 ? "99+" : unreadChannelCounts[chan.id.toString()]}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Direct Messages */}
+            <div>
+              <div className="flex items-center justify-between px-2 pb-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsDMsCollapsed((prev) => !prev)}
+                  className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#A5C9CA] hover:text-white transition"
+                >
+                  <i className={`fa-solid fa-chevron-${isDMsCollapsed ? "right" : "down"} text-[9px] w-3`} />
+                  <span>Direct Messages</span>
+                </button>
+              </div>
+              {!isDMsCollapsed && (
+                <div className="space-y-0.5 pt-1">
+                  {directMessageMembers.length > 0 ? (
+                    directMessageMembers.map((member) => {
+                      const isSelected = selectedDMUser?.id === member.id
+                      return (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDMUser(member)
+                            setShowDetailsPane(false)
+                            setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
+                            markDirectMessagesAsRead(member.id).catch(() => {})
+                            setActiveChannelMenuId(null)
+                            setIsMobileSidebarOpen(false)
+                          }}
+                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
+                            isSelected ? "bg-[#395B64] text-white font-semibold" : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                          }`}
+                        >
+                          <span className="relative flex-shrink-0">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
+                              {member.username?.charAt(0)?.toUpperCase() || "U"}
+                            </span>
+                            <span
+                              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"}`}
+                              title={isUserOnline(member.id) ? "Online" : "Offline"}
+                            />
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">{member.username}</span>
+                          {unreadDMCounts[member.id?.toString()] > 0 && (
+                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                              {unreadDMCounts[member.id.toString()] > 99 ? "99+" : unreadDMCounts[member.id.toString()]}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                      No members yet
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop: Icon rail aside (hidden on mobile) ─────────────────────── */}
+      <aside className="hidden md:flex w-17 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] z-30 select-none">
         <button
           type="button"
           onClick={() => navigate("/app/dashboard")}
@@ -504,7 +805,7 @@ const SlackShell = () => {
                 className="fixed inset-0 z-40"
                 onClick={() => setShowProfileMenu(false)}
               />
-              <div className="absolute bottom-2 left-15 z-50 w-72 rounded-2xl border border-[#395B64] bg-[#1E2525] p-3 text-left text-[#E7F6F2] shadow-2xl">
+              <div className="absolute bottom-2 left-16 z-50 w-64 rounded-2xl border border-[#395B64] bg-[#1E2525] p-3 text-left text-[#E7F6F2] shadow-2xl max-h-[80vh] overflow-y-auto">
                 <div className="mb-3 flex items-center gap-3 rounded-xl bg-[#2C3333] p-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-[#E7F6F2]">
                     {user?.username?.charAt(0)?.toUpperCase() || "U"}
@@ -547,8 +848,8 @@ const SlackShell = () => {
           )}
         </div>
       </aside>
-        {/* Workspace sidebar */}
-      <aside className="flex w-64 flex-col bg-[#1E2525] text-[#E7F6F2] border-r border-[#2C3333]/60 select-none z-20">
+        {/* Workspace sidebar — desktop only, hidden on mobile */}
+      <aside className="hidden md:flex w-64 flex-col bg-[#1E2525] text-[#E7F6F2] border-r border-[#2C3333]/60 select-none z-20">
         {/* Workspace Name & Role Header */}
         <div className="relative border-b border-[#2C3333] px-3.5 py-3 bg-[#1E2525]">
           <button
@@ -672,7 +973,7 @@ const SlackShell = () => {
             className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
           >
             <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
-            <span className="flex-1 text-left">Activity</span>
+            <span className="flex-1 text-left">Notifications</span>
             {unreadNotificationsCount > 0 && (
               <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
                 {unreadNotificationsCount}
@@ -848,6 +1149,7 @@ const SlackShell = () => {
                           })
                           markDirectMessagesAsRead(member.id).catch(() => {})
                           setActiveChannelMenuId(null)
+                          setIsMobileSidebarOpen(false)
                         }}
                         className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
                           isSelected
@@ -893,98 +1195,108 @@ const SlackShell = () => {
 
       <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB] dark:bg-[#121717] transition-colors">
         {!selectedDMUser && (
-          <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-6 shadow-xs select-none transition-colors">
-          <div className="flex min-w-0 items-center gap-3">
+          <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-3 sm:px-6 shadow-xs select-none transition-colors gap-2">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            {/* Hamburger — mobile only */}
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F1F5F4] dark:hover:bg-[#2C3333] transition md:hidden"
+              aria-label="Open sidebar"
+            >
+              <i className="fa-solid fa-bars text-sm" />
+            </button>
+
             <div className="flex items-center gap-2 min-w-0">
-              {selectedDMUser ? (
-                <div className="relative flex-shrink-0">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
-                    {selectedDMUser.username?.charAt(0)?.toUpperCase() || "U"}
-                  </div>
-                </div>
-              ) : currentChannel?.type === "PRIVATE" ? (
-                <i className="fa-solid fa-lock text-sm text-[#395B64] dark:text-[#A5C9CA]" />
+              {currentChannel?.type === "PRIVATE" ? (
+                <i className="fa-solid fa-lock text-sm text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0" />
               ) : (
-                <span className="text-lg font-bold text-[#395B64] dark:text-[#A5C9CA]">#</span>
+                <span className="text-lg font-bold text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0">#</span>
               )}
               <h1 className="truncate text-base font-bold text-[#2C3333] dark:text-white">
-                {selectedDMUser ? `@${selectedDMUser.username}` : currentChannel?.name || "general"}
+                {currentChannel?.name || "general"}
               </h1>
             </div>
 
-            {!selectedDMUser && currentChannel && (selectedRole === "OWNER" || selectedRole === "ADMIN") && (
+            {currentChannel && (selectedRole === "OWNER" || selectedRole === "ADMIN") && (
               <button
                 type="button"
                 onClick={() => setEditingChannel(currentChannel)}
-                className="text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white p-1 text-xs transition"
+                className="flex-shrink-0 text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white p-1 text-xs transition"
                 title="Edit this channel"
               >
                 <i className="fa-solid fa-pen" />
               </button>
             )}
 
-            {currentChannel?.description && !selectedDMUser && (
-              <>
-                <span className="text-[#A5C9CA]">|</span>
-                <span className="truncate text-xs text-[#52656A] dark:text-[#A5C9CA]/80 max-w-md">
-                  {currentChannel.description}
-                </span>
-              </>
+            {currentChannel?.description && (
+              <span className="hidden sm:block truncate text-xs text-[#52656A] dark:text-[#A5C9CA]/80 max-w-xs lg:max-w-md border-l border-[#A5C9CA]/40 pl-2">
+                {currentChannel.description}
+              </span>
             )}
           </div>
 
-          {!selectedDMUser && (
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setShowMembersPanel(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] px-2.5 py-1.5 text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition"
-                title="View members"
-              >
-                <i className="fa-solid fa-users text-xs" />
-                <span>{workspaceMembers.length}</span>
-              </button>
+          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowMembersPanel(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition"
+              title="View members"
+            >
+              <i className="fa-solid fa-users text-xs" />
+              <span>{workspaceMembers.length}</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setShowDetailsPane((prev) => !prev)}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
-                  showDetailsPane
-                    ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
-                    : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D] hover:text-[#2C3333] dark:hover:text-white"
-                }`}
-                title="Channel details"
-              >
-                <i className="fa-solid fa-circle-info text-sm" />
-              </button>
+            <button
+              type="button"
+              onClick={() => setShowDetailsPane((prev) => !prev)}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                showDetailsPane
+                  ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                  : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D] hover:text-[#2C3333] dark:hover:text-white"
+              }`}
+              title="Channel details"
+            >
+              <i className="fa-solid fa-circle-info text-sm" />
+            </button>
 
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
-                title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-                aria-label="Toggle theme"
-              >
-                {isDark ? (
-                  <FiSun className="text-sm text-amber-400" />
-                ) : (
-                  <FiMoon className="text-sm text-[#395B64]" />
-                )}
-              </button>
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
+              title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+              aria-label="Toggle theme"
+            >
+              {isDark ? (
+                <FiSun className="text-sm text-amber-400" />
+              ) : (
+                <FiMoon className="text-sm text-[#395B64]" />
+              )}
+            </button>
+          </div>
           </header>
         )}
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {selectedDMUser ? (
-            <DirectMessaging externalSelectedUser={selectedDMUser} />
+            <DirectMessaging 
+              externalSelectedUser={selectedDMUser} 
+              onOpenSidebar={() => setIsMobileSidebarOpen(true)} 
+            />
           ) : (
             <ChannelMessageThread channel={activeChannel || currentChannel} currentUserId={user?.id} />
           )}
 
+          {/* Mobile backdrop for Details Pane */}
           {showDetailsPane && !selectedDMUser && (
-            <aside className="w-80 border-l border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex flex-col h-full overflow-y-auto z-10 shadow-lg transition-colors">
+            <div
+              className="absolute inset-0 z-10 bg-black/50 sm:hidden"
+              onClick={() => setShowDetailsPane(false)}
+            />
+          )}
+
+          {showDetailsPane && !selectedDMUser && (
+            <aside className="absolute inset-y-0 right-0 w-[85%] sm:relative sm:w-72 md:w-80 border-l border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex flex-col h-full overflow-y-auto z-20 shadow-lg transition-colors sm:inset-auto sm:shadow-none">
               <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-5 py-4">
                 <h3 className="text-base font-bold text-[#2C3333] dark:text-white">Channel Details</h3>
                 <button
@@ -1201,7 +1513,7 @@ const SlackShell = () => {
       {showMembersPanel && (
         <div className="fixed inset-0 z-50 bg-[#2C3333]/60 backdrop-blur-xs flex justify-end">
           <div className="flex h-full w-full max-w-md flex-col bg-white dark:bg-[#1A2121] dark:border-l dark:border-[#2C3333] shadow-2xl animate-[fadeIn_0.15s_ease-out] transition-colors">
-            <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-6 py-4 bg-[#F8FAFB] dark:bg-[#1E2525]">
+            <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-4 sm:px-6 py-4 bg-[#F8FAFB] dark:bg-[#1E2525]">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#395B64] dark:text-[#A5C9CA]">Workspace</p>
                 <h3 className="text-lg font-bold text-[#2C3333] dark:text-white">Manage Members</h3>

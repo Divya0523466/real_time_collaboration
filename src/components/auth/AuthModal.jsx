@@ -37,7 +37,7 @@ const AuthModal = ({ mode, onClose, onSwitchMode, onLoginSuccess }) => {
         <div className="flex items-center justify-between mb-4">
           <h2
             id="auth-title"
-            className="text-[1.7rem] font-bold tracking-[-0.02em] text-[#2C3333] dark:text-[#E7F6F2]"
+            className="text-2xl sm:text-[1.7rem] font-bold tracking-[-0.02em] text-[#2C3333] dark:text-[#E7F6F2]"
           >
             {mode === "login" ? "Welcome back" : "Create your account"}
           </h2>
