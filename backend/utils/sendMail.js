@@ -1,20 +1,27 @@
-import { BrevoClient } from '@getbrevo/brevo';
-
-const brevo = new BrevoClient({
-apiKey: process.env.BREVO_API_KEY,
-});
-
-
-export const sendEmail=async() =>{
- try {
-   const result = await brevo.transactionalEmails.sendTransacEmail({
-     subject: "",
-     textContent: " ",
-     sender: { name: "Support Team", email: "support@worknest.com" },
-     to: [{ email: " ", name: "" }],
-   });
-   console.log("Email sent successfully:", result);
- } catch (error) {
-   console.error("Error sending email:", error);
- }
+export const sendEmail = async (to, subject, text, html = "") => {
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        sender: { name: "Support Team", email: process.env.BREVO_SENDER_EMAIL || "support@worknest.com" },
+        to: [{ email: to }],
+        subject: subject,
+        ...(html ? { htmlContent: html } : { textContent: text })
+      })
+    });
+    
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error sending email:", errorData);
+    } else {
+        console.log("Email sent successfully");
+    }
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
 }

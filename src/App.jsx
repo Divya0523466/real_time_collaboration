@@ -17,6 +17,7 @@ import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext";
 import ForgotPassword from "./components/ForgotPassword";
 import OTP from "./components/OTP";
 import SetPassword from "./components/SetPassword";
+import { Navigate } from "react-router-dom"
 
 const LandingPage = () => {
   const [authMode, setAuthMode] = useState(null)
@@ -50,13 +51,21 @@ const LandingPage = () => {
   )
 }
 
+const ProtectedRoute = ({ children }) => {
+  const { user } = useWorkspace();
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
+
 const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/app/dashboard" element={<GlobalDashboard />} />
-      <Route path="/app/workspace/:workspaceId" element={<SlackShell />} />
-      <Route path="/app/workspace/:workspaceId/channel/:channelId" element={<SlackShell />} />
+      <Route path="/app/dashboard" element={<ProtectedRoute><GlobalDashboard /></ProtectedRoute>} />
+      <Route path="/app/workspace/:workspaceId" element={<ProtectedRoute><SlackShell /></ProtectedRoute>} />
+      <Route path="/app/workspace/:workspaceId/channel/:channelId" element={<ProtectedRoute><SlackShell /></ProtectedRoute>} />
       <Route path="/forgot-password" element={<ForgotPassword/>} />
       <Route path="/enter-otp" element={<OTP/>} />
       <Route path="/set-password" element={<SetPassword/>} />
