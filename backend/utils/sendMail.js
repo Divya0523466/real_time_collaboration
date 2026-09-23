@@ -1,4 +1,4 @@
-export const sendEmail = async (to, subject, text, html = "") => {
+export const sendEmail = async (to, subject, html = "") => {
   try {
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -8,10 +8,10 @@ export const sendEmail = async (to, subject, text, html = "") => {
         "content-type": "application/json"
       },
       body: JSON.stringify({
-        sender: { name: "Support Team", email: process.env.BREVO_SENDER_EMAIL || "support@worknest.com" },
+        sender: { name: "Worknest", email: process.env.BREVO_SENDER_EMAIL || "support@worknest.com" },
         to: [{ email: to }],
         subject: subject,
-        ...(html ? { htmlContent: html } : { textContent: text })
+        htmlContent: html
       })
     });
     

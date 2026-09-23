@@ -3,7 +3,9 @@ import Invitation from "../models/Invitation.js"
 import Workspace from "../models/Workspace.js"
 import WorkspaceMembership from "../models/WorkspaceMembership.js"
 import User from "../models/User.js"
-import { createAndSendNotification } from "../utils/notificationService.js"
+import { createAndSendNotification } from "../utils/notificationService.js";
+import { sendEmail } from "../utils/sendMail.js";
+import {workspaceInvitation} from "../utils/templates.js"
 
 const inviteMembers = async (req, res) => {
   try {
@@ -33,30 +35,32 @@ const inviteMembers = async (req, res) => {
       return res.status(400).json({ message: "No valid email addresses were provided" })
     }
 
+    const inviterUser = await User.findById(userId).select("username");
+    const workspace = await Workspace.findById(workspaceId).select("name");
+    
+    const inviteLink = `${process.env.FRONTEND_URL}/app/dashboard`; 
+
     const createdInvites = []
     for (const email of invitationEmails) {
-      const existingUser = await User.findOne({ email })
+      const htmlTemplate = workspaceInvitation(
+        inviterUser?.username || "A teammate", 
+        workspace?.name || "a workspace", 
+        message, 
+        inviteLink
+      );
+      
+      await sendEmail(
+        email, 
+        `You've been invited to join ${workspace?.name || "a workspace"} on WorkNest`,
+        htmlTemplate
+      );
+      const existingUser = await User.findOne({ email });
       if (existingUser) {
-        const alreadyMember = await WorkspaceMembership.findOne({ workspaceId, userId: existingUser._id })
-        if (!alreadyMember) {
-          await WorkspaceMembership.create({
-            userId: existingUser._id,
-            workspaceId,
-            role: inviteRole,
-          })
-
-          const io = req.app.get("io")
-          const workspace = await Workspace.findById(workspaceId).select("name")
-          await createAndSendNotification(io, {
-            recipientId: existingUser._id,
-            actorId: userId,
-            type: "WORKSPACE_ADDED",
-            title: `Added to ${workspace?.name || "Workspace"}`,
-            message: `You were added to ${workspace?.name || "a workspace"} as a ${inviteRole.toLowerCase()}.`,
-            workspaceId,
-          })
+        const alreadyMember = await WorkspaceMembership.findOne({ workspaceId, userId: existingUser._id });
+        if (alreadyMember) {
+          // If they are already a member, skip creating an invitation
+          continue;
         }
-        continue
       }
 
       const invite = await Invitation.findOneAndUpdate(

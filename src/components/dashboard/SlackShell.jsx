@@ -1405,7 +1405,7 @@ const SlackShell = () => {
                         <span className="rounded bg-[#E7F6F2] dark:bg-[#395B64]/40 px-1.5 py-0.5 text-[9px] font-semibold text-[#395B64] dark:text-[#A5C9CA]">
                           {m.role}
                         </span>
-                        {permissions.canManageChannelMembers && (
+                        {permissions.canManageChannelMembers && m.id !== user?.id && (
                           <button
                             type="button"
                             onClick={() => handleRemoveChannelMember(m)}

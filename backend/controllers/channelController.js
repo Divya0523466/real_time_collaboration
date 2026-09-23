@@ -1,6 +1,11 @@
 import Channel from "../models/Channel.js"
+import Workspace from "../models/Workspace.js"
 import WorkspaceMembership from "../models/WorkspaceMembership.js"
 import { createAndSendNotification } from "../utils/notificationService.js"
+import { sendEmail } from "../utils/sendMail.js";
+import {addedToChannel,removedFromChannel} from "../utils/templates.js";
+import User from "../models/User.js";
+
 
 
 const createChannel = async (req, res) => {
@@ -270,6 +275,19 @@ const addChannelMember = async (req, res) => {
     if (!channel) {
       return res.status(404).json({ message: "Channel not found" })
     }
+    
+    const targetUser = await User.findById(memberId).select("email");
+    const workspaceName=await Workspace.findById(workspaceId).select("name").then(ws=>ws?.name || "the workspace");
+
+    const htmlTemplate=addedToChannel(workspaceName,channel.name);
+
+    if (targetUser && targetUser.email) {
+      await sendEmail(
+        targetUser.email,
+        `You have been added to the channel #${channel.name}`,
+        htmlTemplate
+      );
+    }
 
     if (!channel.members.includes(memberId)) {
       channel.members.push(memberId)
@@ -328,6 +346,20 @@ const removeChannelMember = async (req, res) => {
 
     channel.members = channel.members.filter((m) => m.toString() !== memberId.toString())
     await channel.save()
+
+    const targetUser = await User.findById(memberId).select("email");
+    const workspaceName=await Workspace.findById(workspaceId).select("name").then(ws=>ws?.name || "the workspace");
+
+    const htmlTemplate=removedFromChannel(workspaceName,channel.name);
+
+    if (targetUser && targetUser.email) {
+      await sendEmail(
+        targetUser.email,
+        `You have been removed from the channel #${channel.name}`,
+        htmlTemplate
+      );
+    }
+   
 
     const io = req.app.get("io")
     if (io) {

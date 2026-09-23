@@ -3,6 +3,9 @@ import WorkspaceMembership, { ROLES } from "../models/WorkspaceMembership.js";
 import Channel from "../models/Channel.js";
 import Invitation from "../models/Invitation.js";
 import { createAndSendNotification } from "../utils/notificationService.js";
+import { roleUpdated, memberRemoved } from '../utils/templates.js';
+import { sendEmail } from "../utils/sendMail.js";
+import User from "../models/User.js";
 
 const ensureDefaultChannel = async (workspaceId, createdBy) => {
   const existing = await Channel.findOne({ workspaceId, name: "general" });
@@ -114,13 +117,15 @@ const getWorkspace = async (req, res) => {
         description: workspace.description,
         createdAt: workspace.createdAt,
       },
-      members: members.map((m) => ({
-        id: m.userId._id,
-        username: m.userId.username,
-        email: m.userId.email,
-        avatar: m.userId.avatar,
-        role: m.role,
-      })),
+      members: members
+        .filter((m) => m.userId) 
+        .map((m) => ({
+          id: m.userId._id,
+          username: m.userId.username,
+          email: m.userId.email,
+          avatar: m.userId.avatar,
+          role: m.role,
+        })),
       userRole: membership.role,
     });
   } catch (error) {
@@ -166,6 +171,20 @@ const updateMemberRole = async (req, res) => {
 
     targetMembership.role = role;
     await targetMembership.save();
+
+    const targetUser = await User.findById(memberId).select("email");
+    const workspaceName = await Workspace.findById(workspaceId).select("name").then(ws=>ws?.name || "the workspace");
+
+    const htmlTemplate = roleUpdated(workspaceName, role);
+
+    if (targetUser && targetUser.email) {
+      await sendEmail(
+        targetUser.email,
+        "Your workspace role has been updated",
+        htmlTemplate
+      );
+    }
+
 
     const io = req.app.get("io");
     const workspace = await Workspace.findById(workspaceId).select("name");
@@ -225,6 +244,18 @@ const removeMember = async (req, res) => {
     await WorkspaceMembership.deleteOne({ _id: targetMembership._id });
 
     await Channel.updateMany({ workspaceId }, { $pull: { members: memberId } });
+
+    const targetUser = await User.findById(memberId).select("email");
+    const workspaceName = await Workspace.findById(workspaceId).select("name").then(ws=>ws?.name || "the workspace");
+    const htmlTemplate = memberRemoved(workspaceName);
+
+    if (targetUser && targetUser.email) {
+      await sendEmail(
+        targetUser.email,
+        "You have been removed from a workspace",
+        htmlTemplate
+      );
+    }
 
     const io = req.app.get("io");
     const workspace = await Workspace.findById(workspaceId).select("name");

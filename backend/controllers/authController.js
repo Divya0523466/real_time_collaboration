@@ -4,7 +4,8 @@ import User from "../models/User.js"
 import WorkspaceMembership from "../models/WorkspaceMembership.js"
 import Invitation from "../models/Invitation.js"
 import { createAndSendNotification } from "../utils/notificationService.js"
-import { sendEmail } from "../utils/sendMail.js"
+import { sendEmail } from "../utils/sendMail.js";
+import {htmlTemplateOtp,htmlTemplateWelcome} from "../utils/templates.js"
 
 const register = async (req, res) => {
   try {
@@ -27,7 +28,15 @@ const register = async (req, res) => {
       username: username.trim(),
       email: enteredEmail,
       password: hashedPassword,
-    })
+    });
+
+   const htmlTemplate=htmlTemplateWelcome(username);
+
+    await sendEmail(
+      enteredEmail, 
+      "Welcome to WorkNest - Your Collaboration Hub",
+      htmlTemplate
+    );
 
     
     try {
@@ -132,22 +141,7 @@ const forgotPassword = async (req, res) => {
     user.resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    const htmlTemplate = `
-      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;">
-        <h2 style="color: #395B64; text-align: center;">Password Reset Request</h2>
-        <p style="color: #52656A; font-size: 16px;">Hello,</p>
-        <p style="color: #52656A; font-size: 16px;">You requested to reset your password. Use the OTP below to proceed:</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <span style="font-size: 32px; font-weight: bold; color: #2C3333; letter-spacing: 5px; padding: 10px 20px; background: #F8FAFB; border-radius: 8px; border: 1px solid #D5E1E0;">
-            ${otp}
-          </span>
-        </div>
-        <p style="color: #52656A; font-size: 14px; text-align: center;">This OTP is valid for the next 10 minutes.</p>
-        <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
-        <p style="color: #a0a0a0; font-size: 12px; text-align: center;">If you didn't request a password reset, please ignore this email.</p>
-      </div>
-    `;
-
+    const htmlTemplate=htmlTemplateOtp(otp);
     await sendEmail(
       user.email, 
       "Password Reset OTP - WorkNest", 
