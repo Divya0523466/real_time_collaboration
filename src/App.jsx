@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Route, Routes, useNavigate } from "react-router-dom"
 import "./App.css"
 import AboutUs from "./components/AboutUs"
@@ -52,14 +52,35 @@ const LandingPage = () => {
 }
 
 const ProtectedRoute = ({ children }) => {
-  const { user } = useWorkspace();
+  const { user, isInitializing } = useWorkspace();
+
+  if (isInitializing) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-[#121717]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#395B64] border-t-transparent"></div>
+      </div>
+    );
+  }
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
   return children;
 };
 
+
+
+import { requestNotificationPermission } from "./utils/desktopNotification"
+
+
 const AppRoutes = () => {
+  useEffect(() => {
+    // Automatically ask for permission when the website opens
+    if ("Notification" in window && Notification.permission === "default") {
+      requestNotificationPermission();
+    }
+  }, []);
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />

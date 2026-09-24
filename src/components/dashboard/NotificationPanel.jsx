@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWorkspace } from "../../context/WorkspaceContext";
+import { toast } from "react-toastify";
 
 const formatRelativeTime = (dateInput) => {
   if (!dateInput) return "";
@@ -62,7 +63,7 @@ const NotificationPanel = ({
     deleteNotification,
   } = useWorkspace();
 
-  const [filter, setFilter] = useState("ALL"); // "ALL" | "UNREAD"
+  const [filter, setFilter] = useState("ALL");
 
   if (!isOpen) return null;
 
@@ -75,7 +76,7 @@ const NotificationPanel = ({
       markNotificationAsRead(notif._id);
     }
 
-    // Context-aware navigation
+    //context aware notifications
     if (notif.type === "DM_NEW_MESSAGE" || notif.type === "DM_MENTION") {
       const otherUserId = notif.actorId?._id || notif.metadata?.senderId;
       if (otherUserId && onSelectDM) {
@@ -168,16 +169,18 @@ const NotificationPanel = ({
             </button>
           </div>
 
-          {unreadNotificationsCount > 0 && (
-            <button
-              type="button"
-              onClick={markAllNotificationsAsRead}
-              className="text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white font-semibold text-xs transition flex items-center gap-1.5"
-            >
-              <i className="fa-solid fa-check-double text-[11px]" />
-              <span>Mark all read</span>
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {unreadNotificationsCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllNotificationsAsRead}
+                className="text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white font-semibold text-xs transition flex items-center gap-1.5"
+              >
+                <i className="fa-solid fa-check-double text-[11px]" />
+                <span>Mark all read</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Notification list */}

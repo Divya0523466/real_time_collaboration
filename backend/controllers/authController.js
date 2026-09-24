@@ -71,7 +71,7 @@ const login = async (req, res) => {
 
     const user = await User.findOne({ email: email.trim()})
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: "Invalid email or password" })
     }
 
@@ -91,9 +91,16 @@ const login = async (req, res) => {
         role: m.role,
       }))
 
+    res.cookie("worknestToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
+
     return res.json({
       message: "Login successful",
-      token,
+      token, // Kept for backward compatibility during transition
       user: {
         id: user._id,
         username: user.username,
@@ -216,6 +223,7 @@ const resetPassword = async (req, res) => {
 }
 
 const logout = (req, res) => {
+  res.clearCookie("worknestToken");
   return res.json({ message: "Logout successful" })
 }
 

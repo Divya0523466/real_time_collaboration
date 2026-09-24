@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
+import { showDesktopNotification } from "../utils/desktopNotification";
 import socket, {
   connectSocket,
   onOnlineUsers,
@@ -57,6 +58,37 @@ export const WorkspaceProvider = ({ children }) => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Automatically fetch the user session from HttpOnly cookies on mount
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/me`, {
+          credentials: "include"
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+          setWorkspaces(data.workspaces || []);
+          localStorage.setItem("worknestUser", JSON.stringify(data.user));
+          localStorage.setItem("worknestWorkspaces", JSON.stringify(data.workspaces || []));
+        } else {
+          // Cookie invalid or expired
+          setUser(null);
+          setWorkspaces([]);
+          localStorage.removeItem("worknestUser");
+          localStorage.removeItem("worknestWorkspaces");
+        }
+      } catch (err) {
+        console.error("Failed to restore session:", err);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    fetchSession();
+  }, []);
   const [error, setError] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL;
@@ -114,6 +146,9 @@ export const WorkspaceProvider = ({ children }) => {
       setUnreadNotificationsCount((prev) => prev + 1);
       toast.info(newNotif.title, {
         icon: <i className="fa-solid fa-bell text-[#395B64]" />,
+      });
+      showDesktopNotification(newNotif.title, {
+        body: newNotif.message
       });
     };
 
@@ -803,6 +838,7 @@ export const WorkspaceProvider = ({ children }) => {
   );
 
   const value = {
+    isInitializing,
     user,
     setUser,
     workspaces,
