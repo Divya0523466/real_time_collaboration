@@ -19,7 +19,16 @@ const isImageUrl = (url) => {
   );
 };
 
-// Helper to extract a friendly file name from a URL
+const getOptimizedImageUrl = (url, width = 600) => {
+  if (!url || typeof url !== "string") return url;
+  if (url.includes("res.cloudinary.com") && url.includes("/image/upload/")) {
+    if (!url.includes("/image/upload/f_auto")) {
+      return url.replace("/image/upload/", `/image/upload/f_auto,q_auto,w_${width},c_limit/`);
+    }
+  }
+  return url;
+};
+
 const getFileNameFromUrl = (url) => {
   try {
     const pathname = new URL(url).pathname;
@@ -51,10 +60,14 @@ const MessageContent = ({ content = "", isSender = false, className = "" }) => {
             className="inline-block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
           >
             <img
-              src={trimmed}
+              src={getOptimizedImageUrl(trimmed, 600)}
               alt="Uploaded file"
               loading="lazy"
+              decoding="async"
+              width="300"
+              height="200"
               className="max-h-60 w-auto rounded-lg object-contain bg-black/5"
+              style={{ minHeight: "140px", aspectRatio: "auto" }}
             />
           </a>
         </div>
@@ -125,10 +138,14 @@ const MessageContent = ({ content = "", isSender = false, className = "" }) => {
               className="inline-block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
             >
               <img
-                src={url}
+                src={getOptimizedImageUrl(url, 600)}
                 alt="Attachment"
                 loading="lazy"
+                decoding="async"
+                width="300"
+                height="200"
                 className="max-h-60 w-auto rounded-lg object-contain bg-black/5"
+                style={{ minHeight: "140px", aspectRatio: "auto" }}
               />
             </a>
           </div>

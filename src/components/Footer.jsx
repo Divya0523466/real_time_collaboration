@@ -10,6 +10,8 @@ const Footer = () => {
               <img
                 src={logo}
                 alt="WorkNest logo"
+                loading="lazy"
+                decoding="async"
                 className="h-8 w-8"
               />
               <span className="text-xl font-bold text-white">

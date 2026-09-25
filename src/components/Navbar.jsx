@@ -17,6 +17,7 @@ const Navbar = ({ onOpenAuth }) => {
         <img
           src={logo}
           alt="WorkNest logo"
+          decoding="async"
           className="h-9 w-9 lg:h-10 lg:w-10"
         />
 

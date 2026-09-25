@@ -35,6 +35,8 @@ const Hero = ({ onOpenAuth }) => {
       <img
         src={HeroImage}
         alt="WorkNest collaboration workspace"
+        loading="lazy"
+        decoding="async"
         className="w-full max-w-180 mx-auto md:mx-0 justify-self-center md:justify-self-end object-contain rounded-2xl dark:border dark:border-[#2C3333] dark:shadow-[0_12px_40px_rgba(0,0,0,0.4)] transition mt-4 md:mt-0"
       />
     </main>

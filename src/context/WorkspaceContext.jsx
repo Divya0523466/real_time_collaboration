@@ -83,7 +83,6 @@ export const WorkspaceProvider = ({ children }) => {
         }
 
         const token = localStorage.getItem("worknestToken");
-        // If there is no token, the user is unauthenticated - no need to call /auth/me
         if (!token || token === "null" || token === "undefined") {
           setUser(null);
           setWorkspaces([]);

@@ -47,6 +47,8 @@ const WhyWorkNest = () => {
                 <img
                   src={whyWorkNestImage}
                   alt="WorkNest team collaboration"
+                  loading="lazy"
+                  decoding="async"
                   className="h-full max-h-105 w-full object-cover"
                 />
               </div>
