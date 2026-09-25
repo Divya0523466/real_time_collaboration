@@ -82,6 +82,18 @@ export const WorkspaceProvider = ({ children }) => {
           window.history.replaceState({}, document.title, window.location.pathname + newSearch);
         }
 
+        const token = localStorage.getItem("worknestToken");
+        // If there is no token, the user is unauthenticated - no need to call /auth/me
+        if (!token || token === "null" || token === "undefined") {
+          setUser(null);
+          setWorkspaces([]);
+          localStorage.removeItem("worknestUser");
+          localStorage.removeItem("worknestWorkspaces");
+          localStorage.removeItem("worknestToken");
+          setIsInitializing(false);
+          return;
+        }
+
         const headers = getAuthHeaders();
         const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/me`, {
           credentials: "include",
