@@ -32,7 +32,7 @@ const SetPassword = () => {
     setError("");
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/auth/reset-password`, {
+      const response = await fetch(`${API_URL}/auth/reset-password`, { credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json",

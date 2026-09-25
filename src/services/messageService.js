@@ -12,7 +12,7 @@ export const fetchUnreadMessageCounts = async (workspaceId) => {
   const token = localStorage.getItem("worknestToken")
   if (!token || !workspaceId) return { channels: {}, dms: {} }
 
-  const response = await fetch(`${API_URL}/messages/unread-counts?workspaceId=${workspaceId}`, {
+  const response = await fetch(`${API_URL}/messages/unread-counts?workspaceId=${workspaceId}`, { credentials: "include",
     method: "GET",
     headers: getAuthHeaders(),
   })
@@ -32,7 +32,7 @@ export const markChannelAsRead = async (channelId) => {
   const token = localStorage.getItem("worknestToken")
   if (!token || !channelId) return null
 
-  const response = await fetch(`${API_URL}/messages/channels/${channelId}/read`, {
+  const response = await fetch(`${API_URL}/messages/channels/${channelId}/read`, { credentials: "include",
     method: "POST",
     headers: getAuthHeaders(),
   })
@@ -49,7 +49,7 @@ export const markDirectMessagesAsRead = async (userId) => {
   const token = localStorage.getItem("worknestToken")
   if (!token || !userId) return null
 
-  const response = await fetch(`${API_URL}/messages/direct/${userId}/read`, {
+  const response = await fetch(`${API_URL}/messages/direct/${userId}/read`, { credentials: "include",
     method: "POST",
     headers: getAuthHeaders(),
   })

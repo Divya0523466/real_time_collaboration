@@ -64,7 +64,7 @@ export const WorkspaceProvider = ({ children }) => {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/me`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/me`, { credentials: "include",
           credentials: "include"
         });
         if (response.ok) {
@@ -256,9 +256,8 @@ export const WorkspaceProvider = ({ children }) => {
     }
 
     try {
-      const token = localStorage.getItem("worknestToken");
       const response = await fetch(`${API_URL}/workspaces/invitations`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include"
       });
 
       if (!response.ok) {
@@ -280,13 +279,8 @@ export const WorkspaceProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("worknestToken");
-      if (!token) {
-        throw new Error("No authentication token");
-      }
-
       const response = await fetch(`${API_URL}/workspaces`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include"
       });
 
       if (!response.ok) {
@@ -321,7 +315,7 @@ export const WorkspaceProvider = ({ children }) => {
 
       try {
         const token = localStorage.getItem("worknestToken");
-        const response = await fetch(`${API_URL}/workspaces/${workspaceId}`, {
+        const response = await fetch(`${API_URL}/workspaces/${workspaceId}`, { credentials: "include",
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -336,8 +330,7 @@ export const WorkspaceProvider = ({ children }) => {
         setWorkspaceData(normalizedWorkspace);
 
         const channelsResponse = await fetch(
-          `${API_URL}/workspaces/${workspaceId}/channels`,
-          {
+          `${API_URL}/workspaces/${workspaceId}/channels`, { credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
           },
         );
@@ -368,8 +361,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${workspaceIdToRefresh}/channels`,
-          {
+          `${API_URL}/workspaces/${workspaceIdToRefresh}/channels`, { credentials: "include",
             headers: { Authorization: `Bearer ${token}` },
           },
         );
@@ -393,7 +385,7 @@ export const WorkspaceProvider = ({ children }) => {
       setError(null);
       try {
         const token = localStorage.getItem("worknestToken");
-        const response = await fetch(`${API_URL}/workspaces`, {
+        const response = await fetch(`${API_URL}/workspaces`, { credentials: "include",
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -430,8 +422,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}/channels`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}/channels`, { credentials: "include",
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -466,8 +457,7 @@ export const WorkspaceProvider = ({ children }) => {
 
       const token = localStorage.getItem("worknestToken");
       const response = await fetch(
-        `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`,
-        {
+        `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`, { credentials: "include",
           headers: { Authorization: `Bearer ${token}` },
         },
       );
@@ -496,8 +486,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}/members/${memberId}/role`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}/members/${memberId}/role`, { credentials: "include",
             method: "PATCH",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -531,8 +520,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}/members/${memberId}`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}/members/${memberId}`, { credentials: "include",
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -562,8 +550,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}/members`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}/members`, { credentials: "include",
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -591,8 +578,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}/members/${memberId}`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}/members/${memberId}`, { credentials: "include",
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -622,8 +608,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}`, { credentials: "include",
             method: "PATCH",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -677,8 +662,7 @@ export const WorkspaceProvider = ({ children }) => {
     try {
       const token = localStorage.getItem("worknestToken");
       const response = await fetch(
-        `${API_URL}/workspaces/${selectedWorkspace}`,
-        {
+        `${API_URL}/workspaces/${selectedWorkspace}`, { credentials: "include",
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -711,8 +695,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`, { credentials: "include",
             method: "PATCH",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -758,8 +741,7 @@ export const WorkspaceProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("worknestToken");
         const response = await fetch(
-          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`,
-          {
+          `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`, { credentials: "include",
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -786,7 +768,7 @@ export const WorkspaceProvider = ({ children }) => {
   const acceptInvitation = useCallback(async (invitationId) => {
     try {
       const token = localStorage.getItem("worknestToken");
-      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/accept`, {
+      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/accept`, { credentials: "include",
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -811,7 +793,7 @@ export const WorkspaceProvider = ({ children }) => {
   const declineInvitation = useCallback(async (invitationId) => {
     try {
       const token = localStorage.getItem("worknestToken");
-      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/decline`, {
+      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/decline`, { credentials: "include",
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

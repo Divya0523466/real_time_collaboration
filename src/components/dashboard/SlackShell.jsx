@@ -318,7 +318,7 @@ const SlackShell = () => {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/logout`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/logout`, { credentials: "include",
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("worknestToken")}`,

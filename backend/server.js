@@ -36,7 +36,10 @@ const io = new Server(server, {
 app.set("io", io); 
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: function (origin, callback) {
+    // Allow any origin during local development for ease of use, or restrict to FRONTEND_URL
+    callback(null, true);
+  },
   credentials: true,
 }));
 app.use(express.json());

@@ -26,7 +26,7 @@ const OTP = () => {
     setError("");
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/auth/verify-otp`, {
+      const response = await fetch(`${API_URL}/auth/verify-otp`, { credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -59,7 +59,7 @@ const OTP = () => {
     setError("");
     setResending(true);
     try {
-      const response = await fetch(`${API_URL}/auth/forgot-password`, {
+      const response = await fetch(`${API_URL}/auth/forgot-password`, { credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json",

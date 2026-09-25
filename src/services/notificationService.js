@@ -17,7 +17,7 @@ export const fetchNotifications = async ({ unreadOnly = false } = {}) => {
   });
 
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
-  const response = await fetch(`${API_URL}/notifications${queryString}`, {
+  const response = await fetch(`${API_URL}/notifications${queryString}`, { credentials: "include",
     method: "GET",
     headers: getAuthHeaders(),
   });
@@ -34,7 +34,7 @@ export const fetchUnreadCount = async () => {
   const token = localStorage.getItem("worknestToken");
   if (!token) return 0;
 
-  const response = await fetch(`${API_URL}/notifications/unread-count`, {
+  const response = await fetch(`${API_URL}/notifications/unread-count`, { credentials: "include",
     method: "GET",
     headers: getAuthHeaders(),
   });
@@ -48,7 +48,7 @@ export const fetchUnreadCount = async () => {
 };
 
 export const markNotificationAsRead = async (id) => {
-  const response = await fetch(`${API_URL}/notifications/${id}/read`, {
+  const response = await fetch(`${API_URL}/notifications/${id}/read`, { credentials: "include",
     method: "PATCH",
     headers: getAuthHeaders(),
   });
@@ -62,7 +62,7 @@ export const markNotificationAsRead = async (id) => {
 };
 
 export const markAllNotificationsAsRead = async () => {
-  const response = await fetch(`${API_URL}/notifications/read-all`, {
+  const response = await fetch(`${API_URL}/notifications/read-all`, { credentials: "include",
     method: "PATCH",
     headers: getAuthHeaders(),
   });
@@ -76,7 +76,7 @@ export const markAllNotificationsAsRead = async () => {
 };
 
 export const deleteNotification = async (id) => {
-  const response = await fetch(`${API_URL}/notifications/${id}`, {
+  const response = await fetch(`${API_URL}/notifications/${id}`, { credentials: "include",
     method: "DELETE",
     headers: getAuthHeaders(),
   });

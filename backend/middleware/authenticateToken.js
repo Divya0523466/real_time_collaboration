@@ -3,10 +3,12 @@ import jwt from "jsonwebtoken"
 const authenticateToken = (req, res, next) => {
   try {
   
-    const token = req.cookies.worknestToken || (req.headers.authorization && req.headers.authorization.split(" ")[1]);
+    const authHeader = req.headers.authorization;
+    const headerToken = authHeader ? authHeader.split(" ")[1] : null;
+    const token = req.cookies?.worknestToken || (headerToken !== "null" ? headerToken : null);
 
     if (!token) {
-      return res.status(401).json({ message: "Access token required" })
+      return res.status(401).json({ message: "Access token required" });
     }
 
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {

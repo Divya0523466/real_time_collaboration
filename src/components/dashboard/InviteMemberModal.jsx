@@ -22,7 +22,7 @@ const InviteMemberModal = ({ workspaceName, workspaceId, onClose, onInviteSucces
     setIsSubmitting(true)
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/workspaces/${workspaceId}/invite`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/workspaces/${workspaceId}/invite`, { credentials: "include",
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("worknestToken")}`,

@@ -21,7 +21,7 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${API_URL}/auth/login`, { credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json",

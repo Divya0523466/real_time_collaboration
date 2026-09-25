@@ -26,11 +26,7 @@ const GlobalDashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
-    if (!localStorage.getItem("worknestToken")) {
-      clearAuth()
-      navigate("/", { replace: true })
-      return
-    }
+    // Rely on WorkspaceContext's isInitializing and user state for auth verification.
 
     fetchUserWorkspaces().catch(() => {})
 

@@ -46,7 +46,7 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
         setError(null)
 
         const token = localStorage.getItem("worknestToken")
-        const response = await fetch(`${API_URL}/messages/${currentSelectedUser.id}`, {
+        const response = await fetch(`${API_URL}/messages/${currentSelectedUser.id}`, { credentials: "include",
           headers: {
             Authorization: `Bearer ${token}`,
           },

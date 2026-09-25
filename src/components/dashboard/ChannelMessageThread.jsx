@@ -397,7 +397,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
 
       try {
         const token = localStorage.getItem("worknestToken")
-        const response = await fetch(`${apiUrl}/messages/channels/${channel.id}`, {
+        const response = await fetch(`${apiUrl}/messages/channels/${channel.id}`, { credentials: "include",
           headers: { Authorization: `Bearer ${token}` },
         })
         const data = await response.json().catch(() => ({}))

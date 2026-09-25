@@ -11,7 +11,7 @@ export const uploadFile = async (file) => {
   formData.append("file", file);
 
   try {
-    const response = await fetch(`${API_URL}/uploads`, {
+    const response = await fetch(`${API_URL}/uploads`, { credentials: "include",
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -36,7 +36,7 @@ export const getUserFiles = async () => {
   const token = localStorage.getItem("worknestToken");
   if (!token) throw new Error("You must be logged in to view files.");
 
-  const response = await fetch(`${API_URL}/uploads`, {
+  const response = await fetch(`${API_URL}/uploads`, { credentials: "include",
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -50,7 +50,7 @@ export const deleteFile = async (fileId) => {
   const token = localStorage.getItem("worknestToken");
   if (!token) throw new Error("You must be logged in to delete files.");
 
-  const response = await fetch(`${API_URL}/uploads/${fileId}`, {
+  const response = await fetch(`${API_URL}/uploads/${fileId}`, { credentials: "include",
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
