@@ -3,7 +3,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export const uploadFile = async (file) => {
   const token = localStorage.getItem("worknestToken");
-  if (!token) {
+  if (!token || token === "null" || token === "undefined") {
     throw new Error("You must be logged in to upload files.");
   }
 
@@ -34,7 +34,7 @@ export const uploadFile = async (file) => {
 
 export const getUserFiles = async () => {
   const token = localStorage.getItem("worknestToken");
-  if (!token) throw new Error("You must be logged in to view files.");
+  if (!token || token === "null" || token === "undefined") throw new Error("You must be logged in to view files.");
 
   const response = await fetch(`${API_URL}/uploads`, { credentials: "include",
     method: "GET",
@@ -48,7 +48,7 @@ export const getUserFiles = async () => {
 
 export const deleteFile = async (fileId) => {
   const token = localStorage.getItem("worknestToken");
-  if (!token) throw new Error("You must be logged in to delete files.");
+  if (!token || token === "null" || token === "undefined") throw new Error("You must be logged in to delete files.");
 
   const response = await fetch(`${API_URL}/uploads/${fileId}`, { credentials: "include",
     method: "DELETE",

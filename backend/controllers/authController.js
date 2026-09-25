@@ -91,10 +91,12 @@ const login = async (req, res) => {
         role: m.role,
       }))
 
+    const isProduction = process.env.NODE_ENV === "production" || (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes("localhost"));
+
     res.cookie("worknestToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000 // 1 day
     });
 
@@ -223,8 +225,13 @@ const resetPassword = async (req, res) => {
 }
 
 const logout = (req, res) => {
-  res.clearCookie("worknestToken");
-  return res.json({ message: "Logout successful" })
-}
+  const isProduction = process.env.NODE_ENV === "production" || (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes("localhost"));
+  res.clearCookie("worknestToken", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+  });
+  return res.json({ message: "Logout successful" });
+};
 
 export { register, login, logout, forgotPassword, verifyOTP, resetPassword }

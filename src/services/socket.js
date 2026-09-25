@@ -18,13 +18,17 @@ socket.on("disconnect", (reason) => {
 })
 
 export const connectSocket = () => {
+  const token = localStorage.getItem("worknestToken");
+  if (!token || token === "null" || token === "undefined") {
+    return;
+  }
   socket.auth = {
-    token: localStorage.getItem("worknestToken"),
-  }
+    token,
+  };
   if (!socket.connected) {
-    socket.connect()
+    socket.connect();
   }
-}
+};
 
 
 export const sendDirectMessage = (receiverId, content) => {

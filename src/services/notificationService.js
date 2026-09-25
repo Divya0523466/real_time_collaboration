@@ -2,10 +2,13 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("worknestToken");
-  return {
+  const headers = {
     "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
   };
+  if (token && token !== "null" && token !== "undefined") {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
 };
 
 export const fetchNotifications = async ({ unreadOnly = false } = {}) => {

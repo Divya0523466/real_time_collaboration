@@ -19,6 +19,7 @@ export const getMe = async (req, res) => {
       }));
 
     return res.json({
+      token: req.token,
       user: {
         id: user._id,
         username: user.username,

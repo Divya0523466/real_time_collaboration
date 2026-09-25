@@ -39,11 +39,14 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
         return;
       }
 
+      if (data.token) {
+        localStorage.setItem("worknestToken", data.token);
+      }
       localStorage.setItem("worknestUser", JSON.stringify(data.user));
       localStorage.setItem("worknestWorkspaces", JSON.stringify(data.workspaces || []));
 
       toast.success(data.message);
-      onLoginSuccess(data.user, data.workspaces);
+      onLoginSuccess(data.user, data.workspaces, data.token);
     } catch {
       setError("Unable to connect to the server.");
     } finally {

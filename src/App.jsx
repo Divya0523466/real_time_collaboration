@@ -40,9 +40,9 @@ const LandingPage = () => {
           mode={authMode}
           onClose={() => setAuthMode(null)}
           onSwitchMode={setAuthMode}
-          onLoginSuccess={(user, workspaces) => {
+          onLoginSuccess={(user, workspaces, token) => {
             setAuthMode(null)
-            initializeFromAuth(user, workspaces || [])
+            initializeFromAuth(user, workspaces || [], token)
             navigate("/app/dashboard")
           }}
         />

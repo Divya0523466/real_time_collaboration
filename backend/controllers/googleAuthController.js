@@ -93,14 +93,17 @@ export const googleOAuthCallback = async (req, res) => {
       { expiresIn: "1d" }
     );
 
+    const isProduction = process.env.NODE_ENV === "production" || (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes("localhost"));
+
     res.cookie("worknestToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", 
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax", 
       maxAge: 24 * 60 * 60 * 1000 // 1 day
     });
 
-    return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/app/dashboard`);
+    const cleanFrontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+    return res.redirect(`${cleanFrontendUrl}/app/dashboard?token=${token}`);
 
   } catch (err) {
     console.error("Google OAuth callback failed:", err);

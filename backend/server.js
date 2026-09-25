@@ -23,12 +23,19 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
 
 
+if (process.env.FRONTEND_URL) {
+  process.env.FRONTEND_URL = process.env.FRONTEND_URL.replace(/\/+$/, "");
+}
+
 const app = express();
 const port = process.env.PORT || 5000;
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Dynamic origin callback avoids mismatch caused by trailing slashes
+      callback(null, true);
+    },
     credentials: true,
   },
 });
@@ -37,7 +44,6 @@ app.set("io", io);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow any origin during local development for ease of use, or restrict to FRONTEND_URL
     callback(null, true);
   },
   credentials: true,
