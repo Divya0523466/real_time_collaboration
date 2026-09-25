@@ -51,6 +51,23 @@ const LandingPage = () => {
   )
 }
 
+const PublicRoute = ({ children }) => {
+  const { user, isInitializing } = useWorkspace();
+
+  if (isInitializing) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-[#121717]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#395B64] border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+  return children;
+};
+
 const ProtectedRoute = ({ children }) => {
   const { user, isInitializing } = useWorkspace();
 
@@ -83,13 +100,14 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
       <Route path="/app/dashboard" element={<ProtectedRoute><GlobalDashboard /></ProtectedRoute>} />
       <Route path="/app/workspace/:workspaceId" element={<ProtectedRoute><SlackShell /></ProtectedRoute>} />
       <Route path="/app/workspace/:workspaceId/channel/:channelId" element={<ProtectedRoute><SlackShell /></ProtectedRoute>} />
-      <Route path="/forgot-password" element={<ForgotPassword/>} />
-      <Route path="/enter-otp" element={<OTP/>} />
-      <Route path="/set-password" element={<SetPassword/>} />
+      <Route path="/forgot-password" element={<PublicRoute><ForgotPassword/></PublicRoute>} />
+      <Route path="/enter-otp" element={<PublicRoute><OTP/></PublicRoute>} />
+      <Route path="/set-password" element={<PublicRoute><SetPassword/></PublicRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

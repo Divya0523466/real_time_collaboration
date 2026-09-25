@@ -1,11 +1,15 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FiSun, FiMoon } from "react-icons/fi";
 import logo from "../assets/worknestlogo.png";
 import { useTheme } from "../context/ThemeContext";
+import { useWorkspace } from "../context/WorkspaceContext";
 
 const Navbar = ({ onOpenAuth }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const { theme, toggleTheme, isDark } = useTheme();
+  const { user } = useWorkspace();
+  const navigate = useNavigate();
  
   return (
     <nav className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-y-3 border-b border-[#dbe9e8] bg-white dark:bg-[#1A2121] dark:border-[#2C3333] px-4 pb-4 pt-3 lg:flex-nowrap lg:px-8 lg:pb-6 transition-colors">
@@ -92,21 +96,34 @@ const Navbar = ({ onOpenAuth }) => {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => onOpenAuth("login")}
-          className="cursor-pointer rounded-full border border-[#dbe4e4] dark:border-[#395B64] px-3 py-1.5 text-sm font-semibold text-[#303536] dark:text-[#E7F6F2] transition hover:bg-[#f1f7f6] dark:hover:bg-[#2C3333] sm:px-6 sm:py-2 sm:text-base"
-        >
-          Login
-        </button>
+        {user ? (
+          <button
+            type="button"
+            onClick={() => navigate("/app/dashboard")}
+            className="cursor-pointer rounded-full bg-[#395B64] px-4 py-1.5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(57,91,100,0.22)] transition hover:bg-[#2C3333] dark:hover:bg-[#4E717B] sm:px-6 sm:py-2 sm:text-base flex items-center gap-2"
+          >
+            <span>Dashboard</span>
+            <i className="fa-solid fa-arrow-right text-xs" />
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => onOpenAuth("login")}
+              className="cursor-pointer rounded-full border border-[#dbe4e4] dark:border-[#395B64] px-3 py-1.5 text-sm font-semibold text-[#303536] dark:text-[#E7F6F2] transition hover:bg-[#f1f7f6] dark:hover:bg-[#2C3333] sm:px-6 sm:py-2 sm:text-base"
+            >
+              Login
+            </button>
 
-        <button
-          type="button"
-          onClick={() => onOpenAuth("register")}
-          className="cursor-pointer rounded-full bg-[#395B64] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(57,91,100,0.22)] transition hover:bg-[#2C3333] dark:hover:bg-[#4E717B] sm:px-6 sm:py-2 sm:text-base"
-        >
-          Get Started
-        </button>
+            <button
+              type="button"
+              onClick={() => onOpenAuth("register")}
+              className="cursor-pointer rounded-full bg-[#395B64] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(57,91,100,0.22)] transition hover:bg-[#2C3333] dark:hover:bg-[#4E717B] sm:px-6 sm:py-2 sm:text-base"
+            >
+              Get Started
+            </button>
+          </>
+        )}
       </div>
 
       <button
