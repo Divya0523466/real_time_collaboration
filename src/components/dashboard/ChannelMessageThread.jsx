@@ -13,25 +13,15 @@ import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
 import DateSeparator from "../common/DateSeparator"
 import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
+import { isImageOrFileMessage } from "../../utils/fileUtils"
+import { starMessageApi, unstarMessageApi } from "../../services/messageService"
+import { toast } from "react-toastify"
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
 
-/** Deterministic avatar color from username initial */
+
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
   AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
-
-/** Detect if content is an uploaded image or file (disable editing) */
-const isImageOrFileMessage = (content) => {
-  if (!content) return false
-  const lower = content.toLowerCase()
-  return (
-    lower.includes("res.cloudinary.com") ||
-    lower.match(/\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt)(\?.*)?$/i) !== null
-  )
-}
-
-// ─── Avatar ───────────────────────────────────────────────────────────────────
 
 const Avatar = ({ username = null, small = false }) => (
   <div
@@ -43,8 +33,6 @@ const Avatar = ({ username = null, small = false }) => (
     {(username ?? "?").charAt(0).toUpperCase()}
   </div>
 )
-
-// ─── Reply Reference (compact inline preview inside a reply) ──────────────────
 
 const ReplyReference = ({ replyToMessage = null }) => {
   if (!replyToMessage) return null
@@ -66,10 +54,10 @@ const ReplyReference = ({ replyToMessage = null }) => {
   )
 }
 
-// ─── Inline Reply Composer ────────────────────────────────────────────────────
-
 const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => {
   const [value, setValue] = useState("")
+  const [attachedFile, setAttachedFile] = useState(null)
+  const [uploadError, setUploadError] = useState(null)
   const textareaRef = useRef(null)
 
   useEffect(() => {
@@ -83,9 +71,10 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
 
   const submit = () => {
     const trimmed = value.trim()
-    if (!trimmed) return
-    onSend(channelId, trimmed, parentMessage.id?.toString())
+    if (!trimmed && !attachedFile) return
+    onSend(channelId, trimmed, parentMessage.id?.toString(), attachedFile ? [attachedFile] : [])
     setValue("")
+    setAttachedFile(null)
     onCancel()
   }
 
@@ -111,13 +100,42 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
           <i className="fa-solid fa-xmark text-[11px]" />
         </button>
       </div>
+
+      {/* Attachment chip if file attached */}
+      {attachedFile && (
+        <div className="mx-3 mt-2 flex items-center justify-between gap-2 rounded-lg bg-[#E7F6F2] dark:bg-[#242D2D] px-2.5 py-1 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA] dark:border-[#395B64]">
+          <div className="flex items-center gap-2 truncate">
+            <i className="fa-solid fa-paperclip text-[#395B64] dark:text-[#A5C9CA] text-xs" />
+            <span className="font-medium truncate text-[11px]">{attachedFile.originalName}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAttachedFile(null)}
+            className="text-[#52656A] dark:text-[#A5C9CA] hover:text-rose-500 p-0.5"
+          >
+            <i className="fa-solid fa-xmark text-xs" />
+          </button>
+        </div>
+      )}
+
+      {/* Upload error banner */}
+      {uploadError && (
+        <div className="mx-3 mt-2 flex items-center justify-between text-[11px] text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-1 rounded">
+          <span>{uploadError}</span>
+          <button type="button" onClick={() => setUploadError(null)}>×</button>
+        </div>
+      )}
+
       {/* Input row */}
       <div className="flex items-center gap-2 px-3 py-2">
         <FileUpload
           buttonClassName="flex items-center justify-center h-7 w-7 rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition-colors disabled:opacity-50"
           iconClassName="text-xs"
-          onUploadSuccess={(file) => setValue((prev) => (prev ? `${prev}\n${file.url}` : file.url))}
-          onUploadError={(err) => alert(err)}
+          onUploadSuccess={(file) => {
+            setAttachedFile(file)
+            setUploadError(null)
+          }}
+          onUploadError={(err) => setUploadError(err)}
         />
         <textarea
           ref={textareaRef}
@@ -131,7 +149,7 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
             type="button"
-            disabled={!value.trim()}
+            disabled={!value.trim() && !attachedFile}
             onClick={submit}
             className="flex items-center gap-1.5 rounded-lg bg-[#395B64] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#2C3333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
@@ -159,20 +177,19 @@ const MessageRow = ({
   onSetEditDraft,
   onStartReply,
   onDelete,
+  onToggleStar,
   isReply = false,
 }) => {
   const isSender = message.senderId?.toString() === currentUserId?.toString()
   const isDeleted = message.isDeleted === true
   const isBeingEdited = editingState?.messageId === message.id?.toString()
-  const isImageOrFile = isImageOrFileMessage(message.content)
+  const isImageOrFile = isImageOrFileMessage(message)
   const username = message.sender?.username || "User"
 
-  // Show orphan reference only when a reply is displayed as a root-level message
-  // (i.e., its parent wasn't found in the current message list)
   const showOrphanRef = !isReply && !!message.replyToMessage
 
   return (
-    <div tabIndex="0" className={`group focus:outline-none flex gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[#F8FAFB] focus:bg-[#F8FAFB] dark:hover:bg-[#1E2525]/60 dark:focus:bg-[#1E2525]/60 ${isReply ? "py-1.5" : ""}`}>
+    <div className={`group flex gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[#F8FAFB] dark:hover:bg-[#1E2525]/60 ${isReply ? "py-1.5" : ""}`}>
       {/* Avatar */}
       <div className="flex-shrink-0 pt-0.5">
         <Avatar username={username} small={isReply} />
@@ -183,7 +200,7 @@ const MessageRow = ({
         {/* Content column */}
         <div className="flex flex-col min-w-0 max-w-full">
           {/* Header row */}
-          <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className={`font-semibold text-[#2C3333] dark:text-white leading-none ${isReply ? "text-[12px]" : "text-sm"}`}>
               {isSender ? "You" : username}
             </span>
@@ -192,6 +209,16 @@ const MessageRow = ({
             </span>
             {message.isEdited && !isDeleted && (
               <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50 leading-none whitespace-nowrap">(edited)</span>
+            )}
+            {message.isStarred && !isDeleted && !isImageOrFile && (
+              <button
+                type="button"
+                onClick={() => onToggleStar && onToggleStar(message)}
+                title="Starred message (click to unstar)"
+                className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+              >
+                <i className="fa-solid fa-star text-[10px]" />
+              </button>
             )}
           </div>
 
@@ -246,28 +273,58 @@ const MessageRow = ({
           ) : isDeleted ? (
             <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
           ) : (
-            <MessageContent content={message.content} isSender={isSender} className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed break-words" />
+            <MessageContent
+              content={message.content}
+              attachments={message.attachments || []}
+              isSender={isSender}
+              className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed break-words"
+            />
           )}
         </div>
 
         {/* Hover action buttons — positioned inline next to the content */}
-        {!isBeingEdited && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 focus-within:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 -mt-0.5 self-start">
-            {!isDeleted && (
+        {!isBeingEdited && !isDeleted && (
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 -mt-0.5 self-start pointer-events-none group-hover:pointer-events-auto">
+            {/* Star / Unstar action — only for text messages, not files */}
+            {!isImageOrFile && (
               <div className="group/tip relative">
                 <button
                   type="button"
-                  onClick={() => onStartReply(message)}
-                  aria-label="Reply"
-                  className="flex h-6 w-6 sm:h-6 sm:w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+                  onClick={(e) => {
+                    e.currentTarget.blur()
+                    onToggleStar && onToggleStar(message)
+                  }}
+                  aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                  className={`flex h-6 w-6 sm:h-6 sm:w-6 items-center justify-center rounded-md transition-colors ${
+                    message.isStarred
+                      ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                      : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                  }`}
                 >
-                  <i className="fa-solid fa-reply text-[10px]" />
+                  <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
                 </button>
                 <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
-                  Reply
+                  {message.isStarred ? "Unstar" : "Star"}
                 </span>
               </div>
             )}
+
+            <div className="group/tip relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.currentTarget.blur()
+                  onStartReply(message)
+                }}
+                aria-label="Reply"
+                className="flex h-6 w-6 sm:h-6 sm:w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+              >
+                <i className="fa-solid fa-reply text-[10px]" />
+              </button>
+              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                Reply
+              </span>
+            </div>
             {isSender && !isDeleted && (
               <>
                 {!isImageOrFile && (
@@ -276,7 +333,10 @@ const MessageRow = ({
                     <div className="group/tip relative">
                       <button
                         type="button"
-                        onClick={() => onStartEdit(message)}
+                        onClick={(e) => {
+                          e.currentTarget.blur()
+                          onStartEdit(message)
+                        }}
                         aria-label="Edit message"
                         className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
                       >
@@ -291,7 +351,10 @@ const MessageRow = ({
                 <div className="group/tip relative">
                   <button
                     type="button"
-                    onClick={() => onDelete(message)}
+                    onClick={(e) => {
+                      e.currentTarget.blur()
+                      onDelete(message)
+                    }}
                     aria-label="Delete message"
                     className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                   >
@@ -310,8 +373,6 @@ const MessageRow = ({
   )
 }
 
-// ─── Reply count badge ────────────────────────────────────────────────────────
-
 const ReplyCountBadge = ({ count, onClick }) => {
   if (count === 0) return null
   return (
@@ -326,7 +387,6 @@ const ReplyCountBadge = ({ count, onClick }) => {
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 
 const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
   const [messages, setMessages] = useState([])
@@ -335,19 +395,19 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // ID of the root message currently being replied to (controls inline composer placement)
   const [replyingToId, setReplyingToId] = useState(null)
 
-  // Which thread sections are expanded (by root message ID) — start expanded
+ 
   const [expandedThreads, setExpandedThreads] = useState(new Set())
 
   const [editingState, setEditingState] = useState(null)
 
   const messageIdsRef = useRef(new Set())
   const messagesEndRef = useRef(null)
+  const prevCountRef = useRef(0)
+  const prevChannelIdRef = useRef(null)
   const apiUrl = import.meta.env.VITE_API_URL
 
-  // ── Thread structure: group messages into root + replies ───────────────────
   const { rootMessages, repliesMap } = useMemo(() => {
     const knownIds = new Set(messages.map((m) => m.id?.toString()))
     const roots = []
@@ -355,8 +415,6 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
 
     messages.forEach((msg) => {
       const parentId = msg.replyTo?.toString()
-      // A message is a root if it has no replyTo, OR if its parent is not in
-      // the current message list (orphaned reply — rare edge case)
       if (!parentId || !knownIds.has(parentId)) {
         roots.push(msg)
       } else {
@@ -364,8 +422,6 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
       }
     })
 
-    // Stable sort by createdAt (server already sends sorted, but re-sort
-    // in case real-time messages arrive out of order)
     roots.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     Object.values(replies).forEach((arr) =>
       arr.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
@@ -374,9 +430,8 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     return { rootMessages: roots, repliesMap: replies }
   }, [messages])
 
-  // Auto-expand threads when a reply arrives for them
+ 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpandedThreads((prev) => {
       const next = new Set(prev)
       Object.keys(repliesMap).forEach((id) => next.add(id))
@@ -384,7 +439,6 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     })
   }, [repliesMap])
 
-  // ── Socket listeners + history load ───────────────────────────────────────
   useEffect(() => {
     if (!channel?.id) return undefined
 
@@ -470,25 +524,41 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     }
   }, [apiUrl, channel?.id])
 
-  // Auto-scroll on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    const isNewChannel = prevChannelIdRef.current !== channel?.id
+    const prevCount = prevCountRef.current
+    const currentCount = messages.length
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+    if (isNewChannel) {
+      prevChannelIdRef.current = channel?.id
+      prevCountRef.current = currentCount
+      if (currentCount > 0) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+      }
+      return
+    }
 
+    if (currentCount > prevCount) {
+      prevCountRef.current = currentCount
+      if (prevCount === 0) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      }
+    } else {
+      prevCountRef.current = currentCount
+    }
+  }, [messages, channel?.id])
+
+  
   const handleSendNewMessage = () => {
     const text = inputValue.trim()
     if (!text && !attachedFile) return
     if (!channel?.id) return
     if (!socket.connected) { setError("Socket is not connected. Please try again."); return }
 
-    let content = text
-    if (attachedFile) {
-      content = text ? `${text}\n${attachedFile.url}` : attachedFile.url
-    }
-
-    sendChannelMessage(channel.id, content, null)
+    const attachments = attachedFile ? [attachedFile] : []
+    sendChannelMessage(channel.id, text, null, attachments)
     setInputValue("")
     setAttachedFile(null)
   }
@@ -497,9 +567,9 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendNewMessage() }
   }
 
-  const handleSendReply = (channelId, content, parentId) => {
-    sendChannelMessage(channelId, content, parentId)
-    // Expand the thread of the parent we just replied to
+  const handleSendReply = (channelId, content, parentId, attachments = []) => {
+    sendChannelMessage(channelId, content, parentId, attachments)
+ 
     setExpandedThreads((prev) => new Set([...prev, parentId]))
   }
 
@@ -529,6 +599,38 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     deleteChannelMessage(message.id?.toString())
   }
 
+  const handleToggleStar = async (message) => {
+    if (!message || isImageOrFileMessage(message)) return
+    const msgId = (message.id || message._id)?.toString()
+    if (!msgId) return
+
+    const willStar = !message.isStarred
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        (m.id || m._id)?.toString() === msgId ? { ...m, isStarred: willStar } : m
+      )
+    )
+
+    try {
+      if (willStar) {
+        await starMessageApi(msgId, "CHANNEL")
+        toast.success("Message starred")
+      } else {
+        await unstarMessageApi(msgId)
+        toast.success("Message unstarred")
+      }
+    } catch (err) {
+      console.error("Failed to star/unstar message:", err)
+      toast.error(err.message || "Failed to update star")
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === msgId ? { ...m, isStarred: !willStar } : m
+        )
+      )
+    }
+  }
+
   const toggleThread = (rootId) => {
     setExpandedThreads((prev) => {
       const next = new Set(prev)
@@ -537,7 +639,6 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     })
   }
 
-  // Shared action props passed to every MessageRow
   const actionProps = {
     currentUserId,
     editingState,
@@ -548,10 +649,10 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     onSetEditDraft: (draft) => setEditingState((s) => ({ ...s, draftContent: draft })),
     onStartReply: startReply,
     onDelete: handleDelete,
+    onToggleStar: handleToggleStar,
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
+  
   if (!channel) {
     return (
       <div className="flex min-w-0 flex-1 items-center justify-center bg-white dark:bg-[#121717] text-sm text-[#52656A] dark:text-[#A5C9CA]">

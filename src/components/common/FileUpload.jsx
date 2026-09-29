@@ -25,7 +25,6 @@ const FileUpload = ({
       if (onUploadSuccess) {
         onUploadSuccess(data.file);
       }
-      // Reset input after success
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -34,7 +33,6 @@ const FileUpload = ({
       if (onUploadError) {
         onUploadError(error.message);
       }
-      // Clear file on failure so they can try again
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";

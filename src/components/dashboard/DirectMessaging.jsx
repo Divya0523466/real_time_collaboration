@@ -19,6 +19,9 @@ import {
   offDirectMessageEditError,
   offDirectMessageDeleteError,
 } from "../../services/socket"
+import { starMessageApi, unstarMessageApi } from "../../services/messageService"
+import { isImageOrFileMessage } from "../../utils/fileUtils"
+import { toast } from "react-toastify"
 import MessageThread from "./MessageThread"
 
 const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
@@ -156,13 +159,15 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
     }
   }, [currentSelectedUser])
 
-  const handleSendMessage = (content) => {
-    if (!currentSelectedUser || !content.trim()) {
+  const handleSendMessage = (content, attachments = []) => {
+    if (!currentSelectedUser) return
+    const trimmed = typeof content === "string" ? content.trim() : ""
+    if (!trimmed && (!attachments || attachments.length === 0)) {
       return
     }
 
     try {
-      sendDirectMessage(currentSelectedUser.id, content)
+      sendDirectMessage(currentSelectedUser.id, trimmed, attachments)
     } catch {
       setError("Failed to send message")
     }
@@ -178,6 +183,44 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
     deleteDirectMessage(messageId)
   }
 
+  const handleToggleStar = async (message) => {
+    if (!message || isImageOrFileMessage(message)) return
+    const messageId = (message.id || message._id)?.toString()
+    if (!messageId) return
+
+    const currentlyStarred = Boolean(message.isStarred)
+    const nextStarred = !currentlyStarred
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        (m.id || m._id)?.toString() === messageId
+          ? { ...m, isStarred: nextStarred }
+          : m
+      )
+    )
+
+    try {
+      if (currentlyStarred) {
+        await unstarMessageApi(messageId)
+        toast.success("Message unstarred")
+      } else {
+        await starMessageApi(messageId, "DIRECT")
+        toast.success("Message starred")
+      }
+    } catch (err) {
+      console.error("Failed to toggle star:", err)
+      toast.error(err.message || "Failed to update star")
+      // Revert optimistic update
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === messageId
+            ? { ...m, isStarred: currentlyStarred }
+            : m
+        )
+      )
+    }
+  }
+
   return (
     <MessageThread
       selectedUser={currentSelectedUser}
@@ -187,6 +230,7 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
       onSendMessage={handleSendMessage}
       onEditMessage={handleEditMessage}
       onDeleteMessage={handleDeleteMessage}
+      onToggleStar={handleToggleStar}
       currentUserId={user?.id}
       onOpenSidebar={onOpenSidebar}
     />

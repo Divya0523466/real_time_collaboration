@@ -17,6 +17,7 @@ import DeleteWorkspaceModal from "./DeleteWorkspaceModal"
 import DirectMessaging from "./DirectMessaging"
 import ChannelMessageThread from "./ChannelMessageThread"
 import NotificationPanel from "./NotificationPanel"
+import StarredMessagesView from "./StarredMessagesView"
 import {
   fetchUnreadMessageCounts,
   markChannelAsRead,
@@ -75,6 +76,7 @@ const SlackShell = () => {
   const [showDetailsPane, setShowDetailsPane] = useState(false)
   const [showMembersPanel, setShowMembersPanel] = useState(false)
   const [showActivityPanel, setShowActivityPanel] = useState(false)
+  const [isStarredView, setIsStarredView] = useState(false)
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null)
 
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false)
@@ -294,6 +296,7 @@ const SlackShell = () => {
   }
 
   const handleSelectChannel = (chan) => {
+    setIsStarredView(false)
     setSelectedDMUser(null)
     setUnreadChannelCounts((counts) => {
       const nextCounts = { ...counts }
@@ -613,6 +616,22 @@ const SlackShell = () => {
                 </span>
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsStarredView(true)
+                setSelectedDMUser(null)
+                setIsMobileSidebarOpen(false)
+              }}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
+                isStarredView
+                  ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                  : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+              }`}
+            >
+              <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
+              <span className="flex-1 text-left">Starred</span>
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
             {/* Channels */}
@@ -645,7 +664,7 @@ const SlackShell = () => {
                     </div>
                   ) : (
                     channels.map((chan) => {
-                      const isActive = currentChannel?.id === chan.id && !selectedDMUser
+                      const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView
                       return (
                         <div
                           key={chan.id}
@@ -699,6 +718,7 @@ const SlackShell = () => {
                           key={member.id}
                           type="button"
                           onClick={() => {
+                            setIsStarredView(false)
                             setSelectedDMUser(member)
                             setShowDetailsPane(false)
                             setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
@@ -980,6 +1000,21 @@ const SlackShell = () => {
               </span>
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsStarredView(true)
+              setSelectedDMUser(null)
+            }}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
+              isStarredView
+                ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+            }`}
+          >
+            <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
+            <span className="flex-1 text-left">Starred</span>
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
@@ -1013,7 +1048,7 @@ const SlackShell = () => {
                   </div>
                 ) : (
                   channels.map((chan) => {
-                    const isActive = currentChannel?.id === chan.id && !selectedDMUser
+                    const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView
                     const isMenuOpen = activeChannelMenuId === chan.id
                     return (
                       <div key={chan.id} className="relative group">
@@ -1140,6 +1175,7 @@ const SlackShell = () => {
                         key={member.id}
                         type="button"
                         onClick={() => {
+                          setIsStarredView(false)
                           setSelectedDMUser(member)
                           setShowDetailsPane(false)
                           setUnreadDMCounts((counts) => {
@@ -1194,7 +1230,7 @@ const SlackShell = () => {
 
 
       <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB] dark:bg-[#121717] transition-colors">
-        {!selectedDMUser && (
+        {!selectedDMUser && !isStarredView && (
           <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-3 sm:px-6 shadow-xs select-none transition-colors gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Hamburger — mobile only */}
@@ -1278,7 +1314,32 @@ const SlackShell = () => {
         )}
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
-          {selectedDMUser ? (
+          {isStarredView ? (
+            <StarredMessagesView
+              workspaceId={workspaceId}
+              onNavigateChannel={(cId) => {
+                setIsStarredView(false)
+                setSelectedDMUser(null)
+                navigate(`/app/workspace/${workspaceId}/channel/${cId}`)
+              }}
+              onNavigateDM={(otherUserId, otherUser) => {
+                setIsStarredView(false)
+                if (otherUser && (otherUser.id || otherUser._id)) {
+                  setSelectedDMUser({
+                    id: otherUser.id || otherUser._id,
+                    username: otherUser.username,
+                    avatar: otherUser.avatar,
+                  })
+                } else {
+                  const found = workspaceData?.members?.find(
+                    (m) => (m.id || m._id)?.toString() === otherUserId?.toString()
+                  )
+                  setSelectedDMUser(found || { id: otherUserId, username: "User" })
+                }
+              }}
+              onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+            />
+          ) : selectedDMUser ? (
             <DirectMessaging 
               externalSelectedUser={selectedDMUser} 
               onOpenSidebar={() => setIsMobileSidebarOpen(true)} 
@@ -1288,14 +1349,14 @@ const SlackShell = () => {
           )}
 
           {/* Mobile backdrop for Details Pane */}
-          {showDetailsPane && !selectedDMUser && (
+          {showDetailsPane && !selectedDMUser && !isStarredView && (
             <div
               className="absolute inset-0 z-10 bg-black/50 sm:hidden"
               onClick={() => setShowDetailsPane(false)}
             />
           )}
 
-          {showDetailsPane && !selectedDMUser && (
+          {showDetailsPane && !selectedDMUser && !isStarredView && (
             <aside className="absolute inset-y-0 right-0 w-[85%] sm:relative sm:w-72 md:w-80 border-l border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex flex-col h-full overflow-y-auto z-20 shadow-lg transition-colors sm:inset-auto sm:shadow-none">
               <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-5 py-4">
                 <h3 className="text-base font-bold text-[#2C3333] dark:text-white">Channel Details</h3>
@@ -1637,10 +1698,12 @@ const SlackShell = () => {
         isOpen={showActivityPanel}
         onClose={() => setShowActivityPanel(false)}
         onSelectChannel={(cId) => {
+          setIsStarredView(false)
           setSelectedDMUser(null)
           navigate(`/app/workspace/${workspaceId}/channel/${cId}`)
         }}
         onSelectDM={(otherUserId, otherUser) => {
+          setIsStarredView(false)
           if (otherUser && (otherUser.id || otherUser._id)) {
             setSelectedDMUser({
               id: otherUser.id || otherUser._id,

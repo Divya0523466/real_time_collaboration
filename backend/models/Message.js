@@ -1,5 +1,53 @@
 import mongoose from "mongoose"
 
+const attachmentSchema = new mongoose.Schema(
+  {
+    fileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "File",
+    },
+    originalName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    previewUrl: {
+      type: String,
+      default: "",
+    },
+    publicId: {
+      type: String,
+      default: "",
+    },
+    resourceType: {
+      type: String,
+      default: "auto",
+    },
+    format: {
+      type: String,
+      default: "",
+    },
+    mimeType: {
+      type: String,
+      default: "",
+    },
+    size: {
+      type: Number,
+      default: 0,
+    },
+    extension: {
+      type: String,
+      default: "",
+    },
+  },
+  { _id: true }
+)
+
 const messageSchema = new mongoose.Schema(
   {
     senderId: {
@@ -14,8 +62,12 @@ const messageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
+    },
+    attachments: {
+      type: [attachmentSchema],
+      default: [],
     },
     isEdited: {
       type: Boolean,
@@ -28,6 +80,11 @@ const messageSchema = new mongoose.Schema(
     isRead: {
       type: Boolean,
       default: false,
+      index: true,
+    },
+    starredBy: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
       index: true,
     },
   },

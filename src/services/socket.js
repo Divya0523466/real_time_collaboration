@@ -31,8 +31,8 @@ export const connectSocket = () => {
 };
 
 
-export const sendDirectMessage = (receiverId, content) => {
-  socket.emit("send-direct-message", { receiverId, content })
+export const sendDirectMessage = (receiverId, content, attachments = []) => {
+  socket.emit("send-direct-message", { receiverId, content, attachments })
 }
 
 export const editDirectMessage = (messageId, content) => {
@@ -107,8 +107,8 @@ export const leaveChannel = (channelId) => {
   socket.emit("leave-channel", { channelId })
 }
 
-export const sendChannelMessage = (channelId, content, replyTo = null) => {
-  socket.emit("send-channel-message", { channelId, content, replyTo })
+export const sendChannelMessage = (channelId, content, replyTo = null, attachments = []) => {
+  socket.emit("send-channel-message", { channelId, content, replyTo, attachments })
 }
 
 export const editChannelMessage = (messageId, content) => {

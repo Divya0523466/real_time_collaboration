@@ -4,18 +4,14 @@ import { useWorkspace } from "../../context/WorkspaceContext"
 import { useTheme } from "../../context/ThemeContext"
 import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
+import AttachmentRenderer from "../common/AttachmentRenderer"
 import DateSeparator from "../common/DateSeparator"
 import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
-
-/** Detect if content is an uploaded image or file (disable editing) */
-const isImageOrFileMessage = (content) => {
-  if (!content) return false
-  const lower = content.toLowerCase()
-  return (
-    lower.includes("res.cloudinary.com") ||
-    lower.match(/\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt)(\?.*)?$/i) !== null
-  )
-}
+import {
+  isImageOrFileMessage,
+  isPureAttachmentMessage,
+  getMessageAttachments,
+} from "../../utils/fileUtils"
 
 const MessageThread = ({
   selectedUser = null,
@@ -25,6 +21,7 @@ const MessageThread = ({
   onSendMessage,
   onEditMessage = () => {},
   onDeleteMessage = () => {},
+  onToggleStar = () => {},
   currentUserId = null,
   onOpenSidebar = () => {},
 }) => {
@@ -36,22 +33,43 @@ const MessageThread = ({
   // editingState: { messageId: string, draftContent: string } | null
   const [editingState, setEditingState] = useState(null)
   const messagesEndRef = useRef(null)
+  const prevCountRef = useRef(0)
+  const prevUserIdRef = useRef(null)
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom only when new messages arrive or when switching conversation,
+  // not when starring, unstarring, editing, or deleting existing messages.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    const isNewUser = prevUserIdRef.current !== selectedUser?.id
+    const prevCount = prevCountRef.current
+    const currentCount = messages.length
+
+    if (isNewUser) {
+      prevUserIdRef.current = selectedUser?.id
+      prevCountRef.current = currentCount
+      if (currentCount > 0) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+      }
+      return
+    }
+
+    if (currentCount > prevCount) {
+      prevCountRef.current = currentCount
+      if (prevCount === 0) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      }
+    } else {
+      prevCountRef.current = currentCount
+    }
+  }, [messages, selectedUser?.id])
 
   const handleSendClick = () => {
     const text = inputValue.trim()
     if (!text && !attachedFile) return
 
-    let content = text
-    if (attachedFile) {
-      content = text ? `${text}\n${attachedFile.url}` : attachedFile.url
-    }
-
-    onSendMessage(content)
+    const attachments = attachedFile ? [attachedFile] : []
+    onSendMessage(text, attachments)
     setInputValue("")
     setAttachedFile(null)
   }
@@ -174,6 +192,8 @@ const MessageThread = ({
             const isSender = message.senderId?.toString() === currentUserId?.toString()
             const isDeleted = message.isDeleted === true
             const isBeingEdited = editingState?.messageId === message.id?.toString()
+            const isPureAttachment = !isDeleted && isPureAttachmentMessage(message)
+            const attachments = isPureAttachment ? getMessageAttachments(message) : []
 
             const prevMessage = index > 0 ? messages[index - 1] : null
             const showDateSeparator = !prevMessage || !isSameDay(prevMessage.createdAt, message.createdAt)
@@ -185,19 +205,43 @@ const MessageThread = ({
                   <DateSeparator label={dateLabel} />
                 )}
                 <div
-                  tabIndex="0"
-                  className={`group focus:outline-none flex items-end gap-1.5 ${
+                  className={`group flex items-end gap-1.5 ${
                     isSender ? "justify-end" : "justify-start"
                   }`}
                 >
-                  {/* Hover action toolbar for sender — floats beside bubble */}
+            
                   {isSender && !isDeleted && !isBeingEdited && (
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 focus-within:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-1">
-                      {!isImageOrFileMessage(message.content) && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-1 pointer-events-none group-hover:pointer-events-auto">
+                      {!isImageOrFileMessage(message) && (
                         <div className="group/tip relative">
                           <button
                             type="button"
-                            onClick={() => startEdit(message)}
+                            onClick={(e) => {
+                              e.currentTarget.blur()
+                              onToggleStar(message)
+                            }}
+                           
+                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                              message.isStarred
+                                ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                            }`}
+                          >
+                            <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                          </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                            {message.isStarred ? "Unstar" : "Star"}
+                          </span>
+                        </div>
+                      )}
+                      {!isImageOrFileMessage(message) && (
+                        <div className="group/tip relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.currentTarget.blur()
+                              startEdit(message)
+                            }}
                             aria-label="Edit message"
                             className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
                           >
@@ -211,7 +255,10 @@ const MessageThread = ({
                       <div className="group/tip relative">
                         <button
                           type="button"
-                          onClick={() => onDeleteMessage(message.id?.toString())}
+                          onClick={(e) => {
+                            e.currentTarget.blur()
+                            onDeleteMessage(message.id?.toString())
+                          }}
                           aria-label="Delete message"
                           className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                         >
@@ -279,6 +326,26 @@ const MessageThread = ({
                     <div className="rounded-lg px-3 py-1.5 border border-dashed border-[#D0DCDB] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#1E2525]">
                       <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
                     </div>
+                  ) : isPureAttachment ? (
+                    <div className={`flex flex-col ${isSender ? "items-end" : "items-start"}`}>
+                      <AttachmentRenderer
+                        attachments={attachments}
+                        isSender={isSender}
+                        isPure={true}
+                      />
+                      <div className="flex items-center gap-1.5 mt-0.5 px-1">
+                        <p
+                          className={`text-[10px] leading-4 ${
+                            isSender ? "text-[#52656A] dark:text-[#A5C9CA]/70" : "text-[#52656A] dark:text-[#A5C9CA]/70"
+                          }`}
+                        >
+                          {formatMessageTime(message.createdAt)}
+                          {message.isEdited && !isDeleted && (
+                            <span className="ml-1 opacity-60">(edited)</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
                   ) : (
                     <div
                       className={`rounded-lg px-3 py-1.5 max-w-xs sm:max-w-md break-words ${
@@ -288,17 +355,63 @@ const MessageThread = ({
                       }`}
                     >
                       <div className="flex flex-col gap-1">
-                        <MessageContent content={message.content} isSender={isSender} />
-                        <p
-                          className={`shrink-0 text-[10px] leading-4 ${
-                            isSender ? "text-[#A5C9CA]" : "text-[#52656A] dark:text-[#A5C9CA]/70"
+                        <MessageContent
+                          content={message.content}
+                          attachments={message.attachments || []}
+                          isSender={isSender}
+                        />
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <p
+                            className={`shrink-0 text-[10px] leading-4 ${
+                              isSender ? "text-[#A5C9CA]" : "text-[#52656A] dark:text-[#A5C9CA]/70"
+                            }`}
+                          >
+                            {formatMessageTime(message.createdAt)}
+                            {message.isEdited && !isDeleted && (
+                              <span className="ml-1 opacity-60">(edited)</span>
+                            )}
+                          </p>
+                          {message.isStarred && !isDeleted && !isImageOrFileMessage(message) && (
+                            <button
+                              type="button"
+                              onClick={() => onToggleStar(message)}
+                              title="Starred message (click to unstar)"
+                              className={`${
+                                isSender
+                                  ? "text-emerald-400 hover:text-emerald-300"
+                                  : "text-emerald-500 hover:text-emerald-600"
+                              } transition-colors`}
+                            >
+                              <i className="fa-solid fa-star text-[9px]" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hover action toolbar for receiver — floats beside bubble */}
+                  {!isSender && !isDeleted && !isImageOrFileMessage(message) && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-1 pointer-events-none group-hover:pointer-events-auto">
+                      <div className="group/tip relative">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.currentTarget.blur()
+                            onToggleStar(message)
+                          }}
+                          aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                          className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                            message.isStarred
+                              ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                              : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
                           }`}
                         >
-                          {formatMessageTime(message.createdAt)}
-                          {message.isEdited && !isDeleted && (
-                            <span className="ml-1 opacity-60">(edited)</span>
-                          )}
-                        </p>
+                          <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                          {message.isStarred ? "Unstar" : "Star"}
+                        </span>
                       </div>
                     </div>
                   )}

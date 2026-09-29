@@ -33,6 +33,14 @@ const fileSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    previewUrl: {
+      type: String,
+      default: "",
+    },
+    extension: {
+      type: String,
+      default: "",
+    },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

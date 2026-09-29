@@ -64,3 +64,47 @@ export const markDirectMessagesAsRead = async (userId) => {
 
   return data
 }
+
+export const starMessageApi = async (messageId, messageType = "CHANNEL") => {
+  const response = await fetch(`${API_URL}/messages/${messageId}/star`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ messageType }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to star message")
+  }
+  return data
+}
+
+export const unstarMessageApi = async (messageId) => {
+  const response = await fetch(`${API_URL}/messages/${messageId}/star`, {
+    credentials: "include",
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to unstar message")
+  }
+  return data
+}
+
+export const fetchStarredMessagesApi = async (workspaceId = null) => {
+  const query = workspaceId ? `?workspaceId=${workspaceId}` : ""
+  const response = await fetch(`${API_URL}/messages/starred${query}`, {
+    credentials: "include",
+    method: "GET",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch starred messages")
+  }
+  return Array.isArray(data.starredMessages) ? data.starredMessages : (Array.isArray(data) ? data : [])
+}

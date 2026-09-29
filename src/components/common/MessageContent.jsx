@@ -1,124 +1,54 @@
+import AttachmentRenderer, { AttachmentItem } from "./AttachmentRenderer";
+import {
+  isUrl,
+  isUploadedFileUrl,
+  parseAttachmentFromUrl,
+} from "../../utils/fileUtils";
 
-// Helper to test if a string is a valid URL
-const isUrl = (string) => {
-  try {
-    const url = new URL(string);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
+const MessageContent = ({
+  content = "",
+  attachments = [],
+  isSender = false,
+  isPure = false,
+  className = "",
+}) => {
+  const hasStructuredAttachments = Array.isArray(attachments) && attachments.length > 0;
+  const hasText = Boolean(content && content.trim());
+
+  // If structured attachments exist
+  if (hasStructuredAttachments) {
+    return (
+      <div className={`wrap-break-word ${className}`}>
+        {hasText && (
+          <p className="whitespace-pre-wrap leading-relaxed select-text mb-1">{content}</p>
+        )}
+        <AttachmentRenderer attachments={attachments} isSender={isSender} isPure={!hasText || isPure} />
+      </div>
+    );
   }
-};
 
-// Helper to determine if a URL points to an image
-const isImageUrl = (url) => {
-  if (!url) return false;
-  const lower = url.toLowerCase();
-  return (
-    lower.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i) !== null ||
-    lower.includes("/image/upload/")
-  );
-};
-
-const getOptimizedImageUrl = (url, width = 600) => {
-  if (!url || typeof url !== "string") return url;
-  if (url.includes("res.cloudinary.com") && url.includes("/image/upload/")) {
-    if (!url.includes("/image/upload/f_auto")) {
-      return url.replace("/image/upload/", `/image/upload/f_auto,q_auto,w_${width},c_limit/`);
-    }
-  }
-  return url;
-};
-
-const getFileNameFromUrl = (url) => {
-  try {
-    const pathname = new URL(url).pathname;
-    const parts = pathname.split("/");
-    const lastPart = parts[parts.length - 1] || "Attachment";
-    return decodeURIComponent(lastPart);
-  } catch {
-    return "Attachment";
-  }
-};
-
-const MessageContent = ({ content = "", isSender = false, className = "" }) => {
   if (!content) return null;
 
-  
-  const tokens = content.split(/(\s+)/);
-
   const trimmed = content.trim();
-  const isSingleUrl = isUrl(trimmed);
 
-  if (isSingleUrl) {
-    if (isImageUrl(trimmed)) {
-      return (
-        <div className={`mt-1 ${className}`}>
-          <a
-            href={trimmed}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
-          >
-            <img
-              src={getOptimizedImageUrl(trimmed, 600)}
-              alt="Uploaded file"
-              loading="lazy"
-              decoding="async"
-              width="300"
-              height="200"
-              className="max-h-60 w-auto rounded-lg object-contain bg-black/5"
-              style={{ minHeight: "140px", aspectRatio: "auto" }}
-            />
-          </a>
-        </div>
-      );
-    }
-
-    // Single document / file URL
-    const fileName = getFileNameFromUrl(trimmed);
+  // Backward compatibility: If message is only a file URL
+  if (isUrl(trimmed) && isUploadedFileUrl(trimmed)) {
+    const syntheticAttachment = parseAttachmentFromUrl(trimmed);
     return (
-      <div className={`mt-1 ${className}`}>
-        <a
-          href={trimmed}
-          target="_blank"
-          rel="noopener noreferrer"
-          download
-          className={`flex max-w-sm items-center gap-2.5 rounded-lg border p-2 text-xs transition-all shadow-sm ${
-            isSender
-              ? "border-white/30 bg-white/10 text-white hover:bg-white/20"
-              : "border-[#A5C9CA] bg-white text-[#2C3333] hover:bg-[#F8FAFB] hover:border-[#395B64]"
-          }`}
-        >
-          <div
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${
-              isSender ? "bg-white/20 text-white" : "bg-[#E7F6F2] text-[#395B64]"
-            }`}
-          >
-            <i className="fa-solid fa-file-arrow-down text-sm" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium truncate">{fileName}</p>
-            <p className={`text-[10px] ${isSender ? "text-white/80" : "text-[#52656A]"}`}>
-              Click to view / download
-            </p>
-          </div>
-          <i
-            className={`fa-solid fa-arrow-up-right-from-square text-[10px] shrink-0 ${
-              isSender ? "text-white/70" : "text-[#52656A]"
-            }`}
-          />
-        </a>
+      <div className={`wrap-break-word ${className}`}>
+        <AttachmentItem attachment={syntheticAttachment} isSender={isSender} isPure />
       </div>
     );
   }
 
   // Mixed text with potential URLs
+  const tokens = content.split(/(\s+)/);
   const elements = [];
   let currentText = "";
 
   tokens.forEach((token, index) => {
-    if (isUrl(token.trim())) {
-      const url = token.trim();
+    const tokenTrimmed = token.trim();
+    if (isUrl(tokenTrimmed)) {
       if (currentText) {
         elements.push(
           <span key={`text-${index}`} className="whitespace-pre-wrap">
@@ -128,63 +58,25 @@ const MessageContent = ({ content = "", isSender = false, className = "" }) => {
         currentText = "";
       }
 
-      if (isImageUrl(url)) {
+      if (isUploadedFileUrl(tokenTrimmed)) {
+        const syntheticAttachment = parseAttachmentFromUrl(tokenTrimmed);
         elements.push(
-          <div key={`img-${index}`} className="my-1.5">
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block max-w-sm overflow-hidden rounded-lg border border-black/10 shadow-sm hover:opacity-95 transition-opacity"
-            >
-              <img
-                src={getOptimizedImageUrl(url, 600)}
-                alt="Attachment"
-                loading="lazy"
-                decoding="async"
-                width="300"
-                height="200"
-                className="max-h-60 w-auto rounded-lg object-contain bg-black/5"
-                style={{ minHeight: "140px", aspectRatio: "auto" }}
-              />
-            </a>
+          <div key={`file-${index}`} className="my-1.5">
+            <AttachmentItem attachment={syntheticAttachment} isSender={isSender} />
           </div>
         );
       } else {
-        const fileName = getFileNameFromUrl(url);
+        // Standard external web link
         elements.push(
-          <div key={`file-${index}`} className="my-1.5">
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-              className={`flex max-w-sm items-center gap-2.5 rounded-lg border p-2 text-xs transition-all shadow-sm ${
-                isSender
-                  ? "border-white/30 bg-white/10 text-white hover:bg-white/20"
-                  : "border-[#A5C9CA] bg-white text-[#2C3333] hover:bg-[#F8FAFB] hover:border-[#395B64]"
-              }`}
-            >
-              <div
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${
-                  isSender ? "bg-white/20 text-white" : "bg-[#E7F6F2] text-[#395B64]"
-                }`}
-              >
-                <i className="fa-solid fa-file-arrow-down text-sm" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium truncate">{fileName}</p>
-                <p className={`text-[10px] ${isSender ? "text-white/80" : "text-[#52656A]"}`}>
-                  Click to view / download
-                </p>
-              </div>
-              <i
-                className={`fa-solid fa-arrow-up-right-from-square text-[10px] shrink-0 ${
-                  isSender ? "text-white/70" : "text-[#52656A]"
-                }`}
-              />
-            </a>
-          </div>
+          <a
+            key={`link-${index}`}
+            href={tokenTrimmed}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 dark:text-blue-400 hover:underline break-all"
+          >
+            {tokenTrimmed}
+          </a>
         );
       }
     } else {

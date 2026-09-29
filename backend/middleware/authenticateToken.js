@@ -11,7 +11,7 @@ const authenticateToken = (req, res, next) => {
         headerToken = candidate;
       }
     }
-    const token = headerToken || req.cookies?.worknestToken;
+    const token = headerToken || req.cookies?.worknestToken || req.query?.token;
 
     if (!token) {
       return res.status(401).json({ message: "Access token required" });

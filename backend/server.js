@@ -135,11 +135,12 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("send-channel-message", async ({ channelId, content, replyTo = null } = {}) => {
+  socket.on("send-channel-message", async ({ channelId, content, attachments = [], replyTo = null } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
-    if (!channelId || !trimmedContent) {
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    if (!channelId || (!trimmedContent && !hasAttachments)) {
       socket.emit("send-channel-message-error", {
-        message: "Channel and message content are required",
+        message: "Channel and message content or attachment are required",
       });
       return;
     }
@@ -171,10 +172,24 @@ io.on("connection", async (socket) => {
         validatedReplyTo = parent._id;
       }
 
+      const formattedAttachments = (attachments || []).map((att) => ({
+        fileId: att.fileId || att.id || att._id,
+        originalName: att.originalName || "Attachment",
+        url: att.url,
+        previewUrl: att.previewUrl || "",
+        publicId: att.publicId || "",
+        resourceType: att.resourceType || "auto",
+        format: att.format || "",
+        mimeType: att.mimeType || "",
+        size: att.size || 0,
+        extension: att.extension || "",
+      }));
+
       const savedMessage = await ChannelMessage.create({
         channelId: access.channel._id,
         senderId: socket.userId,
         content: trimmedContent,
+        attachments: formattedAttachments,
         replyTo: validatedReplyTo,
       });
 
@@ -223,8 +238,9 @@ io.on("connection", async (socket) => {
               .filter((id) => memberUserIds.includes(id) && id !== socket.userId.toString());
           }
 
-          const senderName = populatedMessage?.senderId?.username || "Someone";
-          const snippet = trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent;
+          const snippet = trimmedContent
+            ? (trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent)
+            : (hasAttachments ? `[Attachment: ${formattedAttachments[0]?.originalName || "File"}]` : "Sent a message");
 
           // 1. Notify mentioned users
           for (const mUserId of mentionedUserIds) {
@@ -265,8 +281,9 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("send-direct-message", async ({ receiverId, content } = {}) => {
+  socket.on("send-direct-message", async ({ receiverId, content, attachments = [] } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
 
     if (!socket.userId) {
       socket.emit("send-direct-message-error", {
@@ -280,9 +297,9 @@ io.on("connection", async (socket) => {
       });
       return;
     }
-    if (!trimmedContent) {
+    if (!trimmedContent && !hasAttachments) {
       socket.emit("send-direct-message-error", {
-        message: "Message cannot be empty",
+        message: "Message content or attachment is required",
       });
       return;
     }
@@ -309,11 +326,24 @@ io.on("connection", async (socket) => {
     }
 
     try {
+      const formattedAttachments = (attachments || []).map((att) => ({
+        fileId: att.fileId || att.id || att._id,
+        originalName: att.originalName || "Attachment",
+        url: att.url,
+        previewUrl: att.previewUrl || "",
+        publicId: att.publicId || "",
+        resourceType: att.resourceType || "auto",
+        format: att.format || "",
+        mimeType: att.mimeType || "",
+        size: att.size || 0,
+        extension: att.extension || "",
+      }));
 
       const savedMessage = await Message.create({
         senderId: socket.userId,
         receiverId: receiverId.toString(),
         content: trimmedContent,
+        attachments: formattedAttachments,
       });
 
       const messagePayload = {
@@ -321,6 +351,7 @@ io.on("connection", async (socket) => {
         senderId: savedMessage.senderId,
         receiverId: savedMessage.receiverId,
         content: savedMessage.content,
+        attachments: savedMessage.attachments || [],
         isRead: false,
         createdAt: savedMessage.createdAt,
       };
@@ -334,7 +365,9 @@ io.on("connection", async (socket) => {
         try {
           const sender = await User.findById(socket.userId).select("username");
           const senderName = sender?.username || "Someone";
-          const snippet = trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent;
+          const snippet = trimmedContent
+            ? (trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent)
+            : (hasAttachments ? `[Attachment: ${formattedAttachments[0]?.originalName || "File"}]` : "Sent a message");
 
           const isMentioned = receiver?.username
             ? new RegExp(`@${receiver.username}\\b`, "i").test(trimmedContent)
