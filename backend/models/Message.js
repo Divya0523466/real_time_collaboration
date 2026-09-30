@@ -48,6 +48,17 @@ const attachmentSchema = new mongoose.Schema(
   { _id: true }
 )
 
+const mentionSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+  },
+  { _id: false }
+)
+
 const messageSchema = new mongoose.Schema(
   {
     senderId: {
@@ -67,6 +78,10 @@ const messageSchema = new mongoose.Schema(
     },
     attachments: {
       type: [attachmentSchema],
+      default: [],
+    },
+    mentions: {
+      type: [mentionSchema],
       default: [],
     },
     isEdited: {

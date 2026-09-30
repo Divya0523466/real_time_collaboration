@@ -121,7 +121,13 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
     setMessages((prev) =>
       prev.map((m) =>
         m.id?.toString() === payload.id?.toString()
-          ? { ...m, content: payload.content, isEdited: true, updatedAt: payload.updatedAt }
+          ? {
+              ...m,
+              content: payload.content,
+              mentions: payload.mentions !== undefined ? payload.mentions : m.mentions,
+              isEdited: true,
+              updatedAt: payload.updatedAt,
+            }
           : m
       )
     )
@@ -159,7 +165,7 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
     }
   }, [currentSelectedUser])
 
-  const handleSendMessage = (content, attachments = []) => {
+  const handleSendMessage = (content, attachments = [], mentions = []) => {
     if (!currentSelectedUser) return
     const trimmed = typeof content === "string" ? content.trim() : ""
     if (!trimmed && (!attachments || attachments.length === 0)) {
@@ -167,15 +173,15 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
     }
 
     try {
-      sendDirectMessage(currentSelectedUser.id, trimmed, attachments)
+      sendDirectMessage(currentSelectedUser.id, trimmed, attachments, mentions, workspaceData?.id)
     } catch {
       setError("Failed to send message")
     }
   }
 
   // Emit edit to server via socket
-  const handleEditMessage = (messageId, newContent) => {
-    editDirectMessage(messageId, newContent)
+  const handleEditMessage = (messageId, newContent, mentions = undefined) => {
+    editDirectMessage(messageId, newContent, mentions, workspaceData?.id)
   }
 
   // Emit delete to server via socket

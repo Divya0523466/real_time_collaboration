@@ -21,6 +21,7 @@ import messageRoutes from "./routes/messageRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
+import { validateChannelMentions, validateDirectMentions } from "./utils/mentionValidation.js";
 
 
 if (process.env.FRONTEND_URL) {
@@ -135,7 +136,7 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("send-channel-message", async ({ channelId, content, attachments = [], replyTo = null } = {}) => {
+  socket.on("send-channel-message", async ({ channelId, content, attachments = [], replyTo = null, mentions = [] } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
     if (!channelId || (!trimmedContent && !hasAttachments)) {
@@ -149,6 +150,12 @@ io.on("connection", async (socket) => {
       const access = await getChannelAccess(socket.userId, channelId);
       if (!access.channel) {
         socket.emit("send-channel-message-error", { message: "Access denied to channel" });
+        return;
+      }
+
+      const mentionValidation = await validateChannelMentions(mentions, access.channel, socket.userId);
+      if (!mentionValidation.isValid) {
+        socket.emit("send-channel-message-error", { message: mentionValidation.error });
         return;
       }
 
@@ -190,6 +197,7 @@ io.on("connection", async (socket) => {
         senderId: socket.userId,
         content: trimmedContent,
         attachments: formattedAttachments,
+        mentions: mentionValidation.mentions,
         replyTo: validatedReplyTo,
       });
 
@@ -213,6 +221,8 @@ io.on("connection", async (socket) => {
       // Asynchronously dispatch notifications for mentions and channel members
       (async () => {
         try {
+          const sender = await User.findById(socket.userId).select("username");
+          const senderName = sender?.username || "Someone";
           const channel = access.channel;
           let memberUserIds = [];
           if (channel.type === "PUBLIC") {
@@ -229,13 +239,32 @@ io.on("connection", async (socket) => {
             : [];
 
           let mentionedUserIds = [];
-          if (mentionedUsernames.length > 0) {
+          const hasAllMention = mentionedUsernames.includes("all");
+          if (hasAllMention) {
+            mentionedUserIds = memberUserIds.filter((id) => id !== socket.userId.toString());
+          } else if (mentionedUsernames.length > 0) {
             const mentionedUsers = await User.find({
               username: { $in: mentionedUsernames.map((u) => new RegExp(`^${u}$`, "i")) },
             }).select("_id username");
             mentionedUserIds = mentionedUsers
               .map((u) => u._id.toString())
               .filter((id) => memberUserIds.includes(id) && id !== socket.userId.toString());
+          }
+
+          // Ensure savedMessage in MongoDB has all mentioned user IDs recorded
+          if (mentionedUserIds.length > 0) {
+            await ChannelMessage.updateOne(
+              { _id: savedMessage._id },
+              {
+                $addToSet: {
+                  mentions: {
+                    $each: mentionedUserIds.map((id) => ({
+                      userId: new mongoose.Types.ObjectId(id),
+                    })),
+                  },
+                },
+              }
+            ).catch((err) => console.error("Error updating channel mentions in DB:", err));
           }
 
           const snippet = trimmedContent
@@ -248,7 +277,9 @@ io.on("connection", async (socket) => {
               recipientId: mUserId,
               actorId: socket.userId,
               type: "CHANNEL_MENTION",
-              title: `@${senderName} mentioned you in #${channel.name}`,
+              title: hasAllMention
+                ? `@${senderName} mentioned @all in #${channel.name}`
+                : `@${senderName} mentioned you in #${channel.name}`,
               message: snippet,
               workspaceId: channel.workspaceId,
               channelId: channel._id,
@@ -273,7 +304,8 @@ io.on("connection", async (socket) => {
               messageId: savedMessage._id,
             });
           }
-        } catch {
+        } catch (notifErr) {
+          console.error("Error dispatching channel notifications:", notifErr);
         }
       })();
     } catch {
@@ -281,7 +313,7 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("send-direct-message", async ({ receiverId, content, attachments = [] } = {}) => {
+  socket.on("send-direct-message", async ({ receiverId, content, attachments = [], mentions = [] } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
 
@@ -326,6 +358,15 @@ io.on("connection", async (socket) => {
     }
 
     try {
+      // Validate mentions if provided
+      const mentionValidation = await validateDirectMentions(mentions, socket.userId, receiverId);
+      if (!mentionValidation.isValid) {
+        socket.emit("send-direct-message-error", {
+          message: mentionValidation.error,
+        });
+        return;
+      }
+
       const formattedAttachments = (attachments || []).map((att) => ({
         fileId: att.fileId || att.id || att._id,
         originalName: att.originalName || "Attachment",
@@ -344,6 +385,7 @@ io.on("connection", async (socket) => {
         receiverId: receiverId.toString(),
         content: trimmedContent,
         attachments: formattedAttachments,
+        mentions: mentionValidation.mentions,
       });
 
       const messagePayload = {
@@ -352,6 +394,9 @@ io.on("connection", async (socket) => {
         receiverId: savedMessage.receiverId,
         content: savedMessage.content,
         attachments: savedMessage.attachments || [],
+        mentions: (savedMessage.mentions || []).map((m) => ({
+          userId: m.userId?.toString() || m.toString(),
+        })),
         isRead: false,
         createdAt: savedMessage.createdAt,
       };
@@ -373,6 +418,14 @@ io.on("connection", async (socket) => {
             ? new RegExp(`@${receiver.username}\\b`, "i").test(trimmedContent)
             : false;
 
+          // If receiver was mentioned by name, ensure receiver is in mentions
+          if (isMentioned) {
+            await Message.updateOne(
+              { _id: savedMessage._id },
+              { $addToSet: { mentions: { userId: new mongoose.Types.ObjectId(receiverId) } } }
+            ).catch(() => {});
+          }
+
           await createAndSendNotification(io, {
             recipientId: receiverId,
             actorId: socket.userId,
@@ -387,7 +440,27 @@ io.on("connection", async (socket) => {
               receiverId: receiverId.toString(),
             },
           });
-        } catch {
+
+          // Also notify any other mentioned users in this DM
+          for (const m of (savedMessage.mentions || [])) {
+            const mId = m.userId?.toString();
+            if (mId && mId !== socket.userId.toString() && mId !== receiverId.toString()) {
+              await createAndSendNotification(io, {
+                recipientId: mId,
+                actorId: socket.userId,
+                type: "DM_MENTION",
+                title: `@${senderName} mentioned you in a direct message`,
+                message: snippet,
+                messageId: savedMessage._id,
+                metadata: {
+                  senderId: socket.userId,
+                  receiverId: receiverId.toString(),
+                },
+              }).catch(() => {});
+            }
+          }
+        } catch (dmNotifErr) {
+          console.error("Error dispatching DM notifications:", dmNotifErr);
         }
       })();
     } catch {
@@ -398,7 +471,7 @@ io.on("connection", async (socket) => {
   });
 
  
-  socket.on("edit-channel-message", async ({ messageId, content } = {}) => {
+  socket.on("edit-channel-message", async ({ messageId, content, mentions } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     if (!messageId || !trimmedContent) {
       socket.emit("edit-channel-message-error", { message: "Message ID and content are required" });
@@ -426,6 +499,15 @@ io.on("connection", async (socket) => {
         return;
       }
 
+      if (mentions !== undefined) {
+        const mentionValidation = await validateChannelMentions(mentions, access.channel, socket.userId);
+        if (!mentionValidation.isValid) {
+          socket.emit("edit-channel-message-error", { message: mentionValidation.error });
+          return;
+        }
+        message.mentions = mentionValidation.mentions;
+      }
+
       message.content = trimmedContent;
       message.isEdited = true;
       await message.save();
@@ -434,6 +516,9 @@ io.on("connection", async (socket) => {
         id: message._id,
         channelId: message.channelId,
         content: message.content,
+        mentions: (message.mentions || []).map((m) => ({
+          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+        })),
         isEdited: true,
         updatedAt: message.updatedAt,
       };
@@ -480,7 +565,7 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("edit-direct-message", async ({ messageId, content } = {}) => {
+  socket.on("edit-direct-message", async ({ messageId, content, mentions } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     if (!messageId || !trimmedContent) {
       socket.emit("edit-direct-message-error", { message: "Message ID and content are required" });
@@ -502,6 +587,15 @@ io.on("connection", async (socket) => {
         return;
       }
 
+      if (mentions !== undefined) {
+        const mentionValidation = await validateDirectMentions(mentions, message.senderId, message.receiverId);
+        if (!mentionValidation.isValid) {
+          socket.emit("edit-direct-message-error", { message: mentionValidation.error });
+          return;
+        }
+        message.mentions = mentionValidation.mentions;
+      }
+
       message.content = trimmedContent;
       message.isEdited = true;
       await message.save();
@@ -511,6 +605,9 @@ io.on("connection", async (socket) => {
         senderId: message.senderId,
         receiverId: message.receiverId,
         content: message.content,
+        mentions: (message.mentions || []).map((m) => ({
+          userId: m.userId?.toString() || m.toString(),
+        })),
         isEdited: true,
         updatedAt: message.updatedAt,
       };

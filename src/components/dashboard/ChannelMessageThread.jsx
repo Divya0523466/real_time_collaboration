@@ -16,6 +16,10 @@ import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dat
 import { isImageOrFileMessage } from "../../utils/fileUtils"
 import { starMessageApi, unstarMessageApi } from "../../services/messageService"
 import { toast } from "react-toastify"
+import { useWorkspace } from "../../context/WorkspaceContext"
+import MentionSuggestions from "../common/MentionSuggestions"
+import { useMentionInput } from "../../hooks/useMentionInput"
+import { extractMentionIdsFromText } from "../../utils/mentionUtils"
 
 
 
@@ -54,8 +58,13 @@ const ReplyReference = ({ replyToMessage = null }) => {
   )
 }
 
-const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => {
-  const [value, setValue] = useState("")
+const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel, members = [], currentUserId = null }) => {
+  const mention = useMentionInput({
+    members,
+    currentUserId,
+    includeAll: true,
+    channelMembers: members,
+  })
   const [attachedFile, setAttachedFile] = useState(null)
   const [uploadError, setUploadError] = useState(null)
   const textareaRef = useRef(null)
@@ -70,23 +79,32 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
     : (parentMessage.content || "").slice(0, 72)
 
   const submit = () => {
-    const trimmed = value.trim()
+    const trimmed = mention.value.trim()
     if (!trimmed && !attachedFile) return
-    onSend(channelId, trimmed, parentMessage.id?.toString(), attachedFile ? [attachedFile] : [])
-    setValue("")
+    const mentionIds = mention.getMentionedUserIds()
+    onSend(channelId, trimmed, parentMessage.id?.toString(), attachedFile ? [attachedFile] : [], mentionIds)
+    mention.reset()
     setAttachedFile(null)
     onCancel()
   }
 
   const onKeyDown = (e) => {
+    if (mention.handleKeyDown(e)) return
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit() }
     if (e.key === "Escape") onCancel()
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] shadow-sm overflow-hidden focus-within:border-[#395B64] focus-within:ring-1 focus-within:ring-[#E7F6F2] dark:focus-within:ring-[#395B64]/30 transition-all">
+    <div className="relative mt-2 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] shadow-sm overflow-visible focus-within:border-[#395B64] focus-within:ring-1 focus-within:ring-[#E7F6F2] dark:focus-within:ring-[#395B64]/30 transition-all">
+      <MentionSuggestions
+        isOpen={mention.isOpen}
+        users={mention.filteredUsers}
+        activeIndex={mention.activeIndex}
+        onSelect={(user) => mention.selectUser(user, textareaRef.current)}
+        positionClass="bottom-full mb-1 left-0 right-0"
+      />
       {/* Context strip */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-[#F8FAFB] dark:bg-[#161B1B] border-b border-[#E0E7E6] dark:border-[#2C3333]">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#F8FAFB] dark:bg-[#161B1B] border-b border-[#E0E7E6] dark:border-[#2C3333] rounded-t-xl">
         <i className="fa-solid fa-reply text-[11px] text-[#A5C9CA]" />
         <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]">Replying to</span>
         <span className="text-[11px] font-semibold text-[#395B64] dark:text-[#A5C9CA]">{senderName}</span>
@@ -139,9 +157,11 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
         />
         <textarea
           ref={textareaRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+          value={mention.value}
+          onChange={(e) => mention.handleChange(e.target.value, e.target.selectionStart)}
           onKeyDown={onKeyDown}
+          onClick={(e) => mention.handleCursorChange(e.target.selectionStart)}
+          onKeyUp={(e) => mention.handleCursorChange(e.target.selectionStart)}
           placeholder={`Reply to ${senderName}…`}
           rows={1}
           className="flex-1 resize-none bg-transparent text-sm text-[#2C3333] dark:text-[#E7F6F2] outline-none placeholder:text-[#52656A]/50 dark:placeholder:text-[#A5C9CA]/50 leading-5 py-0.5"
@@ -149,7 +169,7 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel }) => 
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
             type="button"
-            disabled={!value.trim() && !attachedFile}
+            disabled={!mention.value.trim() && !attachedFile}
             onClick={submit}
             className="flex items-center gap-1.5 rounded-lg bg-[#395B64] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#2C3333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
@@ -276,6 +296,8 @@ const MessageRow = ({
             <MessageContent
               content={message.content}
               attachments={message.attachments || []}
+              mentions={message.mentions || []}
+              currentUserId={currentUserId}
               isSender={isSender}
               className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed break-words"
             />
@@ -389,13 +411,44 @@ const ReplyCountBadge = ({ count, onClick }) => {
 
 
 const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
+  const { workspaceData } = useWorkspace()
   const [messages, setMessages] = useState([])
-  const [inputValue, setInputValue] = useState("")
   const [attachedFile, setAttachedFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const [replyingToId, setReplyingToId] = useState(null)
+
+  const channelMembers = useMemo(() => {
+    const allWorkspaceMembers = (workspaceData?.members || []).map((m) => {
+      const u = m.user || m
+      return {
+        id: (u.id || u._id || m.userId)?.toString(),
+        username: u.username || m.username || "",
+        displayName: u.displayName || u.fullName || u.username || m.displayName || "",
+        email: u.email || m.email || "",
+        avatarUrl: u.avatarUrl || u.profileImage || m.avatarUrl || null,
+      }
+    }).filter((u) => u.id && u.username)
+
+    const isPrivate = channel?.isPrivate || channel?.type === "PRIVATE"
+    if (isPrivate && Array.isArray(channel?.members) && channel.members.length > 0) {
+      const allowedSet = new Set(
+        channel.members.map((m) => (m.id || m._id || m)?.toString())
+      )
+      return allWorkspaceMembers.filter((m) => allowedSet.has(m.id))
+    }
+
+    return allWorkspaceMembers
+  }, [workspaceData?.members, channel?.isPrivate, channel?.type, channel?.members])
+
+  const mention = useMentionInput({
+    members: channelMembers,
+    currentUserId,
+    includeAll: true,
+    channelMembers,
+  })
+  const composerTextareaRef = useRef(null)
 
  
   const [expandedThreads, setExpandedThreads] = useState(new Set())
@@ -485,7 +538,13 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
       setMessages((prev) =>
         prev.map((m) =>
           m.id?.toString() === payload.id?.toString()
-            ? { ...m, content: payload.content, isEdited: true, updatedAt: payload.updatedAt }
+            ? {
+                ...m,
+                content: payload.content,
+                isEdited: true,
+                updatedAt: payload.updatedAt,
+                mentions: payload.mentions !== undefined ? payload.mentions : m.mentions,
+              }
             : m
         )
       )
@@ -552,23 +611,26 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
 
   
   const handleSendNewMessage = () => {
-    const text = inputValue.trim()
+    const text = mention.value.trim()
     if (!text && !attachedFile) return
     if (!channel?.id) return
     if (!socket.connected) { setError("Socket is not connected. Please try again."); return }
 
     const attachments = attachedFile ? [attachedFile] : []
-    sendChannelMessage(channel.id, text, null, attachments)
-    setInputValue("")
+    const mentionIds = mention.getMentionedUserIds()
+
+    sendChannelMessage(channel.id, text, null, attachments, mentionIds)
+    mention.reset()
     setAttachedFile(null)
   }
 
   const handleKeyDown = (e) => {
+    if (mention.handleKeyDown(e)) return
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendNewMessage() }
   }
 
-  const handleSendReply = (channelId, content, parentId, attachments = []) => {
-    sendChannelMessage(channelId, content, parentId, attachments)
+  const handleSendReply = (channelId, content, parentId, attachments = [], mentions = []) => {
+    sendChannelMessage(channelId, content, parentId, attachments, mentions)
  
     setExpandedThreads((prev) => new Set([...prev, parentId]))
   }
@@ -591,7 +653,13 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
 
   const submitEdit = () => {
     if (!editingState?.draftContent?.trim()) return
-    editChannelMessage(editingState.messageId, editingState.draftContent.trim())
+    const mentionIds = extractMentionIdsFromText(
+      editingState.draftContent,
+      channelMembers,
+      null,
+      { currentUserId, channelMembers }
+    )
+    editChannelMessage(editingState.messageId, editingState.draftContent.trim(), mentionIds)
     setEditingState(null)
   }
 
@@ -781,6 +849,8 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                           channelId={channel.id}
                           onSend={handleSendReply}
                           onCancel={cancelReply}
+                          members={channelMembers}
+                          currentUserId={currentUserId}
                         />
                       )}
                     </div>
@@ -794,6 +864,8 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                         channelId={channel.id}
                         onSend={handleSendReply}
                         onCancel={cancelReply}
+                        members={channelMembers}
+                        currentUserId={currentUserId}
                       />
                     </div>
                   )}
@@ -843,15 +915,25 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
           </div>
         )}
 
-        <div className="flex items-center gap-2 rounded-xl border border-[#D0DCDB] dark:border-[#395B64]/60 bg-[#F8FAFB] dark:bg-[#242D2D] px-3 py-2 focus-within:border-[#395B64] focus-within:bg-white dark:focus-within:bg-[#242D2D] focus-within:ring-1 focus-within:ring-[#E7F6F2] dark:focus-within:ring-[#395B64]/30 transition-all">
+        <div className="relative flex items-center gap-2 rounded-xl border border-[#D0DCDB] dark:border-[#395B64]/60 bg-[#F8FAFB] dark:bg-[#242D2D] px-3 py-2 focus-within:border-[#395B64] focus-within:bg-white dark:focus-within:bg-[#242D2D] focus-within:ring-1 focus-within:ring-[#E7F6F2] dark:focus-within:ring-[#395B64]/30 transition-all">
+          <MentionSuggestions
+            isOpen={mention.isOpen}
+            users={mention.filteredUsers}
+            activeIndex={mention.activeIndex}
+            onSelect={(user) => mention.selectUser(user, composerTextareaRef.current)}
+            positionClass="bottom-full mb-2 left-0 right-0"
+          />
           <FileUpload
             onUploadSuccess={(file) => setAttachedFile(file)}
             onUploadError={(err) => setError(err)}
           />
           <textarea
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            ref={composerTextareaRef}
+            value={mention.value}
+            onChange={(e) => mention.handleChange(e.target.value, e.target.selectionStart)}
             onKeyDown={handleKeyDown}
+            onClick={(e) => mention.handleCursorChange(e.target.selectionStart)}
+            onKeyUp={(e) => mention.handleCursorChange(e.target.selectionStart)}
             placeholder={`Message #${channel.name}`}
             rows={1}
             className="min-w-0 flex-1 resize-none bg-transparent text-sm text-[#2C3333] dark:text-[#E7F6F2] outline-none placeholder:text-[#52656A]/50 dark:placeholder:text-[#A5C9CA]/50 leading-5 py-0.5"
@@ -859,7 +941,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
           <button
             type="button"
             onClick={handleSendNewMessage}
-            disabled={!inputValue.trim() && !attachedFile}
+            disabled={!mention.value.trim() && !attachedFile}
             className="flex items-center gap-1.5 self-center rounded-lg bg-[#395B64] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex-shrink-0"
           >
             Send <i className="fa-solid fa-paper-plane text-[9px]" />

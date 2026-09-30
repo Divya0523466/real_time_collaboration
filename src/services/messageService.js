@@ -108,3 +108,18 @@ export const fetchStarredMessagesApi = async (workspaceId = null) => {
   }
   return Array.isArray(data.starredMessages) ? data.starredMessages : (Array.isArray(data) ? data : [])
 }
+
+export const fetchUserMentionsApi = async (workspaceId = null) => {
+  const query = workspaceId ? `?workspaceId=${workspaceId}` : ""
+  const response = await fetch(`${API_URL}/messages/mentions${query}`, {
+    credentials: "include",
+    method: "GET",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch mentions")
+  }
+  return Array.isArray(data.mentions) ? data.mentions : []
+}

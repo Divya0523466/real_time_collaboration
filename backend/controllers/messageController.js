@@ -6,6 +6,7 @@ import ChannelMessage from "../models/ChannelMessage.js"
 import ChannelReadState from "../models/ChannelReadState.js"
 import WorkspaceMembership from "../models/WorkspaceMembership.js"
 import File from "../models/File.js"
+import Notification from "../models/Notification.js"
 import getChannelAccess from "../utils/channelAccess.js"
 
 const populateLegacyMessageAttachments = async (messages) => {
@@ -97,7 +98,7 @@ const getDirectMessages = async (req, res) => {
         { senderId: otherUserId, receiverId: currentUserId },
       ],
     })
-      .select("_id senderId receiverId content attachments createdAt updatedAt isEdited isDeleted isRead starredBy")
+      .select("_id senderId receiverId content attachments mentions createdAt updatedAt isEdited isDeleted isRead starredBy")
       .sort({ createdAt: 1 })
 
     const populatedMessages = await populateLegacyMessageAttachments(messages);
@@ -115,6 +116,11 @@ const getDirectMessages = async (req, res) => {
         receiverId: msg.receiverId,
         content: msg.isDeleted ? null : msg.content,
         attachments: msg.isDeleted ? [] : (msg.attachments || []),
+        mentions: msg.isDeleted
+          ? []
+          : (msg.mentions || []).map((m) => ({
+              userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+            })),
         createdAt: msg.createdAt,
         updatedAt: msg.updatedAt,
         isEdited: msg.isEdited || false,
@@ -174,6 +180,11 @@ const formatChannelMessage = (message, currentUserId = null) => ({
     size: att.size || 0,
     extension: att.extension || "",
   })),
+  mentions: message.isDeleted
+    ? []
+    : (message.mentions || []).map((m) => ({
+        userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+      })),
   replyTo: message.replyTo?._id || message.replyTo || null,
   replyToMessage: buildReplyToMessage(message.replyTo?._id ? message.replyTo : null),
   isEdited: message.isEdited || false,
@@ -503,6 +514,9 @@ const getStarredMessages = async (req, res) => {
           channelName: msg.channelId.name,
           workspaceId: msg.channelId.workspaceId,
           content: msg.content,
+          mentions: (msg.mentions || []).map((m) => ({
+            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+          })),
           sender: {
             id: msg.senderId?._id,
             username: msg.senderId?.username || "Unknown",
@@ -544,6 +558,9 @@ const getStarredMessages = async (req, res) => {
           otherUserId: otherUser?._id,
           otherUserName: otherUser?.username || "Direct Message",
           content: msg.content,
+          mentions: (msg.mentions || []).map((m) => ({
+            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+          })),
           sender: {
             id: msg.senderId?._id,
             username: msg.senderId?.username || "Unknown",
@@ -565,6 +582,247 @@ const getStarredMessages = async (req, res) => {
   }
 };
 
+const getUserMentions = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const userObjId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+    const { workspaceId } = req.query;
+
+    const currentUser = await User.findById(userId).select("username").lean();
+    const currentUsername = currentUser?.username || "";
+
+    // 1. Fetch mention notifications for current user to track read status and message IDs
+    const mentionNotifications = await Notification.find({
+      recipientId: userObjId,
+      type: { $in: ["CHANNEL_MENTION", "DM_MENTION"] },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const notifByMessageId = new Map();
+    for (const notif of mentionNotifications) {
+      if (notif.messageId) {
+        notifByMessageId.set(notif.messageId.toString(), notif);
+      }
+    }
+
+    // 2. Determine accessible channels for current user in the workspace
+    let channelQuery = {};
+    if (workspaceId && workspaceId !== "undefined" && workspaceId !== "null") {
+      channelQuery.workspaceId = workspaceId;
+    }
+    const allChannelsInScope = await Channel.find(channelQuery).lean();
+    const accessibleChannelMap = new Map();
+
+    for (const chan of allChannelsInScope) {
+      if (chan.type === "PUBLIC") {
+        accessibleChannelMap.set(chan._id.toString(), chan);
+      } else {
+        const isMember = (chan.members || []).some(
+          (m) => (m._id || m)?.toString() === userId.toString()
+        );
+        if (isMember) {
+          accessibleChannelMap.set(chan._id.toString(), chan);
+        }
+      }
+    }
+
+    const accessibleChannelIds = Array.from(accessibleChannelMap.keys()).map(
+      (id) => new mongoose.Types.ObjectId(id)
+    );
+
+    // 3. Find channel messages mentioning this user:
+    // Either by explicit mention object, or regex username/@all in accessible channels
+    const channelConditions = [
+      { "mentions.userId": userId },
+      { "mentions.userId": userObjId },
+    ];
+    if (accessibleChannelIds.length > 0 && currentUsername) {
+      const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      channelConditions.push({
+        channelId: { $in: accessibleChannelIds },
+        senderId: { $ne: userObjId },
+        content: { $regex: `@(${escapedUsername}|all)\\b`, $options: "i" },
+      });
+    }
+
+    // Also include messages referenced by channel mention notifications
+    const notifMsgIds = mentionNotifications
+      .filter((n) => n.type === "CHANNEL_MENTION" && n.messageId)
+      .map((n) => n.messageId);
+    if (notifMsgIds.length > 0) {
+      channelConditions.push({ _id: { $in: notifMsgIds } });
+    }
+
+    const channelMessages = await ChannelMessage.find({
+      $or: channelConditions,
+      isDeleted: false,
+    })
+      .populate("senderId", "username avatar")
+      .populate("channelId", "name type workspaceId")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const validChannelMessages = [];
+    const seenMessageIds = new Set();
+
+    for (const msg of channelMessages) {
+      const msgIdStr = msg._id.toString();
+      if (seenMessageIds.has(msgIdStr)) continue;
+      seenMessageIds.add(msgIdStr);
+
+      const chan = msg.channelId;
+      if (!chan) continue;
+
+      if (
+        workspaceId &&
+        workspaceId !== "undefined" &&
+        workspaceId !== "null" &&
+        chan.workspaceId?.toString() !== workspaceId.toString()
+      ) {
+        continue;
+      }
+
+      const matchingNotif = notifByMessageId.get(msgIdStr);
+
+      validChannelMessages.push({
+        id: msg._id,
+        messageId: msg._id,
+        type: "CHANNEL",
+        channelId: chan._id,
+        channelName: chan.name,
+        channelType: chan.type,
+        content: msg.content,
+        mentions: (msg.mentions || []).map((m) => ({
+          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+        })),
+        sender: {
+          id: msg.senderId?._id,
+          username: msg.senderId?.username || "Unknown",
+          avatar: msg.senderId?.avatar,
+        },
+        isRead: matchingNotif ? matchingNotif.isRead : true,
+        notificationId: matchingNotif ? matchingNotif._id : null,
+        createdAt: msg.createdAt,
+      });
+    }
+
+    // 4. DM messages mentioning current user
+    const dmConditions = [
+      { "mentions.userId": userId },
+      { "mentions.userId": userObjId },
+    ];
+    if (currentUsername) {
+      const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      dmConditions.push({
+        receiverId: userObjId,
+        senderId: { $ne: userObjId },
+        content: { $regex: `@${escapedUsername}\\b`, $options: "i" },
+      });
+    }
+
+    const dmNotifMsgIds = mentionNotifications
+      .filter((n) => n.type === "DM_MENTION" && n.messageId)
+      .map((n) => n.messageId);
+    if (dmNotifMsgIds.length > 0) {
+      dmConditions.push({ _id: { $in: dmNotifMsgIds } });
+    }
+
+    const dmMessages = await Message.find({
+      $or: dmConditions,
+      isDeleted: false,
+    })
+      .populate("senderId", "username avatar")
+      .populate("receiverId", "username avatar")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const validDmMessages = [];
+    for (const msg of dmMessages) {
+      const msgIdStr = msg._id.toString();
+      if (seenMessageIds.has(msgIdStr)) continue;
+      seenMessageIds.add(msgIdStr);
+
+      const otherUser =
+        msg.senderId?._id?.toString() === userId.toString() ? msg.receiverId : msg.senderId;
+
+      const matchingNotif = notifByMessageId.get(msgIdStr);
+
+      validDmMessages.push({
+        id: msg._id,
+        messageId: msg._id,
+        type: "DIRECT",
+        otherUserId: otherUser?._id,
+        otherUserName: otherUser?.username || "Direct Message",
+        content: msg.content,
+        mentions: (msg.mentions || []).map((m) => ({
+          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+        })),
+        sender: {
+          id: msg.senderId?._id,
+          username: msg.senderId?.username || "Unknown",
+          avatar: msg.senderId?.avatar,
+        },
+        isRead: matchingNotif ? matchingNotif.isRead : true,
+        notificationId: matchingNotif ? matchingNotif._id : null,
+        createdAt: msg.createdAt,
+      });
+    }
+
+    // 5. Fallback: Any mention notifications whose messages weren't queried directly
+    for (const notif of mentionNotifications) {
+      const notifMsgIdStr = notif.messageId ? notif.messageId.toString() : notif._id.toString();
+      if (seenMessageIds.has(notifMsgIdStr)) continue;
+      seenMessageIds.add(notifMsgIdStr);
+
+      const isChannel = notif.type === "CHANNEL_MENTION";
+      const chan = notif.channelId;
+
+      if (
+        workspaceId &&
+        workspaceId !== "undefined" &&
+        workspaceId !== "null" &&
+        notif.workspaceId &&
+        notif.workspaceId.toString() !== workspaceId.toString()
+      ) {
+        continue;
+      }
+
+      const actor = notif.actorId;
+      validChannelMessages.push({
+        id: notif._id,
+        messageId: notif.messageId || notif._id,
+        type: isChannel ? "CHANNEL" : "DIRECT",
+        channelId: chan?._id || chan,
+        channelName: chan?.name || "channel",
+        otherUserId: notif.metadata?.senderId || actor?._id,
+        otherUserName: actor?.username || "Direct Message",
+        content: notif.message,
+        mentions: [{ userId: userId }],
+        sender: {
+          id: actor?._id,
+          username: actor?.username || "Someone",
+          avatar: actor?.avatar,
+        },
+        isRead: notif.isRead,
+        notificationId: notif._id,
+        createdAt: notif.createdAt,
+      });
+    }
+
+    const allMentions = [...validChannelMessages, ...validDmMessages].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    return res.json({ mentions: allMentions });
+  } catch (error) {
+    console.error("Error in getUserMentions:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export {
   getDirectMessages,
   getChannelMessages,
@@ -576,4 +834,5 @@ export {
   starMessage,
   unstarMessage,
   getStarredMessages,
+  getUserMentions,
 }

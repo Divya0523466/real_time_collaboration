@@ -31,12 +31,12 @@ export const connectSocket = () => {
 };
 
 
-export const sendDirectMessage = (receiverId, content, attachments = []) => {
-  socket.emit("send-direct-message", { receiverId, content, attachments })
+export const sendDirectMessage = (receiverId, content, attachments = [], mentions = [], workspaceId = null) => {
+  socket.emit("send-direct-message", { receiverId, content, attachments, mentions, workspaceId })
 }
 
-export const editDirectMessage = (messageId, content) => {
-  socket.emit("edit-direct-message", { messageId, content })
+export const editDirectMessage = (messageId, content, mentions = undefined, workspaceId = null) => {
+  socket.emit("edit-direct-message", { messageId, content, mentions, workspaceId })
 }
 
 export const deleteDirectMessage = (messageId) => {
@@ -107,12 +107,12 @@ export const leaveChannel = (channelId) => {
   socket.emit("leave-channel", { channelId })
 }
 
-export const sendChannelMessage = (channelId, content, replyTo = null, attachments = []) => {
-  socket.emit("send-channel-message", { channelId, content, replyTo, attachments })
+export const sendChannelMessage = (channelId, content, replyTo = null, attachments = [], mentions = []) => {
+  socket.emit("send-channel-message", { channelId, content, replyTo, attachments, mentions })
 }
 
-export const editChannelMessage = (messageId, content) => {
-  socket.emit("edit-channel-message", { messageId, content })
+export const editChannelMessage = (messageId, content, mentions = undefined) => {
+  socket.emit("edit-channel-message", { messageId, content, mentions })
 }
 
 export const deleteChannelMessage = (messageId) => {

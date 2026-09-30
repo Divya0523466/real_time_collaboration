@@ -9,6 +9,7 @@ import {
   starMessage,
   unstarMessage,
   getStarredMessages,
+  getUserMentions,
 } from "../controllers/messageController.js"
 
 const router = express.Router()
@@ -17,6 +18,7 @@ router.use(authenticateToken)
 
 router.get("/unread-counts", getUnreadMessageCounts)
 router.get("/starred", getStarredMessages)
+router.get("/mentions", getUserMentions)
 router.post("/:messageId/star", starMessage)
 router.delete("/:messageId/star", unstarMessage)
 router.post("/channels/:channelId/read", markChannelAsRead)

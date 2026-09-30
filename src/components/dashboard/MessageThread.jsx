@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { FiSun, FiMoon } from "react-icons/fi"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { useTheme } from "../../context/ThemeContext"
@@ -6,6 +6,9 @@ import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
 import AttachmentRenderer from "../common/AttachmentRenderer"
 import DateSeparator from "../common/DateSeparator"
+import MentionSuggestions from "../common/MentionSuggestions"
+import useMentionInput from "../../hooks/useMentionInput"
+import { extractMentionIdsFromText } from "../../utils/mentionUtils"
 import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
 import {
   isImageOrFileMessage,
@@ -25,7 +28,7 @@ const MessageThread = ({
   currentUserId = null,
   onOpenSidebar = () => {},
 }) => {
-  const { isUserOnline } = useWorkspace()
+  const { isUserOnline, workspaceData } = useWorkspace()
   const { toggleTheme, isDark } = useTheme()
   const [inputValue, setInputValue] = useState("")
   const [attachedFile, setAttachedFile] = useState(null)
@@ -33,8 +36,27 @@ const MessageThread = ({
   // editingState: { messageId: string, draftContent: string } | null
   const [editingState, setEditingState] = useState(null)
   const messagesEndRef = useRef(null)
+  const mainTextareaRef = useRef(null)
   const prevCountRef = useRef(0)
   const prevUserIdRef = useRef(null)
+
+  // DM mentionable members: all members in current workspace
+  const dmMembers = useMemo(() => {
+    const list = workspaceData?.members || []
+    if (selectedUser && !list.some((m) => (m.id || m._id)?.toString() === selectedUser.id?.toString())) {
+      return [...list, selectedUser]
+    }
+    return list
+  }, [workspaceData?.members, selectedUser])
+
+  const mention = useMentionInput({
+    members: dmMembers,
+    inputValue,
+    setInputValue,
+    textareaRef: mainTextareaRef,
+    currentUserId,
+    includeAll: false,
+  })
 
   // Auto-scroll to bottom only when new messages arrive or when switching conversation,
   // not when starring, unstarring, editing, or deleting existing messages.
@@ -69,12 +91,16 @@ const MessageThread = ({
     if (!text && !attachedFile) return
 
     const attachments = attachedFile ? [attachedFile] : []
-    onSendMessage(text, attachments)
+    const mentions = mention.getMentionedUserIds(inputValue)
+    onSendMessage(text, attachments, mentions)
     setInputValue("")
     setAttachedFile(null)
   }
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
+    if (mention.handleKeyDown(e)) {
+      return
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSendClick()
@@ -89,7 +115,13 @@ const MessageThread = ({
 
   const submitEdit = () => {
     if (!editingState?.draftContent?.trim()) return
-    onEditMessage(editingState.messageId, editingState.draftContent.trim())
+    const mentions = extractMentionIdsFromText(
+      editingState.draftContent.trim(),
+      dmMembers,
+      null,
+      { currentUserId }
+    )
+    onEditMessage(editingState.messageId, editingState.draftContent.trim(), mentions)
     setEditingState(null)
   }
 
@@ -359,6 +391,8 @@ const MessageThread = ({
                           content={message.content}
                           attachments={message.attachments || []}
                           isSender={isSender}
+                          mentions={message.mentions || []}
+                          currentUserId={currentUserId}
                         />
                         <div className="flex items-center justify-between gap-2 mt-0.5">
                           <p
@@ -461,7 +495,15 @@ const MessageThread = ({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
+          <MentionSuggestions
+            isOpen={mention.isMentionOpen}
+            users={mention.filteredUsers}
+            selectedIndex={mention.selectedIndex}
+            onSelect={mention.selectUser}
+            onHoverIndex={mention.setSelectedIndex}
+          />
+
           <FileUpload
             buttonClassName="flex items-center justify-center h-8 w-8 rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition-colors"
             onUploadSuccess={(file) => {
@@ -472,9 +514,11 @@ const MessageThread = ({
           />
 
           <textarea
+            ref={mainTextareaRef}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onChange={mention.handleInputChange}
+            onSelect={mention.handleInputSelect}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             className="flex-1 resize-none rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 px-4 py-2 focus:border-[#395B64] focus:outline-none focus:ring-2 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30"
             rows="2"

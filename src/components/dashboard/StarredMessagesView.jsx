@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
 import { FiSun, FiMoon } from "react-icons/fi"
 import { useTheme } from "../../context/ThemeContext"
+import { useWorkspace } from "../../context/WorkspaceContext"
+import MessageContent from "../common/MessageContent"
 import { fetchStarredMessagesApi, unstarMessageApi } from "../../services/messageService"
 import { formatMessageDate, formatMessageTime } from "../../utils/dateUtils"
 import { isImageOrFileMessage } from "../../utils/fileUtils"
@@ -17,6 +19,7 @@ const StarredMessagesView = ({
   onOpenSidebar,
 }) => {
   const { toggleTheme, isDark } = useTheme()
+  const { user } = useWorkspace()
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -224,10 +227,13 @@ const StarredMessagesView = ({
                       </button>
                     </div>
 
-                    {/* Message text */}
-                    <p className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed break-words whitespace-pre-wrap">
-                      {msg.content}
-                    </p>
+                    {/* Message text with mention highlighting */}
+                    <MessageContent
+                      content={msg.content}
+                      mentions={msg.mentions || []}
+                      currentUserId={user?.id}
+                      className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed break-words"
+                    />
                   </div>
                 </div>
               )
