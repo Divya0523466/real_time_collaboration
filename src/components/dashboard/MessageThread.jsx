@@ -255,6 +255,7 @@ const MessageThread = ({
             const isSender = Boolean(senderId && activeUserId && senderId === activeUserId)
             const isDeleted = message.isDeleted === true
             const isBeingEdited = editingState?.messageId === message.id?.toString()
+            const isPureAttachment = !isDeleted && isPureAttachmentMessage(message)
             const attachments = getMessageAttachments(message)
 
             const prevMessage = index > 0 ? messages[index - 1] : null
@@ -400,14 +401,18 @@ const MessageThread = ({
                     </div>
                   ) : (
                     <div
-                      className={`rounded-2xl px-3 py-1.5 max-w-[85%] sm:max-w-[75%] md:max-w-[65%] break-words shadow-xs text-left ${
-                        isSender
-                          ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50"
-                          : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535]"
+                      className={`max-w-[85%] sm:max-w-[75%] md:max-w-[65%] break-words text-left ${
+                        isPureAttachment
+                          ? "bg-transparent border-0 shadow-none px-0 py-0"
+                          : `rounded-2xl px-3 py-1.5 shadow-xs ${
+                              isSender
+                                ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50"
+                                : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535]"
+                            }`
                       }`}
                     >
-                      <div className="flex items-baseline justify-between gap-x-2.5 gap-y-0.5 flex-wrap">
-                        <div className="min-w-0 flex-1 leading-snug">
+                      <div className="flex flex-col">
+                        <div className="min-w-0 break-words leading-relaxed">
                           <MessageContent
                             content={message.content}
                             attachments={message.attachments?.length ? message.attachments : attachments}
@@ -417,8 +422,8 @@ const MessageThread = ({
                             className="text-sm leading-snug break-words"
                           />
                         </div>
-                        <div className="flex items-center gap-1 flex-shrink-0 self-end ml-auto text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none pb-0.5">
-                          <span className="leading-none whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none px-0.5">
+                          <span className="whitespace-nowrap">
                             {formatMessageTime(message.createdAt)}
                           </span>
                           {message.isEdited && !isDeleted && (
@@ -489,7 +494,7 @@ const MessageThread = ({
       <div className="border-t border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121] p-4 transition-colors">
         {/* Attached file preview chip */}
         {attachedFile && (
-          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#E7F6F2] dark:bg-[#242D2D] px-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA] dark:border-[#395B64]">
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFB] dark:bg-[#242D2D] px-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#D0DCDB] dark:border-[#395B64]/60">
             <div className="flex items-center gap-2 truncate">
               <i className="fa-solid fa-paperclip text-[#395B64] dark:text-[#A5C9CA]" />
               <span className="font-medium truncate">{attachedFile.originalName}</span>

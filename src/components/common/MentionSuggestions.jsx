@@ -32,7 +32,6 @@ const MentionSuggestions = ({
     <div
       className={`absolute bottom-full left-0 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] shadow-xl overflow-hidden z-50 transition-all ${positionClass} ${className}`}
     >
-      {/* Header title */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#F8FAFB] dark:bg-[#161B1B] border-b border-[#E0E7E6] dark:border-[#2C3333]">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#52656A] dark:text-[#A5C9CA]">
           <i className="fa-solid fa-at text-[10px]" />
@@ -43,7 +42,6 @@ const MentionSuggestions = ({
         </span>
       </div>
 
-      {/* Users list */}
       <div ref={listRef} className="max-h-48 overflow-y-auto py-1 space-y-0.5">
         {users.length === 0 ? (
           <div className="px-4 py-3 text-xs text-center text-[#52656A] dark:text-[#A5C9CA]/70">
@@ -57,7 +55,7 @@ const MentionSuggestions = ({
                 key={user.id}
                 type="button"
                 onMouseDown={(e) => {
-                  // Prevent input from losing focus
+                  
                   e.preventDefault();
                   onSelect(user);
                 }}
@@ -68,7 +66,6 @@ const MentionSuggestions = ({
                     : "text-[#52656A] dark:text-[#E7F6F2] hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D]"
                 }`}
               >
-                {/* Avatar */}
                 {user.isAll ? (
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] text-white flex-shrink-0 select-none shadow-xs bg-[#395B64]"
@@ -90,7 +87,7 @@ const MentionSuggestions = ({
                   </div>
                 )}
 
-                {/* Names */}
+    
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 truncate">
                     <span className="font-semibold text-xs text-[#2C3333] dark:text-white truncate">

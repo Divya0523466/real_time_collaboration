@@ -123,3 +123,32 @@ export const fetchUserMentionsApi = async (workspaceId = null) => {
   }
   return Array.isArray(data.mentions) ? data.mentions : []
 }
+
+export const markMentionAsReadApi = async (messageId) => {
+  const response = await fetch(`${API_URL}/messages/mentions/${messageId}/read`, {
+    credentials: "include",
+    method: "PATCH",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to mark mention as read")
+  }
+  return data
+}
+
+export const markAllMentionsAsReadApi = async (workspaceId = null) => {
+  const query = workspaceId ? `?workspaceId=${workspaceId}` : ""
+  const response = await fetch(`${API_URL}/messages/mentions/read-all${query}`, {
+    credentials: "include",
+    method: "PATCH",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to mark all mentions as read")
+  }
+  return data
+}

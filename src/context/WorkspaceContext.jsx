@@ -352,30 +352,30 @@ export const WorkspaceProvider = ({ children }) => {
 
       setLoading(true);
       setError(null);
+      // Immediately reset channels and set selectedWorkspace to avoid cross-workspace race conditions
+      setChannels([]);
+      setSelectedWorkspace(workspaceId);
 
       try {
-        const response = await fetch(`${API_URL}/workspaces/${workspaceId}`, {
-          credentials: "include",
-          headers: getAuthHeaders(),
-        });
+        const [workspaceResponse, channelsResponse] = await Promise.all([
+          fetch(`${API_URL}/workspaces/${workspaceId}`, {
+            credentials: "include",
+            headers: getAuthHeaders(),
+          }),
+          fetch(`${API_URL}/workspaces/${workspaceId}/channels`, {
+            credentials: "include",
+            headers: getAuthHeaders(),
+          }),
+        ]);
 
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}));
+        if (!workspaceResponse.ok) {
+          const payload = await workspaceResponse.json().catch(() => ({}));
           throw new Error(payload.message || "Failed to load workspace");
         }
 
-        const data = await response.json();
+        const data = await workspaceResponse.json();
         const normalizedWorkspace = normalizeWorkspaceData(data, workspaceId);
-        setSelectedWorkspace(workspaceId);
         setWorkspaceData(normalizedWorkspace);
-
-        const channelsResponse = await fetch(
-          `${API_URL}/workspaces/${workspaceId}/channels`,
-          {
-            credentials: "include",
-            headers: getAuthHeaders(),
-          },
-        );
 
         if (channelsResponse.ok) {
           const channelsData = await channelsResponse.json();
@@ -494,11 +494,12 @@ export const WorkspaceProvider = ({ children }) => {
   );
 
   const getChannel = useCallback(
-    async (channelId) => {
-      if (!selectedWorkspace || !channelId) return null;
+    async (channelId, targetWorkspaceId = null) => {
+      const activeWorkspace = targetWorkspaceId || selectedWorkspace;
+      if (!activeWorkspace || !channelId) return null;
 
       const response = await fetch(
-        `${API_URL}/workspaces/${selectedWorkspace}/channels/${channelId}`,
+        `${API_URL}/workspaces/${activeWorkspace}/channels/${channelId}`,
         {
           credentials: "include",
           headers: getAuthHeaders(),

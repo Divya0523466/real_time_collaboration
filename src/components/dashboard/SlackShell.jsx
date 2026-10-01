@@ -19,6 +19,7 @@ import ChannelMessageThread from "./ChannelMessageThread"
 import NotificationPanel from "./NotificationPanel"
 import StarredMessagesView from "./StarredMessagesView"
 import MentionsView from "./MentionsView"
+import HomeView from "./HomeView"
 import {
   fetchUnreadMessageCounts,
   markChannelAsRead,
@@ -50,6 +51,7 @@ const SlackShell = () => {
     addChannelMember,
     removeChannelMember,
     removeMember,
+    notifications,
     unreadNotificationsCount,
     isUserOnline,
     loading,
@@ -79,6 +81,7 @@ const SlackShell = () => {
   const [showActivityPanel, setShowActivityPanel] = useState(false)
   const [isStarredView, setIsStarredView] = useState(false)
   const [isMentionsView, setIsMentionsView] = useState(false)
+  const [isHomeView, setIsHomeView] = useState(!channelId)
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null)
 
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false)
@@ -89,6 +92,18 @@ const SlackShell = () => {
   const [unreadChannelCounts, setUnreadChannelCounts] = useState({})
   const joinedChannelIdsRef = useRef(new Set())
 
+  const unreadMentionsCount = useMemo(() => {
+    return (notifications || []).filter(
+      (n) =>
+        !n.isRead &&
+        (n.type === "CHANNEL_MENTION" || n.type === "DM_MENTION") &&
+        (!workspaceId ||
+          !n.workspaceId ||
+          (n.workspaceId?._id || n.workspaceId?.id || n.workspaceId)?.toString() ===
+            workspaceId.toString())
+    ).length
+  }, [notifications, workspaceId])
+
   useEffect(() => {
     if (!workspaceId) return
     if (!selectedWorkspace || selectedWorkspace !== workspaceId) {
@@ -97,18 +112,20 @@ const SlackShell = () => {
   }, [workspaceId, selectedWorkspace, selectWorkspace])
 
   const currentChannel = useMemo(() => {
+    if (isHomeView && !channelId) return null
     if (!channels || channels.length === 0) return null
     if (channelId) {
-      const found = channels.find((c) => c.id === channelId)
-      if (found) return found
+      const found = channels.find((c) => (c.id || c._id)?.toString() === channelId.toString())
+      return found || null
     }
+    if (isHomeView) return null
     return channels[0]
-  }, [channels, channelId])
+  }, [channels, channelId, isHomeView])
 
   const refreshChannelDetails = async () => {
-    if (!currentChannel?.id) return null
+    if (!currentChannel?.id || !workspaceId) return null
     try {
-      const channel = await getChannel(currentChannel.id)
+      const channel = await getChannel(currentChannel.id, workspaceId)
       setChannelDetails(channel)
       return channel
     } catch (err) {
@@ -119,34 +136,48 @@ const SlackShell = () => {
   }
 
   useEffect(() => {
-    if (!currentChannel?.id) return undefined
+    if (!currentChannel?.id || isHomeView) {
+      setChannelDetails(null)
+      return undefined
+    }
+
+    if (!workspaceId || selectedWorkspace !== workspaceId) {
+      return undefined
+    }
 
     let cancelled = false
-    getChannel(currentChannel.id)
+    getChannel(currentChannel.id, workspaceId)
       .then((channel) => {
         if (!cancelled) setChannelDetails(channel)
       })
       .catch((err) => {
         if (!cancelled) {
           setChannelDetails(null)
-          toast.error(err.message || "Failed to load channel details")
+          console.warn("Failed to load channel details:", err.message)
         }
       })
 
     return () => {
       cancelled = true
     }
-  }, [currentChannel?.id, getChannel])
+  }, [currentChannel?.id, isHomeView, selectedWorkspace, workspaceId, getChannel])
+
+  useEffect(() => {
+    if (channelId) {
+      setIsHomeView(false)
+    }
+  }, [channelId])
 
   const activeChannel = channelDetails?.id === currentChannel?.id ? channelDetails : currentChannel
   useEffect(() => {
-    if (workspaceId && channels.length > 0) {
-      const hasValidChannel = channelId && channels.some((c) => (c.id || c._id)?.toString() === channelId.toString())
+    if (workspaceId && selectedWorkspace === workspaceId && channels.length > 0 && channelId) {
+      const hasValidChannel = channels.some((c) => (c.id || c._id)?.toString() === channelId.toString())
       if (!hasValidChannel) {
-        navigate(`/app/workspace/${workspaceId}/channel/${channels[0].id}`, { replace: true })
+        setIsHomeView(true)
+        navigate(`/app/workspace/${workspaceId}`, { replace: true })
       }
     }
-  }, [workspaceId, channels, channelId, navigate])
+  }, [workspaceId, selectedWorkspace, channels, channelId, navigate])
 
   useEffect(() => {
     const handleChannelMemberRemoved = (data) => {
@@ -298,6 +329,7 @@ const SlackShell = () => {
   }
 
   const handleSelectChannel = (chan) => {
+    setIsHomeView(false)
     setIsStarredView(false)
     setIsMentionsView(false)
     setSelectedDMUser(null)
@@ -317,6 +349,9 @@ const SlackShell = () => {
       const remaining = channels.filter((c) => c.id !== deletingChannel.id)
       if (remaining.length > 0) {
         navigate(`/app/workspace/${workspaceId}/channel/${remaining[0].id}`, { replace: true })
+      } else {
+        setIsHomeView(true)
+        navigate(`/app/workspace/${workspaceId}`, { replace: true })
       }
     }
     setDeletingChannel(null)
@@ -606,6 +641,27 @@ const SlackShell = () => {
             </button>
           </div>
           <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-1">
+            {/* Home button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsHomeView(true)
+                setIsStarredView(false)
+                setIsMentionsView(false)
+                setSelectedDMUser(null)
+                setIsMobileSidebarOpen(false)
+                navigate(`/app/workspace/${workspaceId}`)
+              }}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
+                isHomeView && !isStarredView && !isMentionsView && !selectedDMUser
+                  ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                  : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+              }`}
+            >
+              <i className="fa-solid fa-house w-4 text-center" />
+              <span className="flex-1 text-left">Home</span>
+            </button>
+
             <button
               type="button"
               onClick={() => { setShowActivityPanel(true); setIsMobileSidebarOpen(false) }}
@@ -622,7 +678,9 @@ const SlackShell = () => {
             <button
               type="button"
               onClick={() => {
+                setIsHomeView(false)
                 setIsStarredView(true)
+                setIsMentionsView(false)
                 setSelectedDMUser(null)
                 setIsMobileSidebarOpen(false)
               }}
@@ -634,6 +692,29 @@ const SlackShell = () => {
             >
               <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
               <span className="flex-1 text-left">Starred</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsHomeView(false)
+                setIsMentionsView(true)
+                setIsStarredView(false)
+                setSelectedDMUser(null)
+                setIsMobileSidebarOpen(false)
+              }}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
+                isMentionsView
+                  ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                  : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+              }`}
+            >
+              <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
+              <span className="flex-1 text-left">Mentions</span>
+              {unreadMentionsCount > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                  {unreadMentionsCount}
+                </span>
+              )}
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
@@ -667,7 +748,7 @@ const SlackShell = () => {
                     </div>
                   ) : (
                     channels.map((chan) => {
-                      const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView
+                      const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView
                       return (
                         <div
                           key={chan.id}
@@ -721,7 +802,9 @@ const SlackShell = () => {
                           key={member.id}
                           type="button"
                           onClick={() => {
+                            setIsHomeView(false)
                             setIsStarredView(false)
+                            setIsMentionsView(false)
                             setSelectedDMUser(member)
                             setShowDetailsPane(false)
                             setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
@@ -990,6 +1073,27 @@ const SlackShell = () => {
           )}
         </div>
         <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-1">
+          {/* Home button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsHomeView(true)
+              setIsStarredView(false)
+              setIsMentionsView(false)
+              setSelectedDMUser(null)
+              setIsMobileSidebarOpen(false)
+              navigate(`/app/workspace/${workspaceId}`)
+            }}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
+              isHomeView && !isStarredView && !isMentionsView && !selectedDMUser
+                ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+            }`}
+          >
+            <i className="fa-solid fa-house w-4 text-center" />
+            <span className="flex-1 text-left">Home</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowActivityPanel(true)}
@@ -1006,6 +1110,7 @@ const SlackShell = () => {
           <button
             type="button"
             onClick={() => {
+              setIsHomeView(false)
               setIsStarredView(true)
               setIsMentionsView(false)
               setSelectedDMUser(null)
@@ -1023,6 +1128,7 @@ const SlackShell = () => {
           <button
             type="button"
             onClick={() => {
+              setIsHomeView(false)
               setIsMentionsView(true)
               setIsStarredView(false)
               setSelectedDMUser(null)
@@ -1036,6 +1142,11 @@ const SlackShell = () => {
           >
             <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
             <span className="flex-1 text-left">Mentions</span>
+            {unreadMentionsCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                {unreadMentionsCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1070,7 +1181,7 @@ const SlackShell = () => {
                   </div>
                 ) : (
                   channels.map((chan) => {
-                    const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView && !isMentionsView
+                    const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView
                     const isMenuOpen = activeChannelMenuId === chan.id
                     return (
                       <div key={chan.id} className="relative group">
@@ -1197,6 +1308,7 @@ const SlackShell = () => {
                         key={member.id}
                         type="button"
                         onClick={() => {
+                          setIsHomeView(false)
                           setIsStarredView(false)
                           setIsMentionsView(false)
                           setSelectedDMUser(member)
@@ -1253,7 +1365,7 @@ const SlackShell = () => {
 
 
       <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB] dark:bg-[#121717] transition-colors">
-        {!selectedDMUser && !isStarredView && !isMentionsView && (
+        {!selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && (
           <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-3 sm:px-6 shadow-xs select-none transition-colors gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Hamburger — mobile only */}
@@ -1337,15 +1449,19 @@ const SlackShell = () => {
         )}
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
-          {isStarredView ? (
+          {isHomeView ? (
+            <HomeView onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
+          ) : isStarredView ? (
             <StarredMessagesView
               workspaceId={workspaceId}
               onNavigateChannel={(cId) => {
+                setIsHomeView(false)
                 setIsStarredView(false)
                 setSelectedDMUser(null)
                 navigate(`/app/workspace/${workspaceId}/channel/${cId}`)
               }}
               onNavigateDM={(otherUserId, otherUser) => {
+                setIsHomeView(false)
                 setIsStarredView(false)
                 if (otherUser && (otherUser.id || otherUser._id)) {
                   setSelectedDMUser({
@@ -1366,11 +1482,13 @@ const SlackShell = () => {
             <MentionsView
               workspaceId={workspaceId}
               onNavigateChannel={(cId) => {
+                setIsHomeView(false)
                 setIsMentionsView(false)
                 setSelectedDMUser(null)
                 navigate(`/app/workspace/${workspaceId}/channel/${cId}`)
               }}
               onNavigateDM={(otherUserId, otherUser) => {
+                setIsHomeView(false)
                 setIsMentionsView(false)
                 if (otherUser && (otherUser.id || otherUser._id)) {
                   setSelectedDMUser({
@@ -1397,14 +1515,14 @@ const SlackShell = () => {
           )}
 
           {/* Mobile backdrop for Details Pane */}
-          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && (
+          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && (
             <div
               className="absolute inset-0 z-10 bg-black/50 sm:hidden"
               onClick={() => setShowDetailsPane(false)}
             />
           )}
 
-          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && (
+          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && (
             <aside className="absolute inset-y-0 right-0 w-[85%] sm:relative sm:w-72 md:w-80 border-l border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex flex-col h-full overflow-y-auto z-20 shadow-lg transition-colors sm:inset-auto sm:shadow-none">
               <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-5 py-4">
                 <h3 className="text-base font-bold text-[#2C3333] dark:text-white">Channel Details</h3>

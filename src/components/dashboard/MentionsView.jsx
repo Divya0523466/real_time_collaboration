@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { FiSun, FiMoon } from "react-icons/fi"
-import { useTheme } from "../../context/ThemeContext"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import MessageContent from "../common/MessageContent"
 import { parseDate } from "../../utils/dateUtils"
-import { fetchUserMentionsApi } from "../../services/messageService"
+import {
+  fetchUserMentionsApi,
+  markMentionAsReadApi,
+} from "../../services/messageService"
 import { onNotificationReceived, offNotificationReceived } from "../../services/socket"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
@@ -15,27 +16,6 @@ const formatChatDate = (dateInput) => {
   const date = parseDate(dateInput)
   if (!date) return ""
   const now = new Date()
-
-
-  if (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  ) {
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-  }
-
-  // If yesterday
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-  if (
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate()
-  ) {
-    return "Yesterday"
-  }
-
-  // Older dates: format as "19 Sept" (or "19 Sept 2025" if different year)
   const isThisYear = date.getFullYear() === now.getFullYear()
   return date.toLocaleDateString("en-GB", {
     day: "numeric",
@@ -50,8 +30,7 @@ const MentionsView = ({
   onNavigateDM,
   onOpenSidebar,
 }) => {
-  const { toggleTheme, isDark } = useTheme()
-  const { user, notifications, fetchNotifications, channels } = useWorkspace()
+  const { user, notifications, fetchNotifications, channels, markNotificationAsRead } = useWorkspace()
 
   const [loading, setLoading] = useState(false)
   const [dbMentions, setDbMentions] = useState([])
@@ -97,6 +76,14 @@ const MentionsView = ({
         channels?.find((c) => (c.id || c._id)?.toString() === cId?.toString())?.name ||
         "channel"
 
+      // Cross-check notification state in real-time
+      const matchingNotif = (notifications || []).find(
+        (n) =>
+          (n.messageId && (n.messageId === m.messageId || n.messageId?._id === m.messageId)) ||
+          n._id === m.notificationId
+      )
+      const isRead = matchingNotif ? Boolean(matchingNotif.isRead) : Boolean(m.isRead)
+
       return {
         id: m.id || m._id,
         messageId: m.messageId || m.id || m._id,
@@ -109,11 +96,13 @@ const MentionsView = ({
         senderAvatar: m.sender?.avatar || null,
         content: m.content || "",
         mentions: m.mentions || [{ userId: user?.id }],
+        isRead,
+        notificationId: m.notificationId || matchingNotif?._id || null,
         createdAt: m.createdAt,
       }
     })
 
-    // Also include real-time notifications if not already captured
+    // Also include real-time notifications if not already captured in dbMentions
     const existingMsgIds = new Set(items.map((i) => i.messageId?.toString()))
     const notifItems = (notifications || [])
       .filter((n) => n.type === "CHANNEL_MENTION" || n.type === "DM_MENTION")
@@ -146,6 +135,8 @@ const MentionsView = ({
           senderAvatar: actor?.avatar || null,
           content: n.message || "Mentioned you in a message",
           mentions: [{ userId: user?.id }],
+          isRead: Boolean(n.isRead),
+          notificationId: n._id,
           createdAt: n.createdAt,
         }
       })
@@ -155,7 +146,33 @@ const MentionsView = ({
     )
   }, [dbMentions, notifications, channels, workspaceId, user?.id])
 
+  const handleMarkAsRead = async (item, e) => {
+    if (e) e.stopPropagation()
+    if (item.isRead) return
+
+    // Optimistic local state update
+    setDbMentions((prev) =>
+      prev.map((m) =>
+        (m.messageId === item.messageId || m.id === item.id) ? { ...m, isRead: true } : m
+      )
+    )
+
+    if (item.notificationId && markNotificationAsRead) {
+      markNotificationAsRead(item.notificationId).catch(() => {})
+    }
+
+    try {
+      await markMentionAsReadApi(item.messageId)
+    } catch (err) {
+      console.error("Failed to mark mention as read:", err)
+    }
+  }
+
   const handleItemClick = (item) => {
+    if (!item.isRead) {
+      handleMarkAsRead(item)
+    }
+
     if (item.isChannel) {
       if (item.channelId && onNavigateChannel) {
         onNavigateChannel(item.channelId.toString())
@@ -174,40 +191,30 @@ const MentionsView = ({
 
   return (
     <div className="flex h-full w-full flex-col bg-white dark:bg-[#121717] overflow-hidden select-none transition-colors">
-    
-      <div className="flex items-center justify-between px-6 sm:px-8 pt-5 pb-3 border-b border-[#E0E7E6] dark:border-[#2C3333] flex-shrink-0">
-        <div className="flex items-center gap-3">
-          {/* Mobile hamburger */}
-          <button
-            type="button"
-            onClick={onOpenSidebar}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F1F5F4] dark:hover:bg-[#2C3333] transition md:hidden"
-            aria-label="Open sidebar"
-          >
-            <i className="fa-solid fa-bars text-sm" />
-          </button>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
-            Mentions
-          </h1>
-        </div>
-
-        {/* Theme Toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
-          title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-          aria-label="Toggle theme"
-        >
-          {isDark ? (
-            <FiSun className="text-sm text-amber-400" />
-          ) : (
-            <FiMoon className="text-sm text-[#395B64]" />
+      {/* ── Header ────────────────────────────────────────────── */}
+      <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-4 sm:px-6 shadow-xs select-none transition-colors flex-shrink-0">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+          {onOpenSidebar && (
+            <button
+              type="button"
+              onClick={onOpenSidebar}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F1F5F4] dark:hover:bg-[#2C3333] transition md:hidden"
+              aria-label="Open sidebar"
+            >
+              <i className="fa-solid fa-bars text-sm" />
+            </button>
           )}
-        </button>
-      </div>
 
-      {/* ── Content Area: Full Width List Rows ─────────────────────────────── */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <i className="fa-solid fa-at text-[#395B64] dark:text-[#A5C9CA] text-base" />
+            <h1 className="truncate text-base font-bold text-[#2C3333] dark:text-white">
+              Mentions
+            </h1>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Content Area: Mentions List ─────────────────────────────── */}
       <div className="flex-1 overflow-y-auto w-full">
         {loading && mentionItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-[#52656A] dark:text-[#A5C9CA]">
@@ -231,13 +238,30 @@ const MentionsView = ({
             {mentionItems.map((item) => {
               const actorName = item.senderName || "Someone"
               const title = item.isChannel ? item.channelName : item.otherUserName
+              const isUnread = !item.isRead
 
               return (
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
-                  className="group flex items-center gap-3.5 px-6 sm:px-8 py-3.5 hover:bg-[#F8FAFB] dark:hover:bg-[#1A2121] cursor-pointer transition-colors w-full"
+                  className={`group flex items-center gap-3 px-4 sm:px-6 py-3.5 cursor-pointer transition-colors w-full ${
+                    isUnread
+                      ? "bg-[#E7F6F2]/30 dark:bg-[#1E2E30]/35 hover:bg-[#E7F6F2]/50 dark:hover:bg-[#1E2E30]/50"
+                      : "bg-transparent hover:bg-[#F8FAFB] dark:hover:bg-[#1A2121]"
+                  }`}
                 >
+                  {/* Unread Indicator Dot */}
+                  <div className="flex-shrink-0 w-2.5 flex items-center justify-center">
+                    {isUnread ? (
+                      <span
+                        className="h-2 w-2 rounded-full bg-[#395B64] dark:bg-[#A5C9CA]"
+                        title="Unread"
+                      />
+                    ) : (
+                      <span className="h-2 w-2" />
+                    )}
+                  </div>
+
                   {/* Left: Avatar */}
                   <div className="relative flex-shrink-0">
                     {item.senderAvatar ? (
@@ -260,17 +284,37 @@ const MentionsView = ({
                   <div className="flex-1 min-w-0">
                     {/* Top line: Channel/DM Name and Date */}
                     <div className="flex items-center justify-between gap-4 mb-0.5">
-                      <span className="font-semibold text-sm text-[#2C3333] dark:text-white truncate">
+                      <span
+                        className={`text-sm truncate ${
+                          isUnread
+                            ? "font-bold text-[#2C3333] dark:text-white"
+                            : "font-normal text-[#2C3333]/90 dark:text-white/90"
+                        }`}
+                      >
                         {title}
                       </span>
-                      <span className="text-xs text-[#7B8B8F] dark:text-[#A5C9CA]/70 flex-shrink-0 whitespace-nowrap">
-                        {formatChatDate(item.createdAt)}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`text-xs whitespace-nowrap ${
+                            isUnread
+                              ? "font-semibold text-[#395B64] dark:text-[#A5C9CA]"
+                              : "text-[#7B8B8F] dark:text-[#A5C9CA]/70"
+                          }`}
+                        >
+                          {formatChatDate(item.createdAt)}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Bottom line: SenderName: @mention message... */}
                     <div className="flex items-center text-xs sm:text-sm text-[#52656A] dark:text-[#A5C9CA] truncate leading-normal">
-                      <span className="font-medium text-[#2C3333] dark:text-[#E7F6F2] mr-1.5 flex-shrink-0">
+                      <span
+                        className={`mr-1.5 flex-shrink-0 ${
+                          isUnread
+                            ? "font-semibold text-[#2C3333] dark:text-[#E7F6F2]"
+                            : "font-medium text-[#2C3333]/80 dark:text-[#E7F6F2]/80"
+                        }`}
+                      >
                         {actorName}:
                       </span>
                       <div className="truncate flex-1">
@@ -278,7 +322,12 @@ const MentionsView = ({
                           content={item.content || "Mentioned you in a message"}
                           mentions={item.mentions || [{ userId: user?.id }]}
                           currentUserId={user?.id}
-                          className="inline text-xs sm:text-sm text-[#52656A] dark:text-[#A5C9CA] truncate"
+                          currentUsername={user?.username}
+                          className={`inline text-xs sm:text-sm truncate ${
+                            isUnread
+                              ? "font-medium text-[#2C3333] dark:text-white"
+                              : "text-[#52656A] dark:text-[#A5C9CA]"
+                          }`}
                         />
                       </div>
                     </div>

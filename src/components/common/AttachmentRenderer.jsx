@@ -40,19 +40,19 @@ export const AttachmentItem = ({
   if (fileType === "image") {
     const imageUrl = attachment.previewUrl || attachment.url;
     return (
-      <div className="my-0.5">
+      <div className="relative inline-block my-0.5 overflow-hidden rounded-xl">
         <a
           href={fileUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block overflow-hidden rounded-lg hover:opacity-95 transition-opacity"
+          className="block overflow-hidden rounded-xl hover:opacity-95 transition-opacity"
         >
           <img
             src={imageUrl}
             alt={originalName}
             loading="lazy"
             decoding="async"
-            className="rounded-lg object-contain block"
+            className="rounded-xl object-contain block"
             style={{ maxWidth: "300px", maxHeight: "240px", width: "auto", height: "auto" }}
           />
         </a>
@@ -64,22 +64,24 @@ export const AttachmentItem = ({
     const hasThumbnail = Boolean(attachment.previewUrl);
     if (hasThumbnail) {
       return (
-        <div className="my-0.5">
+        <div className="relative inline-block my-0.5 overflow-hidden rounded-xl">
           <a
             href={fileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block overflow-hidden rounded-lg hover:opacity-95 transition-opacity"
+            className="block overflow-hidden rounded-xl hover:opacity-95 transition-opacity"
           >
-            <img
-              src={attachment.previewUrl}
-              alt={originalName}
-              loading="lazy"
-              decoding="async"
-              className="rounded-lg object-contain block"
-              style={{ maxWidth: "300px", maxHeight: "240px", width: "auto", height: "auto" }}
-            />
-            <div className="flex items-center gap-1.5 mt-1 text-xs truncate text-[#52656A] dark:text-[#A5C9CA]">
+            <div className="relative">
+              <img
+                src={attachment.previewUrl}
+                alt={originalName}
+                loading="lazy"
+                decoding="async"
+                className="rounded-xl object-contain block"
+                style={{ maxWidth: "300px", maxHeight: "240px", width: "auto", height: "auto" }}
+              />
+            </div>
+            <div className="flex items-center gap-1.5 mt-1 text-xs truncate text-[#52656A] dark:text-[#A5C9CA] px-0.5">
               <i className="fa-solid fa-file-pdf text-red-500 text-xs shrink-0" />
               <span className="font-medium truncate max-w-[240px] text-[#2C3333] dark:text-[#E7F6F2]">{originalName}</span>
               {sizeStr && <span className="text-[10px] opacity-70 shrink-0">({sizeStr})</span>}
@@ -96,7 +98,9 @@ export const AttachmentItem = ({
           target="_blank"
           rel="noopener noreferrer"
           className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors border ${
-            isSender
+            isPure
+              ? "bg-transparent border-[#D0DCDB] dark:border-[#395B64]/50 hover:bg-black/5 dark:hover:bg-white/5 text-[#2C3333] dark:text-[#E7F6F2]"
+              : isSender
               ? "bg-[#395B64]/10 dark:bg-white/10 hover:bg-[#395B64]/20 dark:hover:bg-white/20 text-[#2C3333] dark:text-[#E7F6F2] border-[#A5C9CA]/40 dark:border-[#395B64]/40"
               : "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[#2C3333] dark:text-[#E7F6F2] border-[#E0E7E6] dark:border-[#2C3535]"
           }`}
@@ -119,7 +123,9 @@ export const AttachmentItem = ({
         target="_blank"
         rel="noopener noreferrer"
         className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors border ${
-          isSender
+          isPure
+            ? "bg-transparent border-[#D0DCDB] dark:border-[#395B64]/50 hover:bg-black/5 dark:hover:bg-white/5 text-[#2C3333] dark:text-[#E7F6F2]"
+            : isSender
             ? "bg-[#395B64]/10 dark:bg-white/10 hover:bg-[#395B64]/20 dark:hover:bg-white/20 text-[#2C3333] dark:text-[#E7F6F2] border-[#A5C9CA]/40 dark:border-[#395B64]/40"
             : "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[#2C3333] dark:text-[#E7F6F2] border-[#E0E7E6] dark:border-[#2C3535]"
         }`}

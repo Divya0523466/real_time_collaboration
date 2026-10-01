@@ -346,6 +346,11 @@ const markChannelAsRead = async (req, res) => {
       { upsert: true, new: true }
     )
 
+    await Notification.updateMany(
+      { recipientId: userId, channelId, isRead: false },
+      { $set: { isRead: true } }
+    )
+
     return res.json({ success: true, channelId, lastReadAt: now })
   } catch (error) {
     return res.status(500).json({ message: "Server error", error: error.message })
@@ -370,6 +375,16 @@ const markDirectMessagesAsRead = async (req, res) => {
       {
         $set: { isRead: true },
       }
+    )
+
+    await Notification.updateMany(
+      {
+        recipientId: currentUserId,
+        actorId: senderUserId,
+        type: "DM_MENTION",
+        isRead: false,
+      },
+      { $set: { isRead: true } }
     )
 
     return res.json({ success: true })
@@ -633,6 +648,16 @@ const getUserMentions = async (req, res) => {
       (id) => new mongoose.Types.ObjectId(id)
     );
 
+    const readStates = await ChannelReadState.find({
+      userId,
+      channelId: { $in: accessibleChannelIds },
+    }).lean();
+
+    const readStateMap = new Map();
+    readStates.forEach((rs) => {
+      readStateMap.set(rs.channelId.toString(), rs.lastReadAt);
+    });
+
     // 3. Find channel messages mentioning this user:
     // Either by explicit mention object, or regex username/@all in accessible channels
     const channelConditions = [
@@ -687,26 +712,33 @@ const getUserMentions = async (req, res) => {
 
       const matchingNotif = notifByMessageId.get(msgIdStr);
 
-      validChannelMessages.push({
-        id: msg._id,
-        messageId: msg._id,
-        type: "CHANNEL",
-        channelId: chan._id,
-        channelName: chan.name,
-        channelType: chan.type,
-        content: msg.content,
-        mentions: (msg.mentions || []).map((m) => ({
-          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
-        })),
-        sender: {
-          id: msg.senderId?._id,
-          username: msg.senderId?.username || "Unknown",
-          avatar: msg.senderId?.avatar,
-        },
-        isRead: matchingNotif ? matchingNotif.isRead : true,
-        notificationId: matchingNotif ? matchingNotif._id : null,
-        createdAt: msg.createdAt,
-      });
+        const chanLastRead = readStateMap.get(chan._id.toString());
+        const isRead = matchingNotif
+          ? Boolean(matchingNotif.isRead)
+          : chanLastRead
+          ? new Date(msg.createdAt) <= new Date(chanLastRead)
+          : false;
+
+        validChannelMessages.push({
+          id: msg._id,
+          messageId: msg._id,
+          type: "CHANNEL",
+          channelId: chan._id,
+          channelName: chan.name,
+          channelType: chan.type,
+          content: msg.content,
+          mentions: (msg.mentions || []).map((m) => ({
+            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+          })),
+          sender: {
+            id: msg.senderId?._id,
+            username: msg.senderId?.username || "Unknown",
+            avatar: msg.senderId?.avatar,
+          },
+          isRead,
+          notificationId: matchingNotif ? matchingNotif._id : null,
+          createdAt: msg.createdAt,
+        });
     }
 
     // 4. DM messages mentioning current user
@@ -765,7 +797,7 @@ const getUserMentions = async (req, res) => {
           username: msg.senderId?.username || "Unknown",
           avatar: msg.senderId?.avatar,
         },
-        isRead: matchingNotif ? matchingNotif.isRead : true,
+        isRead: matchingNotif ? Boolean(matchingNotif.isRead) : Boolean(msg.isRead),
         notificationId: matchingNotif ? matchingNotif._id : null,
         createdAt: msg.createdAt,
       });
@@ -823,6 +855,53 @@ const getUserMentions = async (req, res) => {
   }
 };
 
+const markMentionAsRead = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { messageId } = req.params;
+
+    const notifQuery = {
+      recipientId: userId,
+      type: { $in: ["CHANNEL_MENTION", "DM_MENTION"] },
+    };
+    if (mongoose.isValidObjectId(messageId)) {
+      notifQuery.$or = [{ messageId: messageId }, { _id: messageId }];
+    } else {
+      notifQuery.messageId = messageId;
+    }
+
+    await Notification.updateMany(notifQuery, { $set: { isRead: true } });
+
+    return res.json({ success: true, message: "Mention marked as read" });
+  } catch (error) {
+    console.error("Error in markMentionAsRead:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const markAllMentionsAsRead = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { workspaceId } = req.query;
+
+    const filter = {
+      recipientId: userId,
+      type: { $in: ["CHANNEL_MENTION", "DM_MENTION"] },
+      isRead: false,
+    };
+    if (workspaceId && workspaceId !== "undefined" && workspaceId !== "null") {
+      filter.workspaceId = workspaceId;
+    }
+
+    await Notification.updateMany(filter, { $set: { isRead: true } });
+
+    return res.json({ success: true, message: "All mentions marked as read" });
+  } catch (error) {
+    console.error("Error in markAllMentionsAsRead:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export {
   getDirectMessages,
   getChannelMessages,
@@ -835,4 +914,6 @@ export {
   unstarMessage,
   getStarredMessages,
   getUserMentions,
+  markMentionAsRead,
+  markAllMentionsAsRead,
 }
