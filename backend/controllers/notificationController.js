@@ -5,7 +5,15 @@ export const getNotifications = async (req, res) => {
     const userId = req.userId;
     const { unreadOnly } = req.query;
 
-    const filter = { recipientId: userId };
+    const filter = {
+      recipientId: userId,
+      $nor: [
+        {
+          type: "DM_MENTION",
+          "metadata.receiverId": { $exists: true, $ne: userId.toString() },
+        },
+      ],
+    };
     if (unreadOnly === "true") {
       filter.isRead = false;
     }
@@ -17,7 +25,16 @@ export const getNotifications = async (req, res) => {
         .populate("workspaceId", "name")
         .populate("channelId", "name type"),
       Notification.countDocuments(filter),
-      Notification.countDocuments({ recipientId: userId, isRead: false }),
+      Notification.countDocuments({
+        recipientId: userId,
+        isRead: false,
+        $nor: [
+          {
+            type: "DM_MENTION",
+            "metadata.receiverId": { $exists: true, $ne: userId.toString() },
+          },
+        ],
+      }),
     ]);
 
     return res.status(200).json({
@@ -41,6 +58,12 @@ export const getUnreadCount = async (req, res) => {
     const unreadCount = await Notification.countDocuments({
       recipientId: userId,
       isRead: false,
+      $nor: [
+        {
+          type: "DM_MENTION",
+          "metadata.receiverId": { $exists: true, $ne: userId.toString() },
+        },
+      ],
     });
 
     return res.status(200).json({

@@ -68,31 +68,9 @@ export const validateChannelMentions = async (rawMentions, channel, senderId = n
   if (memberships.length !== uniqueUserIds.length) {
     return {
       isValid: false,
-      error: "One or more mentioned users are not members of this channel.",
+      error: "One or more mentioned users do not belong to this workspace.",
       statusCode: 400,
     };
-  }
-
-  if (channel.type === "PRIVATE") {
-    const memberRoleMap = new Map();
-    memberships.forEach((m) => memberRoleMap.set(m.userId.toString(), m.role));
-    const channelMemberSet = new Set(
-      (channel.members || []).map((m) => (m._id ? m._id.toString() : m.toString()))
-    );
-
-    for (const userId of uniqueUserIds) {
-      const role = memberRoleMap.get(userId);
-      const isChannelMember = channelMemberSet.has(userId);
-      const isWorkspaceAdmin = ["OWNER", "ADMIN"].includes(role);
-
-      if (!isChannelMember && !isWorkspaceAdmin) {
-        return {
-          isValid: false,
-          error: "One or more mentioned users are not members of this channel.",
-          statusCode: 400,
-        };
-      }
-    }
   }
 
   return {

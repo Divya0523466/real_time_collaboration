@@ -232,24 +232,33 @@ io.on("connection", async (socket) => {
             memberUserIds = (channel.members || []).map((m) => m.toString());
           }
 
-          // Parse @mentions
+          // Parse @mentions from message content
           const mentionMatches = trimmedContent.match(/@([a-zA-Z0-9_.-]+)/g);
           const mentionedUsernames = mentionMatches
             ? [...new Set(mentionMatches.map((m) => m.slice(1).toLowerCase()))]
             : [];
 
-          let mentionedUserIds = [];
+          let textMentionUserIds = [];
           const hasAllMention = mentionedUsernames.includes("all");
           if (hasAllMention) {
-            mentionedUserIds = memberUserIds.filter((id) => id !== socket.userId.toString());
+            textMentionUserIds = memberUserIds.filter((id) => id !== socket.userId.toString());
           } else if (mentionedUsernames.length > 0) {
             const mentionedUsers = await User.find({
               username: { $in: mentionedUsernames.map((u) => new RegExp(`^${u}$`, "i")) },
             }).select("_id username");
-            mentionedUserIds = mentionedUsers
+            textMentionUserIds = mentionedUsers
               .map((u) => u._id.toString())
               .filter((id) => memberUserIds.includes(id) && id !== socket.userId.toString());
           }
+
+          // Extract mentioned user IDs from savedMessage.mentions (e.g. from autocomplete)
+          // ONLY users who are actual members of this channel are eligible for notifications
+          const explicitMentionIds = (savedMessage.mentions || [])
+            .map((m) => (m.userId?._id || m.userId || m)?.toString())
+            .filter((id) => id && memberUserIds.includes(id) && id !== socket.userId.toString());
+
+          // Final list of mentioned channel participants to notify
+          const mentionedUserIds = [...new Set([...explicitMentionIds, ...textMentionUserIds])];
 
           // Ensure savedMessage in MongoDB has all mentioned user IDs recorded
           if (mentionedUserIds.length > 0) {
@@ -414,23 +423,30 @@ io.on("connection", async (socket) => {
             ? (trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent)
             : (hasAttachments ? `[Attachment: ${formattedAttachments[0]?.originalName || "File"}]` : "Sent a message");
 
-          const isMentioned = receiver?.username
-            ? new RegExp(`@${receiver.username}\\b`, "i").test(trimmedContent)
-            : false;
+          const isReceiverMentioned =
+            (savedMessage.mentions || []).some(
+              (m) => (m.userId?._id || m.userId || m)?.toString() === receiverId.toString()
+            ) ||
+            (receiver?.username
+              ? new RegExp(`@${receiver.username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(trimmedContent)
+              : false);
 
-          // If receiver was mentioned by name, ensure receiver is in mentions
-          if (isMentioned) {
+          // If receiver was mentioned, ensure receiver is in mentions
+          if (isReceiverMentioned) {
             await Message.updateOne(
               { _id: savedMessage._id },
               { $addToSet: { mentions: { userId: new mongoose.Types.ObjectId(receiverId) } } }
             ).catch(() => {});
           }
 
+          // In a 1-to-1 direct message, only the conversation participant (receiverId) receives a notification.
+          // Mentioning third-party users (e.g. @R) is a reference only — they must NOT receive notifications,
+          // socket events, or Mentions tab entries.
           await createAndSendNotification(io, {
             recipientId: receiverId,
             actorId: socket.userId,
-            type: isMentioned ? "DM_MENTION" : "DM_NEW_MESSAGE",
-            title: isMentioned
+            type: isReceiverMentioned ? "DM_MENTION" : "DM_NEW_MESSAGE",
+            title: isReceiverMentioned
               ? `@${senderName} mentioned you in a direct message`
               : `New direct message from ${senderName}`,
             message: snippet,
@@ -440,25 +456,6 @@ io.on("connection", async (socket) => {
               receiverId: receiverId.toString(),
             },
           });
-
-          // Also notify any other mentioned users in this DM
-          for (const m of (savedMessage.mentions || [])) {
-            const mId = m.userId?.toString();
-            if (mId && mId !== socket.userId.toString() && mId !== receiverId.toString()) {
-              await createAndSendNotification(io, {
-                recipientId: mId,
-                actorId: socket.userId,
-                type: "DM_MENTION",
-                title: `@${senderName} mentioned you in a direct message`,
-                message: snippet,
-                messageId: savedMessage._id,
-                metadata: {
-                  senderId: socket.userId,
-                  receiverId: receiverId.toString(),
-                },
-              }).catch(() => {});
-            }
-          }
         } catch (dmNotifErr) {
           console.error("Error dispatching DM notifications:", dmNotifErr);
         }

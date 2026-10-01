@@ -658,37 +658,33 @@ const getUserMentions = async (req, res) => {
       readStateMap.set(rs.channelId.toString(), rs.lastReadAt);
     });
 
-    // 3. Find channel messages mentioning this user:
-    // Either by explicit mention object, or regex username/@all in accessible channels
-    const channelConditions = [
-      { "mentions.userId": userId },
-      { "mentions.userId": userObjId },
-    ];
-    if (accessibleChannelIds.length > 0 && currentUsername) {
-      const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      channelConditions.push({
+    // 3. Find channel messages mentioning this user in channels the user has access to
+    let channelMessages = [];
+    if (accessibleChannelIds.length > 0) {
+      const channelMentionFilters = [
+        { "mentions.userId": { $in: [userId, userObjId] } },
+      ];
+      if (currentUsername) {
+        const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        channelMentionFilters.push({
+          content: { $regex: `@(${escapedUsername}|all)\\b`, $options: "i" },
+        });
+      }
+      if (notifMsgIds.length > 0) {
+        channelMentionFilters.push({ _id: { $in: notifMsgIds } });
+      }
+
+      channelMessages = await ChannelMessage.find({
         channelId: { $in: accessibleChannelIds },
         senderId: { $ne: userObjId },
-        content: { $regex: `@(${escapedUsername}|all)\\b`, $options: "i" },
-      });
+        $or: channelMentionFilters,
+        isDeleted: false,
+      })
+        .populate("senderId", "username avatar")
+        .populate("channelId", "name type workspaceId")
+        .sort({ createdAt: -1 })
+        .lean();
     }
-
-    // Also include messages referenced by channel mention notifications
-    const notifMsgIds = mentionNotifications
-      .filter((n) => n.type === "CHANNEL_MENTION" && n.messageId)
-      .map((n) => n.messageId);
-    if (notifMsgIds.length > 0) {
-      channelConditions.push({ _id: { $in: notifMsgIds } });
-    }
-
-    const channelMessages = await ChannelMessage.find({
-      $or: channelConditions,
-      isDeleted: false,
-    })
-      .populate("senderId", "username avatar")
-      .populate("channelId", "name type workspaceId")
-      .sort({ createdAt: -1 })
-      .lean();
 
     const validChannelMessages = [];
     const seenMessageIds = new Set();
@@ -699,7 +695,7 @@ const getUserMentions = async (req, res) => {
       seenMessageIds.add(msgIdStr);
 
       const chan = msg.channelId;
-      if (!chan) continue;
+      if (!chan || !accessibleChannelMap.has(chan._id?.toString() || chan.toString())) continue;
 
       if (
         workspaceId &&
@@ -712,58 +708,58 @@ const getUserMentions = async (req, res) => {
 
       const matchingNotif = notifByMessageId.get(msgIdStr);
 
-        const chanLastRead = readStateMap.get(chan._id.toString());
-        const isRead = matchingNotif
-          ? Boolean(matchingNotif.isRead)
-          : chanLastRead
-          ? new Date(msg.createdAt) <= new Date(chanLastRead)
-          : false;
+      const chanLastRead = readStateMap.get(chan._id.toString());
+      const isRead = matchingNotif
+        ? Boolean(matchingNotif.isRead)
+        : chanLastRead
+        ? new Date(msg.createdAt) <= new Date(chanLastRead)
+        : false;
 
-        validChannelMessages.push({
-          id: msg._id,
-          messageId: msg._id,
-          type: "CHANNEL",
-          channelId: chan._id,
-          channelName: chan.name,
-          channelType: chan.type,
-          content: msg.content,
-          mentions: (msg.mentions || []).map((m) => ({
-            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
-          })),
-          sender: {
-            id: msg.senderId?._id,
-            username: msg.senderId?.username || "Unknown",
-            avatar: msg.senderId?.avatar,
-          },
-          isRead,
-          notificationId: matchingNotif ? matchingNotif._id : null,
-          createdAt: msg.createdAt,
-        });
-    }
-
-    // 4. DM messages mentioning current user
-    const dmConditions = [
-      { "mentions.userId": userId },
-      { "mentions.userId": userObjId },
-    ];
-    if (currentUsername) {
-      const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      dmConditions.push({
-        receiverId: userObjId,
-        senderId: { $ne: userObjId },
-        content: { $regex: `@${escapedUsername}\\b`, $options: "i" },
+      validChannelMessages.push({
+        id: msg._id,
+        messageId: msg._id,
+        type: "CHANNEL",
+        channelId: chan._id,
+        channelName: chan.name,
+        channelType: chan.type,
+        content: msg.content,
+        mentions: (msg.mentions || []).map((m) => ({
+          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+        })),
+        sender: {
+          id: msg.senderId?._id,
+          username: msg.senderId?.username || "Unknown",
+          avatar: msg.senderId?.avatar,
+        },
+        isRead,
+        notificationId: matchingNotif ? matchingNotif._id : null,
+        createdAt: msg.createdAt,
       });
     }
 
+    // 4. DM messages mentioning current user
+    // A DM mention only belongs to the current user if the current user is a conversation participant (receiverId)
+    const dmSubFilters = [
+      { "mentions.userId": { $in: [userId, userObjId] } },
+    ];
+    if (currentUsername) {
+      const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      dmSubFilters.push({
+        content: { $regex: `@${escapedUsername}\\b`, $options: "i" },
+      });
+    }
     const dmNotifMsgIds = mentionNotifications
       .filter((n) => n.type === "DM_MENTION" && n.messageId)
       .map((n) => n.messageId);
     if (dmNotifMsgIds.length > 0) {
-      dmConditions.push({ _id: { $in: dmNotifMsgIds } });
+      dmSubFilters.push({ _id: { $in: dmNotifMsgIds } });
     }
 
+    // Current user MUST be the receiver in this DM conversation (not an outside reference)
     const dmMessages = await Message.find({
-      $or: dmConditions,
+      receiverId: userObjId,
+      senderId: { $ne: userObjId },
+      $or: dmSubFilters,
       isDeleted: false,
     })
       .populate("senderId", "username avatar")
@@ -820,6 +816,22 @@ const getUserMentions = async (req, res) => {
         notif.workspaceId.toString() !== workspaceId.toString()
       ) {
         continue;
+      }
+
+      // If DM mention notification, ensure recipient was actually the receiver in the DM conversation
+      if (!isChannel) {
+        const receiverIdFromMeta = notif.metadata?.receiverId?.toString();
+        if (receiverIdFromMeta && receiverIdFromMeta !== userId.toString()) {
+          continue;
+        }
+      }
+
+      // If channel mention notification, ensure current user has access to that channel
+      if (isChannel && chan) {
+        const cIdStr = (chan._id || chan).toString();
+        if (!accessibleChannelMap.has(cIdStr)) {
+          continue;
+        }
       }
 
       const actor = notif.actorId;
