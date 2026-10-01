@@ -237,7 +237,7 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
       onEditMessage={handleEditMessage}
       onDeleteMessage={handleDeleteMessage}
       onToggleStar={handleToggleStar}
-      currentUserId={user?.id}
+      currentUserId={user?.id || user?._id}
       onOpenSidebar={onOpenSidebar}
     />
   )

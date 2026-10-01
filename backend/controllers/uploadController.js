@@ -97,7 +97,6 @@ export const downloadOrViewFile = async (req, res) => {
     }
 
     if (!file && fileUrlParam) {
-      // Synthesize file metadata if it's a Cloudinary URL
       const decodedUrl = decodeURIComponent(fileUrlParam);
       const isPdf = decodedUrl.toLowerCase().includes(".pdf");
       const match = decodedUrl.match(/\/upload\/(?:(?:s--[^/]+--\/)?(?:v\d+\/)?)?([^/?#]+)/);

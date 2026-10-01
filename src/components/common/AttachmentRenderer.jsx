@@ -35,8 +35,8 @@ export const AttachmentItem = ({
       fileUrl = `${API_URL}/uploads/view?url=${encodeURIComponent(attachment.url)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
     }
   }
-
-  // 1. IMAGE: Clean image display with fixed dimensions and no background box or borders
+//clean image view
+ 
   if (fileType === "image") {
     const imageUrl = attachment.previewUrl || attachment.url;
     return (
@@ -59,8 +59,7 @@ export const AttachmentItem = ({
       </div>
     );
   }
-
-  // 2. PDF: Clean preview thumbnail if available or compact file badge
+//pdf view
   if (fileType === "pdf") {
     const hasThumbnail = Boolean(attachment.previewUrl);
     if (hasThumbnail) {
@@ -80,17 +79,9 @@ export const AttachmentItem = ({
               className="rounded-lg object-contain block"
               style={{ maxWidth: "300px", maxHeight: "240px", width: "auto", height: "auto" }}
             />
-            <div
-              className={`flex items-center gap-1.5 mt-1 text-xs truncate ${
-                isPure
-                  ? "text-[#52656A] dark:text-[#A5C9CA]"
-                  : isSender
-                  ? "text-white/90"
-                  : "text-[#52656A] dark:text-[#A5C9CA]"
-              }`}
-            >
+            <div className="flex items-center gap-1.5 mt-1 text-xs truncate text-[#52656A] dark:text-[#A5C9CA]">
               <i className="fa-solid fa-file-pdf text-red-500 text-xs shrink-0" />
-              <span className="font-medium truncate max-w-[240px]">{originalName}</span>
+              <span className="font-medium truncate max-w-[240px] text-[#2C3333] dark:text-[#E7F6F2]">{originalName}</span>
               {sizeStr && <span className="text-[10px] opacity-70 shrink-0">({sizeStr})</span>}
             </div>
           </a>
@@ -104,14 +95,10 @@ export const AttachmentItem = ({
           href={fileUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors ${
-            isPure
-              ? isSender
-                ? "bg-[#395B64] hover:bg-[#2C3333] text-white"
-                : "bg-[#F1F5F4] dark:bg-[#242D2D] hover:bg-[#E0E7E6] dark:hover:bg-[#1E2525] text-[#2C3333] dark:text-[#E7F6F2]"
-              : isSender
-              ? "bg-white/15 hover:bg-white/25 text-white"
-              : "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[#2C3333] dark:text-[#E7F6F2]"
+          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors border ${
+            isSender
+              ? "bg-[#395B64]/10 dark:bg-white/10 hover:bg-[#395B64]/20 dark:hover:bg-white/20 text-[#2C3333] dark:text-[#E7F6F2] border-[#A5C9CA]/40 dark:border-[#395B64]/40"
+              : "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[#2C3333] dark:text-[#E7F6F2] border-[#E0E7E6] dark:border-[#2C3535]"
           }`}
         >
           <i className="fa-solid fa-file-pdf text-red-500 text-sm shrink-0" />
@@ -124,21 +111,17 @@ export const AttachmentItem = ({
     );
   }
 
-  // 3. OTHER FILES: Clean, borderless compact chip with file icon, name, and size
+ //for other files other than image and pdfs
   return (
     <div className="my-0.5">
       <a
         href={fileUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors ${
-          isPure
-            ? isSender
-              ? "bg-[#395B64] hover:bg-[#2C3333] text-white"
-              : "bg-[#F1F5F4] dark:bg-[#242D2D] hover:bg-[#E0E7E6] dark:hover:bg-[#1E2525] text-[#2C3333] dark:text-[#E7F6F2]"
-            : isSender
-            ? "bg-white/15 hover:bg-white/25 text-white"
-            : "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[#2C3333] dark:text-[#E7F6F2]"
+        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors border ${
+          isSender
+            ? "bg-[#395B64]/10 dark:bg-white/10 hover:bg-[#395B64]/20 dark:hover:bg-white/20 text-[#2C3333] dark:text-[#E7F6F2] border-[#A5C9CA]/40 dark:border-[#395B64]/40"
+            : "bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[#2C3333] dark:text-[#E7F6F2] border-[#E0E7E6] dark:border-[#2C3535]"
         }`}
       >
         <i className={`${iconConfig.icon} ${iconConfig.color} text-sm shrink-0`} />

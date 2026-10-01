@@ -1393,7 +1393,7 @@ const SlackShell = () => {
               onOpenSidebar={() => setIsMobileSidebarOpen(true)} 
             />
           ) : (
-            <ChannelMessageThread channel={activeChannel || currentChannel} currentUserId={user?.id} />
+            <ChannelMessageThread channel={activeChannel || currentChannel} currentUserId={user?.id || user?._id} />
           )}
 
           {/* Mobile backdrop for Details Pane */}

@@ -13,32 +13,44 @@ import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
 import DateSeparator from "../common/DateSeparator"
 import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
-import { isImageOrFileMessage } from "../../utils/fileUtils"
+import { isImageOrFileMessage, isPureAttachmentMessage, getMessageAttachments } from "../../utils/fileUtils"
 import { starMessageApi, unstarMessageApi } from "../../services/messageService"
 import { toast } from "react-toastify"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import MentionSuggestions from "../common/MentionSuggestions"
 import { useMentionInput } from "../../hooks/useMentionInput"
 import { extractMentionIdsFromText } from "../../utils/mentionUtils"
-
-
+import AttachmentRenderer from "../common/AttachmentRenderer"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
   AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
 
-const Avatar = ({ username = null, small = false }) => (
-  <div
-    className={`flex items-center justify-center rounded-full font-semibold text-white flex-shrink-0 select-none ${
-      small ? "w-6 h-6 text-[10px]" : "w-8 h-8 text-sm"
-    }`}
-    style={{ backgroundColor: avatarColor(username) }}
-  >
-    {(username ?? "?").charAt(0).toUpperCase()}
-  </div>
-)
+const Avatar = ({ username = null, avatar = null, small = false }) => {
+  if (avatar) {
+    return (
+      <img
+        src={avatar}
+        alt={username || "User"}
+        className={`rounded-full object-cover flex-shrink-0 select-none ${
+          small ? "w-5.5 h-5.5" : "w-7 h-7"
+        }`}
+      />
+    )
+  }
+  return (
+    <div
+      className={`flex items-center justify-center rounded-full font-semibold text-white flex-shrink-0 select-none ${
+        small ? "w-5.5 h-5.5 text-[9px]" : "w-7 h-7 text-xs"
+      }`}
+      style={{ backgroundColor: avatarColor(username) }}
+    >
+      {(username ?? "?").charAt(0).toUpperCase()}
+    </div>
+  )
+}
 
-const ReplyReference = ({ replyToMessage = null }) => {
+const ReplyReference = ({ replyToMessage = null, isSender = false }) => {
   if (!replyToMessage) return null
   const content = replyToMessage.isDeleted
     ? "This message was deleted"
@@ -46,12 +58,16 @@ const ReplyReference = ({ replyToMessage = null }) => {
   const senderName = replyToMessage.sender?.username || "User"
 
   return (
-    <div className="flex items-start gap-1.5 mb-2 rounded-md bg-[#F1F5F4] dark:bg-[#242D2D] border-l-[3px] border-[#A5C9CA] dark:border-[#395B64] px-2.5 py-1.5 max-w-sm">
-      <i className="fa-solid fa-reply text-[10px] text-[#A5C9CA] mt-[3px] flex-shrink-0" />
+    <div className={`flex items-start gap-1.5 mb-1.5 rounded-lg border-l-[3px] border-[#395B64] dark:border-[#A5C9CA] px-2.5 py-1 text-left ${
+      isSender 
+        ? "bg-black/[0.04] dark:bg-white/[0.06]" 
+        : "bg-black/[0.03] dark:bg-white/[0.05]"
+    }`}>
+      <i className="fa-solid fa-reply text-[9px] text-[#395B64] dark:text-[#A5C9CA] mt-[3px] flex-shrink-0" />
       <div className="min-w-0">
-        <span className="text-[11px] font-semibold text-[#395B64] dark:text-[#A5C9CA] mr-1.5">{senderName}</span>
-        <span className={`text-[11px] truncate block ${replyToMessage.isDeleted ? "italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60" : "text-[#52656A] dark:text-[#E7F6F2]"}`}>
-          {content.length > 80 ? `${content.slice(0, 80)}…` : content}
+        <span className="text-[10px] font-semibold text-[#395B64] dark:text-[#A5C9CA] mr-1.5">{senderName}</span>
+        <span className={`text-[10px] truncate block ${replyToMessage.isDeleted ? "italic opacity-60" : "text-[#52656A] dark:text-[#A5C9CA]/80"}`}>
+          {content.length > 70 ? `${content.slice(0, 70)}…` : content}
         </span>
       </div>
     </div>
@@ -191,6 +207,7 @@ const MessageRow = ({
   currentUserId = null,
   editingState = null,
   replyingToId = null,
+  channelMembers = [],
   onStartEdit,
   onCancelEdit,
   onSubmitEdit,
@@ -200,197 +217,279 @@ const MessageRow = ({
   onToggleStar,
   isReply = false,
 }) => {
-  const isSender = message.senderId?.toString() === currentUserId?.toString()
+  const activeUserId = (currentUserId?._id || currentUserId?.id || currentUserId)?.toString()
+  const senderId = (message.senderId?._id || message.senderId?.id || message.senderId || message.sender?.id || message.sender?._id)?.toString()
+  const isSender = Boolean(senderId && activeUserId && senderId === activeUserId)
   const isDeleted = message.isDeleted === true
   const isBeingEdited = editingState?.messageId === message.id?.toString()
+  const attachments = getMessageAttachments(message)
   const isImageOrFile = isImageOrFileMessage(message)
-  const username = message.sender?.username || "User"
 
-  const showOrphanRef = !isReply && !!message.replyToMessage
+  const senderMember = useMemo(() => {
+    if (!senderId || !Array.isArray(channelMembers)) return null
+    return channelMembers.find((m) => m.id === senderId)
+  }, [channelMembers, senderId])
+
+  const username = message.sender?.username || senderMember?.username || senderMember?.displayName || "User"
+  const avatar = message.sender?.avatar || message.sender?.avatarUrl || message.sender?.profileImage || senderMember?.avatarUrl || null
+
+  const showOrphanRef = !isReply && Boolean(message.replyToMessage)
 
   return (
-    <div className={`group flex gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[#F8FAFB] dark:hover:bg-[#1E2525]/60 ${isReply ? "py-1.5" : ""}`}>
-      {/* Avatar */}
-      <div className="flex-shrink-0 pt-0.5">
-        <Avatar username={username} small={isReply} />
-      </div>
-
-      {/* Content & Actions wrapper */}
-      <div className="flex items-start justify-start gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
-        {/* Content column */}
-        <div className="flex flex-col min-w-0 max-w-full">
-          {/* Header row */}
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={`font-semibold text-[#2C3333] dark:text-white leading-none ${isReply ? "text-[12px]" : "text-sm"}`}>
-              {isSender ? "You" : username}
-            </span>
-            <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA] leading-none whitespace-nowrap">
-              {formatMessageTime(message.createdAt)}
-            </span>
-            {message.isEdited && !isDeleted && (
-              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50 leading-none whitespace-nowrap">(edited)</span>
-            )}
-            {message.isStarred && !isDeleted && !isImageOrFile && (
-              <button
-                type="button"
-                onClick={() => onToggleStar && onToggleStar(message)}
-                title="Starred message (click to unstar)"
-                className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
-              >
-                <i className="fa-solid fa-star text-[10px]" />
-              </button>
-            )}
-          </div>
-
-          {/* Orphan reply reference — only when parent not in thread */}
-          {showOrphanRef && <ReplyReference replyToMessage={message.replyToMessage} />}
-
-          {/* Content / edit mode / deleted state */}
-          {isBeingEdited ? (
-            <div className="w-full sm:w-[400px] max-w-full">
-              <textarea
-                className="w-full text-sm text-[#2C3333] dark:text-[#E7F6F2] bg-white dark:bg-[#1E2525] border border-[#A5C9CA] dark:border-[#395B64] rounded-lg px-3 py-2 outline-none focus:border-[#395B64] focus:ring-1 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30 resize-none transition-colors leading-relaxed"
-                value={editingState.draftContent}
-                onChange={(e) => onSetEditDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmitEdit() }
-                  if (e.key === "Escape") onCancelEdit()
-                }}
-                rows={Math.min(Math.max(editingState.draftContent.split("\n").length, 1), 5)}
-                autoFocus
-              />
-              <div className="flex items-center gap-1.5 mt-1.5">
-                {/* Save — icon only with tooltip */}
-                <div className="group/tip relative">
-                  <button
-                    type="button"
-                    onClick={onSubmitEdit}
-                    aria-label="Save"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-white bg-[#395B64] hover:bg-[#2C3333] transition-colors"
-                  >
-                    <i className="fa-solid fa-check text-[11px]" />
-                  </button>
-                  <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
-                    Save
-                  </span>
-                </div>
-                {/* Cancel — icon only with tooltip */}
-                <div className="group/tip relative">
-                  <button
-                    type="button"
-                    onClick={onCancelEdit}
-                    aria-label="Cancel"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] border border-[#E0E7E6] dark:border-[#395B64] hover:bg-[#F1F5F4] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white transition-colors"
-                  >
-                    <i className="fa-solid fa-xmark text-[11px]" />
-                  </button>
-                  <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
-                    Cancel
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : isDeleted ? (
-            <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
-          ) : (
-            <MessageContent
-              content={message.content}
-              attachments={message.attachments || []}
-              mentions={message.mentions || []}
-              currentUserId={currentUserId}
-              isSender={isSender}
-              className="text-sm text-[#2C3333] dark:text-[#E7F6F2] leading-relaxed break-words"
-            />
-          )}
+    <div
+      className={`group flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015] ${
+        isReply ? "py-0.5" : ""
+      } ${isSender ? "justify-end" : "justify-start"}`}
+    >
+      {/* Receiver Avatar (left side) */}
+      {!isSender && (
+        <div className="flex-shrink-0 mb-0.5">
+          <Avatar username={username} avatar={avatar} small={isReply} />
         </div>
+      )}
 
-        {/* Hover action buttons — positioned inline next to the content */}
-        {!isBeingEdited && !isDeleted && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 -mt-0.5 self-start pointer-events-none group-hover:pointer-events-auto">
-            {/* Star / Unstar action — only for text messages, not files */}
-            {!isImageOrFile && (
-              <div className="group/tip relative">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.currentTarget.blur()
-                    onToggleStar && onToggleStar(message)
-                  }}
-                  aria-label={message.isStarred ? "Unstar message" : "Star message"}
-                  className={`flex h-6 w-6 sm:h-6 sm:w-6 items-center justify-center rounded-md transition-colors ${
-                    message.isStarred
-                      ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                      : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
-                  }`}
-                >
-                  <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
-                </button>
-                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
-                  {message.isStarred ? "Unstar" : "Star"}
-                </span>
-              </div>
-            )}
-
+      {/* Hover action toolbar for sender (floats to the left of the bubble) */}
+      {isSender && !isBeingEdited && !isDeleted && (
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-0.5 pointer-events-none group-hover:pointer-events-auto">
+          {!isImageOrFile && (
             <div className="group/tip relative">
               <button
                 type="button"
                 onClick={(e) => {
                   e.currentTarget.blur()
-                  onStartReply(message)
+                  onToggleStar && onToggleStar(message)
                 }}
-                aria-label="Reply"
-                className="flex h-6 w-6 sm:h-6 sm:w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+                aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                  message.isStarred
+                    ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                    : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                }`}
               >
-                <i className="fa-solid fa-reply text-[10px]" />
+                <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
               </button>
               <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
-                Reply
+                {message.isStarred ? "Unstar" : "Star"}
               </span>
             </div>
-            {isSender && !isDeleted && (
-              <>
-                {!isImageOrFile && (
-                  <>
-                    <div className="w-px h-3.5 bg-[#E0E7E6] dark:bg-[#395B64]/40 mx-0.5" />
-                    <div className="group/tip relative">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.currentTarget.blur()
-                          onStartEdit(message)
-                        }}
-                        aria-label="Edit message"
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
-                      >
-                        <i className="fa-solid fa-pen text-[10px]" />
-                      </button>
-                      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
-                        Edit
-                      </span>
-                    </div>
-                  </>
-                )}
-                <div className="group/tip relative">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.currentTarget.blur()
-                      onDelete(message)
-                    }}
-                    aria-label="Delete message"
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                  >
-                    <i className="fa-solid fa-trash text-[10px]" />
-                  </button>
-                  <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
-                    Delete
-                  </span>
-                </div>
-              </>
-            )}
+          )}
+
+          <div className="group/tip relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.blur()
+                onStartReply(message)
+              }}
+              aria-label="Reply"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+            >
+              <i className="fa-solid fa-reply text-[10px]" />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+              Reply
+            </span>
           </div>
-        )}
-      </div>
+
+          {!isImageOrFile && (
+            <>
+              <div className="w-px h-3.5 bg-[#E0E7E6] dark:bg-[#395B64]/40 mx-0.5" />
+              <div className="group/tip relative">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.currentTarget.blur()
+                    onStartEdit(message)
+                  }}
+                  aria-label="Edit message"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+                >
+                  <i className="fa-solid fa-pen text-[10px]" />
+                </button>
+                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                  Edit
+                </span>
+              </div>
+            </>
+          )}
+
+          <div className="group/tip relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.blur()
+                onDelete(message)
+              }}
+              aria-label="Delete message"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+            >
+              <i className="fa-solid fa-trash text-[10px]" />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+              Delete
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Message Bubble / Editor / Deleted / Pure attachment */}
+      {isBeingEdited ? (
+        <div className="w-full sm:w-[380px] max-w-full text-left">
+          <textarea
+            className="w-full text-sm text-[#2C3333] dark:text-[#E7F6F2] bg-white dark:bg-[#1E2525] border border-[#A5C9CA] dark:border-[#395B64] rounded-lg px-3 py-2 outline-none focus:border-[#395B64] focus:ring-1 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30 resize-none transition-colors leading-relaxed shadow-xs"
+            value={editingState.draftContent}
+            onChange={(e) => onSetEditDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                onSubmitEdit()
+              }
+              if (e.key === "Escape") onCancelEdit()
+            }}
+            rows={Math.min(
+              Math.max((editingState.draftContent || "").split("\n").length, 1),
+              5
+            )}
+            autoFocus
+          />
+          <div className="flex items-center justify-end gap-1.5 mt-1.5">
+            <div className="group/tip relative">
+              <button
+                type="button"
+                onClick={onSubmitEdit}
+                aria-label="Save"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-white bg-[#395B64] hover:bg-[#2C3333] transition-colors"
+              >
+                <i className="fa-solid fa-check text-[11px]" />
+              </button>
+              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                Save
+              </span>
+            </div>
+            <div className="group/tip relative">
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                aria-label="Cancel"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] border border-[#E0E7E6] dark:border-[#395B64] hover:bg-[#F1F5F4] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white transition-colors"
+              >
+                <i className="fa-solid fa-xmark text-[11px]" />
+              </button>
+              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10">
+                Cancel
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : isDeleted ? (
+        <div className="rounded-2xl px-3.5 py-2 border border-dashed border-[#D0DCDB] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#1E2525]">
+          <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
+        </div>
+      ) : (
+        <div
+          className={`rounded-2xl px-3 py-1.5 max-w-[85%] sm:max-w-[75%] md:max-w-[65%] break-words shadow-xs text-left ${
+            isSender
+              ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50"
+              : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535]"
+          }`}
+        >
+          {/* Sender username in Channels (for other users) */}
+          {!isSender && username && (
+            <p className="text-[11px] font-bold text-[#395B64] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
+              {username}
+            </p>
+          )}
+
+          {/* Orphan reply reference */}
+          {showOrphanRef && <ReplyReference replyToMessage={message.replyToMessage} isSender={isSender} />}
+
+          {/* Content and compact inline timestamp */}
+          <div className="flex items-baseline justify-between gap-x-2.5 gap-y-0.5 flex-wrap">
+            <div className="min-w-0 flex-1 leading-snug">
+              <MessageContent
+                content={message.content}
+                attachments={message.attachments?.length ? message.attachments : attachments}
+                mentions={message.mentions || []}
+                currentUserId={activeUserId}
+                isSender={isSender}
+                className="text-sm leading-snug break-words"
+              />
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0 self-end ml-auto text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none pb-0.5">
+              <span className="leading-none whitespace-nowrap">
+                {formatMessageTime(message.createdAt)}
+              </span>
+              {message.isEdited && !isDeleted && (
+                <span className="text-[9px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                  (edited)
+                </span>
+              )}
+              {message.isStarred && !isDeleted && !isImageOrFile && (
+                <button
+                  type="button"
+                  onClick={() => onToggleStar && onToggleStar(message)}
+                  title="Starred message (click to unstar)"
+                  className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                >
+                  <i className="fa-solid fa-star text-[9px]" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hover action toolbar for receiver (floats to the right of the bubble) */}
+      {!isSender && !isBeingEdited && !isDeleted && (
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-0.5 pointer-events-none group-hover:pointer-events-auto">
+          {!isImageOrFile && (
+            <div className="group/tip relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.currentTarget.blur()
+                  onToggleStar && onToggleStar(message)
+                }}
+                aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                  message.isStarred
+                    ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                    : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                }`}
+              >
+                <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+              </button>
+              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                {message.isStarred ? "Unstar" : "Star"}
+              </span>
+            </div>
+          )}
+
+          <div className="group/tip relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.blur()
+                onStartReply(message)
+              }}
+              aria-label="Reply"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+            >
+              <i className="fa-solid fa-reply text-[10px]" />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+              Reply
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Sender Avatar (right side) */}
+      {isSender && (
+        <div className="flex-shrink-0 mb-0.5">
+          <Avatar username={username} avatar={avatar} small={isReply} />
+        </div>
+      )}
     </div>
   )
 }
@@ -401,7 +500,7 @@ const ReplyCountBadge = ({ count, onClick }) => {
     <button
       type="button"
       onClick={onClick}
-      className="ml-11 mt-0.5 flex items-center gap-1.5 text-[11px] text-[#395B64] hover:text-[#2C3333] hover:underline transition-colors"
+      className="flex items-center gap-1.5 text-[11px] text-[#395B64] hover:text-[#2C3333] hover:underline transition-colors"
     >
       <i className="fa-regular fa-comment text-[10px] opacity-70" />
       <span>{count} {count === 1 ? "reply" : "replies"}</span>
@@ -409,9 +508,9 @@ const ReplyCountBadge = ({ count, onClick }) => {
   )
 }
 
-
 const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
-  const { workspaceData } = useWorkspace()
+  const { workspaceData, user } = useWorkspace()
+  const resolvedCurrentUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
   const [messages, setMessages] = useState([])
   const [attachedFile, setAttachedFile] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -427,7 +526,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
         username: u.username || m.username || "",
         displayName: u.displayName || u.fullName || u.username || m.displayName || "",
         email: u.email || m.email || "",
-        avatarUrl: u.avatarUrl || u.profileImage || m.avatarUrl || null,
+        avatarUrl: u.avatar || u.avatarUrl || u.profileImage || m.avatar || m.avatarUrl || null,
       }
     }).filter((u) => u.id && u.username)
 
@@ -444,7 +543,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
 
   const mention = useMentionInput({
     members: channelMembers,
-    currentUserId,
+    currentUserId: resolvedCurrentUserId,
     includeAll: true,
     channelMembers,
   })
@@ -708,9 +807,10 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
   }
 
   const actionProps = {
-    currentUserId,
+    currentUserId: resolvedCurrentUserId,
     editingState,
     replyingToId,
+    channelMembers,
     onStartEdit: startEdit,
     onCancelEdit: cancelEdit,
     onSubmitEdit: submitEdit,
@@ -810,7 +910,9 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
 
                   {/* ── Reply count badge (collapsed state) ───────────────── */}
                   {replyCount > 0 && !isThreadExpanded && (
-                    <ReplyCountBadge count={replyCount} onClick={() => toggleThread(rootId)} />
+                    <div className={`flex ${(rootMsg.senderId?._id || rootMsg.senderId?.id || rootMsg.senderId || rootMsg.sender?.id || rootMsg.sender?._id)?.toString() === resolvedCurrentUserId ? "justify-end pr-11" : "justify-start pl-11"} mt-0.5`}>
+                      <ReplyCountBadge count={replyCount} onClick={() => toggleThread(rootId)} />
+                    </div>
                   )}
 
                   {/* ── Thread section ────────────────────────────────────── */}
@@ -850,7 +952,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                           onSend={handleSendReply}
                           onCancel={cancelReply}
                           members={channelMembers}
-                          currentUserId={currentUserId}
+                          currentUserId={resolvedCurrentUserId}
                         />
                       )}
                     </div>
@@ -865,7 +967,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                         onSend={handleSendReply}
                         onCancel={cancelReply}
                         members={channelMembers}
-                        currentUserId={currentUserId}
+                        currentUserId={resolvedCurrentUserId}
                       />
                     </div>
                   )}

@@ -16,6 +16,34 @@ import {
   getMessageAttachments,
 } from "../../utils/fileUtils"
 
+const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
+const avatarColor = (username) =>
+  AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
+
+const Avatar = ({ username = null, avatar = null, small = false }) => {
+  if (avatar) {
+    return (
+      <img
+        src={avatar}
+        alt={username || "User"}
+        className={`rounded-full object-cover flex-shrink-0 select-none ${
+          small ? "w-5.5 h-5.5" : "w-7 h-7"
+        }`}
+      />
+    )
+  }
+  return (
+    <div
+      className={`flex items-center justify-center rounded-full font-semibold text-white flex-shrink-0 select-none ${
+        small ? "w-5.5 h-5.5 text-[9px]" : "w-7 h-7 text-xs"
+      }`}
+      style={{ backgroundColor: avatarColor(username) }}
+    >
+      {(username ?? "?").charAt(0).toUpperCase()}
+    </div>
+  )
+}
+
 const MessageThread = ({
   selectedUser = null,
   messages = [],
@@ -28,7 +56,8 @@ const MessageThread = ({
   currentUserId = null,
   onOpenSidebar = () => {},
 }) => {
-  const { isUserOnline, workspaceData } = useWorkspace()
+  const { isUserOnline, workspaceData, user } = useWorkspace()
+  const resolvedCurrentUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
   const { toggleTheme, isDark } = useTheme()
   const [inputValue, setInputValue] = useState("")
   const [attachedFile, setAttachedFile] = useState(null)
@@ -54,7 +83,7 @@ const MessageThread = ({
     inputValue,
     setInputValue,
     textareaRef: mainTextareaRef,
-    currentUserId,
+    currentUserId: resolvedCurrentUserId,
     includeAll: false,
   })
 
@@ -221,11 +250,12 @@ const MessageThread = ({
           </div>
         ) : (
           messages.map((message, index) => {
-            const isSender = message.senderId?.toString() === currentUserId?.toString()
+            const activeUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
+            const senderId = (message.senderId?._id || message.senderId?.id || message.senderId || message.sender?.id || message.sender?._id)?.toString()
+            const isSender = Boolean(senderId && activeUserId && senderId === activeUserId)
             const isDeleted = message.isDeleted === true
             const isBeingEdited = editingState?.messageId === message.id?.toString()
-            const isPureAttachment = !isDeleted && isPureAttachmentMessage(message)
-            const attachments = isPureAttachment ? getMessageAttachments(message) : []
+            const attachments = getMessageAttachments(message)
 
             const prevMessage = index > 0 ? messages[index - 1] : null
             const showDateSeparator = !prevMessage || !isSameDay(prevMessage.createdAt, message.createdAt)
@@ -237,13 +267,23 @@ const MessageThread = ({
                   <DateSeparator label={dateLabel} />
                 )}
                 <div
-                  className={`group flex items-end gap-1.5 ${
+                  className={`group flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015] ${
                     isSender ? "justify-end" : "justify-start"
                   }`}
                 >
+                  {/* Receiver Avatar (left side) */}
+                  {!isSender && (
+                    <div className="flex-shrink-0 mb-0.5">
+                      <Avatar
+                        username={selectedUser?.username}
+                        avatar={selectedUser?.avatar || selectedUser?.avatarUrl || selectedUser?.profileImage}
+                        small
+                      />
+                    </div>
+                  )}
             
                   {isSender && !isDeleted && !isBeingEdited && (
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-1 pointer-events-none group-hover:pointer-events-auto">
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-0.5 pointer-events-none group-hover:pointer-events-auto">
                       {!isImageOrFileMessage(message) && (
                         <div className="group/tip relative">
                           <button
@@ -355,66 +395,43 @@ const MessageThread = ({
                       </div>
                     </div>
                   ) : isDeleted ? (
-                    <div className="rounded-lg px-3 py-1.5 border border-dashed border-[#D0DCDB] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#1E2525]">
+                    <div className="rounded-2xl px-3.5 py-2 border border-dashed border-[#D0DCDB] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#1E2525]">
                       <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
-                    </div>
-                  ) : isPureAttachment ? (
-                    <div className={`flex flex-col ${isSender ? "items-end" : "items-start"}`}>
-                      <AttachmentRenderer
-                        attachments={attachments}
-                        isSender={isSender}
-                        isPure={true}
-                      />
-                      <div className="flex items-center gap-1.5 mt-0.5 px-1">
-                        <p
-                          className={`text-[10px] leading-4 ${
-                            isSender ? "text-[#52656A] dark:text-[#A5C9CA]/70" : "text-[#52656A] dark:text-[#A5C9CA]/70"
-                          }`}
-                        >
-                          {formatMessageTime(message.createdAt)}
-                          {message.isEdited && !isDeleted && (
-                            <span className="ml-1 opacity-60">(edited)</span>
-                          )}
-                        </p>
-                      </div>
                     </div>
                   ) : (
                     <div
-                      className={`rounded-lg px-3 py-1.5 max-w-xs sm:max-w-md break-words ${
+                      className={`rounded-2xl px-3 py-1.5 max-w-[85%] sm:max-w-[75%] md:max-w-[65%] break-words shadow-xs text-left ${
                         isSender
-                          ? "bg-[#395B64] text-white"
-                          : "bg-[#F1F5F4] dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2]"
+                          ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50"
+                          : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535]"
                       }`}
                     >
-                      <div className="flex flex-col gap-1">
-                        <MessageContent
-                          content={message.content}
-                          attachments={message.attachments || []}
-                          isSender={isSender}
-                          mentions={message.mentions || []}
-                          currentUserId={currentUserId}
-                        />
-                        <div className="flex items-center justify-between gap-2 mt-0.5">
-                          <p
-                            className={`shrink-0 text-[10px] leading-4 ${
-                              isSender ? "text-[#A5C9CA]" : "text-[#52656A] dark:text-[#A5C9CA]/70"
-                            }`}
-                          >
+                      <div className="flex items-baseline justify-between gap-x-2.5 gap-y-0.5 flex-wrap">
+                        <div className="min-w-0 flex-1 leading-snug">
+                          <MessageContent
+                            content={message.content}
+                            attachments={message.attachments?.length ? message.attachments : attachments}
+                            isSender={isSender}
+                            mentions={message.mentions || []}
+                            currentUserId={activeUserId}
+                            className="text-sm leading-snug break-words"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0 self-end ml-auto text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none pb-0.5">
+                          <span className="leading-none whitespace-nowrap">
                             {formatMessageTime(message.createdAt)}
-                            {message.isEdited && !isDeleted && (
-                              <span className="ml-1 opacity-60">(edited)</span>
-                            )}
-                          </p>
+                          </span>
+                          {message.isEdited && !isDeleted && (
+                            <span className="text-[9px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                              (edited)
+                            </span>
+                          )}
                           {message.isStarred && !isDeleted && !isImageOrFileMessage(message) && (
                             <button
                               type="button"
                               onClick={() => onToggleStar(message)}
                               title="Starred message (click to unstar)"
-                              className={`${
-                                isSender
-                                  ? "text-emerald-400 hover:text-emerald-300"
-                                  : "text-emerald-500 hover:text-emerald-600"
-                              } transition-colors`}
+                              className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
                             >
                               <i className="fa-solid fa-star text-[9px]" />
                             </button>
@@ -426,7 +443,7 @@ const MessageThread = ({
 
                   {/* Hover action toolbar for receiver — floats beside bubble */}
                   {!isSender && !isDeleted && !isImageOrFileMessage(message) && (
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-1 pointer-events-none group-hover:pointer-events-auto">
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-0.5 pointer-events-none group-hover:pointer-events-auto">
                       <div className="group/tip relative">
                         <button
                           type="button"
@@ -447,6 +464,17 @@ const MessageThread = ({
                           {message.isStarred ? "Unstar" : "Star"}
                         </span>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Sender Avatar (right side) */}
+                  {isSender && (
+                    <div className="flex-shrink-0 mb-0.5">
+                      <Avatar
+                        username={user?.username || "You"}
+                        avatar={user?.avatarUrl || user?.profileImage}
+                        small
+                      />
                     </div>
                   )}
                 </div>
