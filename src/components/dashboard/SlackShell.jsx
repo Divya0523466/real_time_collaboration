@@ -14,6 +14,7 @@ import RoleManagementModal from "./RoleManagementModal"
 import CreateWorkspaceModal from "./CreateWorkspaceModal"
 import EditWorkspaceModal from "./EditWorkspaceModal"
 import DeleteWorkspaceModal from "./DeleteWorkspaceModal"
+import ProfileModal from "./ProfileModal"
 import DirectMessaging from "./DirectMessaging"
 import ChannelMessageThread from "./ChannelMessageThread"
 import NotificationPanel from "./NotificationPanel"
@@ -65,6 +66,7 @@ const SlackShell = () => {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false)
@@ -900,7 +902,11 @@ const SlackShell = () => {
             className="relative mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#52656A] bg-[#395B64] text-xs font-bold text-white shadow-sm transition hover:border-[#A5C9CA]"
             title="Your Profile"
           >
-            {user?.username?.charAt(0)?.toUpperCase() || "U"}
+            {user?.avatar ? (
+              <img src={user.avatar} alt={user.username || "Profile"} className="h-full w-full object-cover" />
+            ) : (
+              user?.username?.charAt(0)?.toUpperCase() || "U"
+            )}
             <span className="absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-[#2C3333]" />
           </button>
 
@@ -913,14 +919,30 @@ const SlackShell = () => {
               />
               <div className="absolute bottom-2 left-16 z-50 w-64 rounded-2xl border border-[#395B64] bg-[#1E2525] p-3 text-left text-[#E7F6F2] shadow-2xl max-h-[80vh] overflow-y-auto">
                 <div className="mb-3 flex items-center gap-3 rounded-xl bg-[#2C3333] p-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-[#E7F6F2]">
-                    {user?.username?.charAt(0)?.toUpperCase() || "U"}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-[#E7F6F2] overflow-hidden flex-shrink-0">
+                    {user?.avatar ? (
+                      <img src={user.avatar} alt={user.username || "Profile"} className="h-full w-full object-cover" />
+                    ) : (
+                      user?.username?.charAt(0)?.toUpperCase() || "U"
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-bold text-white">{user?.username || "User"}</div>
                     <div className="truncate text-xs text-[#A5C9CA]">{user?.email || ""}</div>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    setShowEditProfileModal(true)
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#E7F6F2] hover:bg-[#395B64] transition mb-3 border border-[#395B64]/50 bg-[#2C3333]/60 hover:text-white cursor-pointer"
+                >
+                  <i className="fa-regular fa-user text-xs text-[#A5C9CA]" />
+                  <span>Edit Profile</span>
+                </button>
 
                 <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[#A5C9CA]">
                   Workspace Memberships
@@ -1329,8 +1351,12 @@ const SlackShell = () => {
                         }`}
                       >
                         <span className="relative flex-shrink-0">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
-                            {member.username?.charAt(0)?.toUpperCase() || "U"}
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
+                            {(member.avatar || member.avatarUrl) ? (
+                              <img src={member.avatar || member.avatarUrl} alt={member.username} className="h-full w-full object-cover" />
+                            ) : (
+                              member.username?.charAt(0)?.toUpperCase() || "U"
+                            )}
                           </span>
                           <span
                             className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${
@@ -1736,6 +1762,13 @@ const SlackShell = () => {
         />
       )}
 
+      {/* Edit Profile Modal */}
+      {showEditProfileModal && (
+        <ProfileModal
+          onClose={() => setShowEditProfileModal(false)}
+        />
+      )}
+
       {/* Workspace Members Panel (Slide-Over) */}
       {showMembersPanel && (
         <div className="fixed inset-0 z-50 bg-[#2C3333]/60 backdrop-blur-xs flex justify-end">
@@ -1797,8 +1830,12 @@ const SlackShell = () => {
                     className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#242D2D] p-3 hover:border-[#A5C9CA] dark:hover:border-[#395B64] transition shadow-xs"
                   >
                     <div className="relative flex-shrink-0">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
-                        {member.username?.charAt(0)?.toUpperCase() || "U"}
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
+                        {(member.avatar || member.avatarUrl) ? (
+                          <img src={member.avatar || member.avatarUrl} alt={member.username} className="h-full w-full object-cover" />
+                        ) : (
+                          member.username?.charAt(0)?.toUpperCase() || "U"
+                        )}
                       </div>
                       <span
                         className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white dark:ring-[#242D2D] ${

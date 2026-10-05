@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { toast } from "react-toastify"
 import NotificationPanel from "./NotificationPanel"
+import ProfileModal from "./ProfileModal"
 
 const GlobalNav = ({ user }) => {
   const navigate = useNavigate()
   const { clearAuth, unreadNotificationsCount } = useWorkspace()
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   const handleLogout = async () => {
     try {
@@ -74,21 +76,33 @@ const GlobalNav = ({ user }) => {
    
       <div className="p-3 border-t border-[#2C3333] space-y-2">
         {user && (
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#2C3333]/60">
-            <div className="w-8 h-8 rounded-full bg-[#395B64] text-[#E7F6F2] font-bold text-xs flex items-center justify-center flex-shrink-0">
-              {user.username?.charAt(0)?.toUpperCase() || "U"}
+          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#2C3333]/60 group">
+            <div className="w-8 h-8 rounded-full bg-[#395B64] text-[#E7F6F2] font-bold text-xs flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {user.avatar ? (
+                <img src={user.avatar} alt={user.username} className="h-full w-full object-cover" />
+              ) : (
+                user.username?.charAt(0)?.toUpperCase() || "U"
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-white truncate">{user.username}</p>
               <p className="text-[11px] text-[#A5C9CA] truncate">{user.email}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowProfileModal(true)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A5C9CA] hover:text-white hover:bg-[#395B64] transition cursor-pointer"
+              title="Edit Profile"
+            >
+              <i className="fa-solid fa-pen-to-square text-xs" />
+            </button>
           </div>
         )}
 
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-950/40 transition flex items-center gap-2"
+          className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-950/40 transition flex items-center gap-2 cursor-pointer"
         >
           <i className="fa-solid fa-arrow-right-from-bracket" /> Logout
         </button>
@@ -98,6 +112,10 @@ const GlobalNav = ({ user }) => {
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
+
+      {showProfileModal && (
+        <ProfileModal onClose={() => setShowProfileModal(false)} />
+      )}
     </div>
   )
 }

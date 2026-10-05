@@ -8,6 +8,14 @@ import { useWorkspace } from "../../context/WorkspaceContext";
 
 const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+export const isOnlyEmojis = (text) => {
+  if (!text || typeof text !== "string") return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const emojiRegex = /^(\s*[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}\u{E0020}-\u{E007F}\u{FE0E}\u{FE0F}\u{200D}]+\s*)+$/u;
+  return emojiRegex.test(trimmed);
+};
+
 const getCandidateMentions = (
   activeUser,
   activeUserId,
@@ -155,8 +163,8 @@ const renderTextWithMentions = (
         key={`mention-${matchIndex}`}
         className={
           isSelf
-            ? "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold select-text bg-[#A5C9CA] text-[#072B2E] dark:bg-[#255458] dark:text-[#DCFAF6] border border-[#70A2A4]/60 dark:border-[#38767B] shadow-2xs mx-0.5 align-baseline"
-            : "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium select-text bg-white dark:bg-[#1A2222] text-[#2C3333] dark:text-[#E0E7E6] border border-[#D0DCDB] dark:border-[#2C3535] shadow-2xs mx-0.5 align-baseline"
+            ? "inline-flex items-center px-2 py-0.5 rounded-md text-[13px] font-semibold select-text bg-[#A5C9CA] text-[#072B2E] dark:bg-[#255458] dark:text-[#DCFAF6] border border-[#70A2A4]/60 dark:border-[#38767B] shadow-2xs mx-0.5 align-baseline"
+            : "inline-flex items-center px-2 py-0.5 rounded-md text-[13px] font-medium select-text bg-white dark:bg-[#1A2222] text-[#2C3333] dark:text-[#E0E7E6] border border-[#D0DCDB] dark:border-[#2C3535] shadow-2xs mx-0.5 align-baseline"
         }
       >
         <span className="font-bold opacity-80 mr-1">@</span>
@@ -199,11 +207,14 @@ const MessageContent = ({
 
   const hasStructuredAttachments = Array.isArray(attachments) && attachments.length > 0;
   const hasText = Boolean(content && content.trim());
+  const trimmed = typeof content === "string" ? content.trim() : "";
+  const onlyEmojis = isOnlyEmojis(trimmed);
+  const emojiClass = onlyEmojis ? "text-2xl sm:text-3xl leading-normal py-0.5" : "";
 
   // If structured attachments exist
   if (hasStructuredAttachments) {
     return (
-      <div className={`wrap-break-word ${className}`}>
+      <div className={`wrap-break-word ${emojiClass} ${className}`}>
         {hasText && (
           <p className="whitespace-pre-wrap leading-relaxed select-text mb-1">
             {renderTextWithMentions(content, mentions, activeUserId, activeUser, workspaceMembers)}
@@ -219,8 +230,6 @@ const MessageContent = ({
   }
 
   if (!content) return null;
-
-  const trimmed = content.trim();
 
   // Backward compatibility: If message is only a file URL
   if (isUrl(trimmed) && isUploadedFileUrl(trimmed)) {
@@ -287,7 +296,7 @@ const MessageContent = ({
     );
   }
 
-  return <div className={`wrap-break-word ${className}`}>{elements}</div>;
+  return <div className={`wrap-break-word ${emojiClass} ${className}`}>{elements}</div>;
 };
 
 export default MessageContent;

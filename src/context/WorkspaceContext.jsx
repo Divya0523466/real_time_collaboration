@@ -852,6 +852,70 @@ export const WorkspaceProvider = ({ children }) => {
     }
   }, [API_URL]);
 
+  const updateUserProfile = useCallback(
+    async ({ username, avatar }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`${API_URL}/auth/profile`, {
+          credentials: "include",
+          method: "PUT",
+          headers: getAuthHeaders({
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({ username, avatar }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to update profile");
+        }
+
+        const updatedUser = data.user;
+        setUser(updatedUser);
+        localStorage.setItem("worknestUser", JSON.stringify(updatedUser));
+
+        // Also update local workspaceData members if current workspace is loaded
+        setWorkspaceData((prev) => {
+          if (!prev || !Array.isArray(prev.members)) return prev;
+          const nextMembers = prev.members.map((m) => {
+            const mId = (m.id || m._id || m.userId)?.toString();
+            if (mId === updatedUser.id?.toString()) {
+              return {
+                ...m,
+                username: updatedUser.username,
+                avatar: updatedUser.avatar,
+                avatarUrl: updatedUser.avatar,
+                ...(m.user
+                  ? {
+                      user: {
+                        ...m.user,
+                        username: updatedUser.username,
+                        avatar: updatedUser.avatar,
+                        avatarUrl: updatedUser.avatar,
+                      },
+                    }
+                  : {}),
+              };
+            }
+            return m;
+          });
+          return { ...prev, members: nextMembers };
+        });
+
+        toast.success("Profile updated successfully!");
+        return updatedUser;
+      } catch (err) {
+        setError(err.message);
+        toast.error(err.message || "Failed to update profile");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [API_URL],
+  );
+
   const isUserOnline = useCallback(
     (userId) => Boolean(userId && onlineUsers.has(userId.toString())),
     [onlineUsers]
@@ -861,6 +925,7 @@ export const WorkspaceProvider = ({ children }) => {
     isInitializing,
     user,
     setUser,
+    updateUserProfile,
     workspaces,
     selectedWorkspace,
     workspaceData,

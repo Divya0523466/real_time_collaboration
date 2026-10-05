@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react"
+import { useEffect, useRef, useState, useMemo } from "react";
 import socket, {
   joinChannel,
   sendChannelMessage,
@@ -8,23 +8,42 @@ import socket, {
   onChannelMessageDeleted,
   offChannelMessageEdited,
   offChannelMessageDeleted,
-} from "../../services/socket"
-import FileUpload from "../common/FileUpload"
-import MessageContent from "../common/MessageContent"
-import DateSeparator from "../common/DateSeparator"
-import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
-import { isImageOrFileMessage, isPureAttachmentMessage, getMessageAttachments } from "../../utils/fileUtils"
-import { starMessageApi, unstarMessageApi } from "../../services/messageService"
-import { toast } from "react-toastify"
-import { useWorkspace } from "../../context/WorkspaceContext"
-import MentionSuggestions from "../common/MentionSuggestions"
-import { useMentionInput } from "../../hooks/useMentionInput"
-import { extractMentionIdsFromText } from "../../utils/mentionUtils"
-import AttachmentRenderer from "../common/AttachmentRenderer"
+} from "../../services/socket";
+import FileUpload from "../common/FileUpload";
+import MessageContent from "../common/MessageContent";
+import DateSeparator from "../common/DateSeparator";
+import {
+  formatMessageDate,
+  formatMessageTime,
+  isSameDay,
+} from "../../utils/dateUtils";
+import {
+  isImageOrFileMessage,
+  isPureAttachmentMessage,
+  getMessageAttachments,
+} from "../../utils/fileUtils";
+import {
+  starMessageApi,
+  unstarMessageApi,
+} from "../../services/messageService";
+import { toast } from "react-toastify";
+import { useWorkspace } from "../../context/WorkspaceContext";
+import MentionSuggestions from "../common/MentionSuggestions";
+import { useMentionInput } from "../../hooks/useMentionInput";
+import { extractMentionIdsFromText } from "../../utils/mentionUtils";
+import AttachmentRenderer from "../common/AttachmentRenderer";
+import EmojiPickerButton from "../common/EmojiPickerButton";
 
-const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
+const AVATAR_COLORS = [
+  "#395B64",
+  "#4A7C88",
+  "#52656A",
+  "#2E6E79",
+  "#3D7A52",
+  "#5B6E7C",
+];
 const avatarColor = (username) =>
-  AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
+  AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
 
 const Avatar = ({ username = null, avatar = null, small = false }) => {
   if (avatar) {
@@ -36,7 +55,7 @@ const Avatar = ({ username = null, avatar = null, small = false }) => {
           small ? "w-5.5 h-5.5" : "w-7 h-7"
         }`}
       />
-    )
+    );
   }
   return (
     <div
@@ -47,68 +66,107 @@ const Avatar = ({ username = null, avatar = null, small = false }) => {
     >
       {(username ?? "?").charAt(0).toUpperCase()}
     </div>
-  )
-}
+  );
+};
 
 const ReplyReference = ({ replyToMessage = null, isSender = false }) => {
-  if (!replyToMessage) return null
+  if (!replyToMessage) return null;
   const content = replyToMessage.isDeleted
     ? "This message was deleted"
-    : replyToMessage.content || "Message unavailable"
-  const senderName = replyToMessage.sender?.username || "User"
+    : replyToMessage.content || "Message unavailable";
+  const senderName = replyToMessage.sender?.username || "User";
 
   return (
-    <div className={`flex items-start gap-1.5 mb-1.5 rounded-lg border-l-[3px] border-[#395B64] dark:border-[#A5C9CA] px-2.5 py-1 text-left ${
-      isSender 
-        ? "bg-black/[0.04] dark:bg-white/[0.06]" 
-        : "bg-black/[0.03] dark:bg-white/[0.05]"
-    }`}>
+    <div
+      className={`flex items-start gap-1.5 mb-1.5 rounded-lg border-l-[3px] border-[#395B64] dark:border-[#A5C9CA] px-2.5 py-1 text-left ${
+        isSender
+          ? "bg-black/[0.04] dark:bg-white/[0.06]"
+          : "bg-black/[0.03] dark:bg-white/[0.05]"
+      }`}
+    >
       <i className="fa-solid fa-reply text-[9px] text-[#395B64] dark:text-[#A5C9CA] mt-[3px] flex-shrink-0" />
       <div className="min-w-0">
-        <span className="text-[10px] font-semibold text-[#395B64] dark:text-[#A5C9CA] mr-1.5">{senderName}</span>
-        <span className={`text-[10px] truncate block ${replyToMessage.isDeleted ? "italic opacity-60" : "text-[#52656A] dark:text-[#A5C9CA]/80"}`}>
+        <span className="text-[10px] font-semibold text-[#395B64] dark:text-[#A5C9CA] mr-1.5">
+          {senderName}
+        </span>
+        <span
+          className={`text-[10px] truncate block ${replyToMessage.isDeleted ? "italic opacity-60" : "text-[#52656A] dark:text-[#A5C9CA]/80"}`}
+        >
           {content.length > 70 ? `${content.slice(0, 70)}…` : content}
         </span>
       </div>
     </div>
-  )
-}
+  );
+};
 
-const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel, members = [], currentUserId = null }) => {
+const InlineReplyComposer = ({
+  parentMessage,
+  channelId,
+  onSend,
+  onCancel,
+  members = [],
+  currentUserId = null,
+}) => {
   const mention = useMentionInput({
     members,
     currentUserId,
     includeAll: true,
     channelMembers: members,
-  })
-  const [attachedFile, setAttachedFile] = useState(null)
-  const [uploadError, setUploadError] = useState(null)
-  const textareaRef = useRef(null)
+  });
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
+    textareaRef.current?.focus();
+  }, []);
 
-  const senderName = parentMessage.sender?.username || "User"
+  const senderName = parentMessage.sender?.username || "User";
   const preview = parentMessage.isDeleted
     ? "This message was deleted"
-    : (parentMessage.content || "").slice(0, 72)
+    : (parentMessage.content || "").slice(0, 72);
 
   const submit = () => {
-    const trimmed = mention.value.trim()
-    if (!trimmed && !attachedFile) return
-    const mentionIds = mention.getMentionedUserIds()
-    onSend(channelId, trimmed, parentMessage.id?.toString(), attachedFile ? [attachedFile] : [], mentionIds)
-    mention.reset()
-    setAttachedFile(null)
-    onCancel()
-  }
+    const trimmed = mention.value.trim();
+    if (!trimmed && !attachedFile) return;
+    const mentionIds = mention.getMentionedUserIds();
+    onSend(
+      channelId,
+      trimmed,
+      parentMessage.id?.toString(),
+      attachedFile ? [attachedFile] : [],
+      mentionIds,
+    );
+    mention.reset();
+    setAttachedFile(null);
+    onCancel();
+  };
 
   const onKeyDown = (e) => {
-    if (mention.handleKeyDown(e)) return
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit() }
-    if (e.key === "Escape") onCancel()
-  }
+    if (mention.handleKeyDown(e)) return;
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+    if (e.key === "Escape") onCancel();
+  };
+
+  const handleEmojiSelect = (emoji) => {
+    const el = textareaRef.current;
+    if (!el) {
+      mention.setValue((mention.value || "") + emoji);
+      return;
+    }
+    const start = el.selectionStart ?? mention.value.length;
+    const end = el.selectionEnd ?? mention.value.length;
+    const text = mention.value || "";
+    const updated = text.substring(0, start) + emoji + text.substring(end);
+    mention.handleChange(updated, start + emoji.length);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + emoji.length, start + emoji.length);
+    }, 0);
+  };
 
   return (
     <div className="relative mt-2 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] shadow-sm overflow-visible focus-within:border-[#395B64] focus-within:ring-1 focus-within:ring-[#E7F6F2] dark:focus-within:ring-[#395B64]/30 transition-all">
@@ -122,9 +180,16 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel, membe
       {/* Context strip */}
       <div className="flex items-center gap-2 px-3 py-2 bg-[#F8FAFB] dark:bg-[#161B1B] border-b border-[#E0E7E6] dark:border-[#2C3333] rounded-t-xl">
         <i className="fa-solid fa-reply text-[11px] text-[#A5C9CA]" />
-        <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]">Replying to</span>
-        <span className="text-[11px] font-semibold text-[#395B64] dark:text-[#A5C9CA]">{senderName}</span>
-        <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 opacity-60 truncate">· {preview}{(parentMessage.content?.length ?? 0) > 72 ? "…" : ""}</span>
+        <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]">
+          Replying to
+        </span>
+        <span className="text-[11px] font-semibold text-[#395B64] dark:text-[#A5C9CA]">
+          {senderName}
+        </span>
+        <span className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 opacity-60 truncate">
+          · {preview}
+          {(parentMessage.content?.length ?? 0) > 72 ? "…" : ""}
+        </span>
         <button
           type="button"
           onClick={onCancel}
@@ -140,7 +205,9 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel, membe
         <div className="mx-3 mt-2 flex items-center justify-between gap-2 rounded-lg bg-[#E7F6F2] dark:bg-[#242D2D] px-2.5 py-1 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA] dark:border-[#395B64]">
           <div className="flex items-center gap-2 truncate">
             <i className="fa-solid fa-paperclip text-[#395B64] dark:text-[#A5C9CA] text-xs" />
-            <span className="font-medium truncate text-[11px]">{attachedFile.originalName}</span>
+            <span className="font-medium truncate text-[11px]">
+              {attachedFile.originalName}
+            </span>
           </div>
           <button
             type="button"
@@ -156,7 +223,9 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel, membe
       {uploadError && (
         <div className="mx-3 mt-2 flex items-center justify-between text-[11px] text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-1 rounded">
           <span>{uploadError}</span>
-          <button type="button" onClick={() => setUploadError(null)}>×</button>
+          <button type="button" onClick={() => setUploadError(null)}>
+            ×
+          </button>
         </div>
       )}
 
@@ -166,23 +235,29 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel, membe
           buttonClassName="flex items-center justify-center h-7 w-7 rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition-colors disabled:opacity-50"
           iconClassName="text-xs"
           onUploadSuccess={(file) => {
-            setAttachedFile(file)
-            setUploadError(null)
+            setAttachedFile(file);
+            setUploadError(null);
           }}
           onUploadError={(err) => setUploadError(err)}
         />
         <textarea
           ref={textareaRef}
           value={mention.value}
-          onChange={(e) => mention.handleChange(e.target.value, e.target.selectionStart)}
+          onChange={(e) =>
+            mention.handleChange(e.target.value, e.target.selectionStart)
+          }
           onKeyDown={onKeyDown}
           onClick={(e) => mention.handleCursorChange(e.target.selectionStart)}
           onKeyUp={(e) => mention.handleCursorChange(e.target.selectionStart)}
           placeholder={`Reply to ${senderName}…`}
           rows={1}
-          className="flex-1 resize-none bg-transparent text-sm text-[#2C3333] dark:text-[#E7F6F2] outline-none placeholder:text-[#52656A]/50 dark:placeholder:text-[#A5C9CA]/50 leading-5 py-0.5"
+          className="flex-1 resize-none bg-transparent text-[15px] text-[#2C3333] dark:text-[#E7F6F2] outline-none placeholder:text-[#52656A]/50 dark:placeholder:text-[#A5C9CA]/50 leading-5 py-0.5"
         />
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          <EmojiPickerButton
+            buttonClassName="flex items-center justify-center h-7 w-7 rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition-colors"
+            onEmojiSelect={handleEmojiSelect}
+          />
           <button
             type="button"
             disabled={!mention.value.trim() && !attachedFile}
@@ -194,17 +269,13 @@ const InlineReplyComposer = ({ parentMessage, channelId, onSend, onCancel, membe
         </div>
       </div>
     </div>
-  )
-}
-
-// ─── Message Row ──────────────────────────────────────────────────────────────
-// Used for both root messages and replies. `isReply` controls visual indentation
-// and suppresses the ReplyReference (since replies inside a thread are already
-// visually grouped under their parent).
+  );
+};
 
 const MessageRow = ({
   message,
   currentUserId = null,
+  currentUser = null,
   editingState = null,
   replyingToId = null,
   channelMembers = [],
@@ -217,24 +288,46 @@ const MessageRow = ({
   onToggleStar,
   isReply = false,
 }) => {
-  const activeUserId = (currentUserId?._id || currentUserId?.id || currentUserId)?.toString()
-  const senderId = (message.senderId?._id || message.senderId?.id || message.senderId || message.sender?.id || message.sender?._id)?.toString()
-  const isSender = Boolean(senderId && activeUserId && senderId === activeUserId)
-  const isDeleted = message.isDeleted === true
-  const isBeingEdited = editingState?.messageId === message.id?.toString()
-  const isPureAttachment = !isDeleted && isPureAttachmentMessage(message)
-  const attachments = getMessageAttachments(message)
-  const isImageOrFile = isImageOrFileMessage(message)
+  const activeUserId = (
+    currentUserId?._id ||
+    currentUserId?.id ||
+    currentUserId
+  )?.toString();
+  const senderId = (
+    message.senderId?._id ||
+    message.senderId?.id ||
+    message.senderId ||
+    message.sender?.id ||
+    message.sender?._id
+  )?.toString();
+  const isSender = Boolean(
+    senderId && activeUserId && senderId === activeUserId,
+  );
+  const isDeleted = message.isDeleted === true;
+  const isBeingEdited = editingState?.messageId === message.id?.toString();
+  const isPureAttachment = !isDeleted && isPureAttachmentMessage(message);
+  const attachments = getMessageAttachments(message);
+  const isImageOrFile = isImageOrFileMessage(message);
 
   const senderMember = useMemo(() => {
-    if (!senderId || !Array.isArray(channelMembers)) return null
-    return channelMembers.find((m) => m.id === senderId)
-  }, [channelMembers, senderId])
+    if (!senderId || !Array.isArray(channelMembers)) return null;
+    return channelMembers.find((m) => m.id === senderId);
+  }, [channelMembers, senderId]);
 
-  const username = message.sender?.username || senderMember?.username || senderMember?.displayName || "User"
-  const avatar = message.sender?.avatar || message.sender?.avatarUrl || message.sender?.profileImage || senderMember?.avatarUrl || null
+  const username = isSender
+    ? (currentUser?.username || message.sender?.username || senderMember?.username || "You")
+    : (message.sender?.username || senderMember?.username || senderMember?.displayName || "User");
 
-  const showOrphanRef = !isReply && Boolean(message.replyToMessage)
+  const avatar = isSender
+    ? (currentUser?.avatar || null)
+    : (senderMember?.avatar ||
+       senderMember?.avatarUrl ||
+       message.sender?.avatar ||
+       message.sender?.avatarUrl ||
+       message.sender?.profileImage ||
+       null);
+
+  const showOrphanRef = !isReply && Boolean(message.replyToMessage);
 
   return (
     <div
@@ -257,17 +350,21 @@ const MessageRow = ({
               <button
                 type="button"
                 onClick={(e) => {
-                  e.currentTarget.blur()
-                  onToggleStar && onToggleStar(message)
+                  e.currentTarget.blur();
+                  onToggleStar && onToggleStar(message);
                 }}
-                aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                aria-label={
+                  message.isStarred ? "Unstar message" : "Star message"
+                }
                 className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
                   message.isStarred
                     ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                     : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
                 }`}
               >
-                <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                <i
+                  className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`}
+                />
               </button>
               <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                 {message.isStarred ? "Unstar" : "Star"}
@@ -279,8 +376,8 @@ const MessageRow = ({
             <button
               type="button"
               onClick={(e) => {
-                e.currentTarget.blur()
-                onStartReply(message)
+                e.currentTarget.blur();
+                onStartReply(message);
               }}
               aria-label="Reply"
               className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
@@ -299,8 +396,8 @@ const MessageRow = ({
                 <button
                   type="button"
                   onClick={(e) => {
-                    e.currentTarget.blur()
-                    onStartEdit(message)
+                    e.currentTarget.blur();
+                    onStartEdit(message);
                   }}
                   aria-label="Edit message"
                   className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
@@ -318,8 +415,8 @@ const MessageRow = ({
             <button
               type="button"
               onClick={(e) => {
-                e.currentTarget.blur()
-                onDelete(message)
+                e.currentTarget.blur();
+                onDelete(message);
               }}
               aria-label="Delete message"
               className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
@@ -342,14 +439,14 @@ const MessageRow = ({
             onChange={(e) => onSetEditDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                onSubmitEdit()
+                e.preventDefault();
+                onSubmitEdit();
               }
-              if (e.key === "Escape") onCancelEdit()
+              if (e.key === "Escape") onCancelEdit();
             }}
             rows={Math.min(
               Math.max((editingState.draftContent || "").split("\n").length, 1),
-              5
+              5,
             )}
             autoFocus
           />
@@ -384,7 +481,9 @@ const MessageRow = ({
         </div>
       ) : isDeleted ? (
         <div className="rounded-2xl px-3.5 py-2 border border-dashed border-[#D0DCDB] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#1E2525]">
-          <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
+          <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">
+            This message was deleted
+          </p>
         </div>
       ) : (
         <div
@@ -400,30 +499,41 @@ const MessageRow = ({
         >
           {/* Sender username in Channels (for other users) */}
           {!isSender && username && (
-            <p className="text-[11px] font-bold text-[#395B64] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
+            <p className="text-xs sm:text-[13px] font-bold text-[#395B64] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
               {username}
             </p>
           )}
 
           {/* Orphan reply reference */}
-          {showOrphanRef && <ReplyReference replyToMessage={message.replyToMessage} isSender={isSender} />}
+          {showOrphanRef && (
+            <ReplyReference
+              replyToMessage={message.replyToMessage}
+              isSender={isSender}
+            />
+          )}
 
           {/* Content and timestamp */}
           <div className="flex flex-col">
             <div className="min-w-0 break-words leading-relaxed">
               <MessageContent
                 content={message.content}
-                attachments={message.attachments?.length ? message.attachments : attachments}
+                attachments={
+                  message.attachments?.length
+                    ? message.attachments
+                    : attachments
+                }
                 mentions={message.mentions || []}
                 currentUserId={activeUserId}
                 isSender={isSender}
-                className="text-sm leading-snug break-words"
+                className="text-[15px] sm:text-base leading-relaxed break-words"
               />
             </div>
-            <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none px-0.5">
-              <span className="whitespace-nowrap">{formatMessageTime(message.createdAt)}</span>
+            <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none px-0.5">
+              <span className="whitespace-nowrap">
+                {formatMessageTime(message.createdAt)}
+              </span>
               {message.isEdited && !isDeleted && (
-                <span className="text-[9px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
                   (edited)
                 </span>
               )}
@@ -450,17 +560,21 @@ const MessageRow = ({
               <button
                 type="button"
                 onClick={(e) => {
-                  e.currentTarget.blur()
-                  onToggleStar && onToggleStar(message)
+                  e.currentTarget.blur();
+                  onToggleStar && onToggleStar(message);
                 }}
-                aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                aria-label={
+                  message.isStarred ? "Unstar message" : "Star message"
+                }
                 className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
                   message.isStarred
                     ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                     : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
                 }`}
               >
-                <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                <i
+                  className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`}
+                />
               </button>
               <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                 {message.isStarred ? "Unstar" : "Star"}
@@ -472,8 +586,8 @@ const MessageRow = ({
             <button
               type="button"
               onClick={(e) => {
-                e.currentTarget.blur()
-                onStartReply(message)
+                e.currentTarget.blur();
+                onStartReply(message);
               }}
               aria-label="Reply"
               className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
@@ -494,11 +608,11 @@ const MessageRow = ({
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 const ReplyCountBadge = ({ count, onClick }) => {
-  if (count === 0) return null
+  if (count === 0) return null;
   return (
     <button
       type="button"
@@ -506,137 +620,178 @@ const ReplyCountBadge = ({ count, onClick }) => {
       className="flex items-center gap-1.5 text-[11px] text-[#395B64] hover:text-[#2C3333] hover:underline transition-colors"
     >
       <i className="fa-regular fa-comment text-[10px] opacity-70" />
-      <span>{count} {count === 1 ? "reply" : "replies"}</span>
+      <span>
+        {count} {count === 1 ? "reply" : "replies"}
+      </span>
     </button>
-  )
-}
+  );
+};
 
 const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
-  const { workspaceData, user } = useWorkspace()
-  const resolvedCurrentUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
-  const [messages, setMessages] = useState([])
-  const [attachedFile, setAttachedFile] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const { workspaceData, user } = useWorkspace();
+  const resolvedCurrentUserId = (
+    currentUserId?._id ||
+    currentUserId?.id ||
+    currentUserId ||
+    user?.id ||
+    user?._id
+  )?.toString();
+  const [messages, setMessages] = useState([]);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const [replyingToId, setReplyingToId] = useState(null)
+  const [replyingToId, setReplyingToId] = useState(null);
 
   const channelMembers = useMemo(() => {
-    const allWorkspaceMembers = (workspaceData?.members || []).map((m) => {
-      const u = m.user || m
-      return {
-        id: (u.id || u._id || m.userId)?.toString(),
-        username: u.username || m.username || "",
-        displayName: u.displayName || u.fullName || u.username || m.displayName || "",
-        email: u.email || m.email || "",
-        avatarUrl: u.avatar || u.avatarUrl || u.profileImage || m.avatar || m.avatarUrl || null,
-      }
-    }).filter((u) => u.id && u.username)
+    const allWorkspaceMembers = (workspaceData?.members || [])
+      .map((m) => {
+        const u = m.user || m;
+        return {
+          id: (u.id || u._id || m.userId)?.toString(),
+          username: u.username || m.username || "",
+          displayName:
+            u.displayName || u.fullName || u.username || m.displayName || "",
+          email: u.email || m.email || "",
+          avatarUrl:
+            u.avatar ||
+            u.avatarUrl ||
+            u.profileImage ||
+            m.avatar ||
+            m.avatarUrl ||
+            null,
+        };
+      })
+      .filter((u) => u.id && u.username);
 
-    const isPrivate = channel?.isPrivate || channel?.type === "PRIVATE"
-    if (isPrivate && Array.isArray(channel?.members) && channel.members.length > 0) {
+    const isPrivate = channel?.isPrivate || channel?.type === "PRIVATE";
+    if (
+      isPrivate &&
+      Array.isArray(channel?.members) &&
+      channel.members.length > 0
+    ) {
       const allowedSet = new Set(
-        channel.members.map((m) => (m.id || m._id || m)?.toString())
-      )
-      return allWorkspaceMembers.filter((m) => allowedSet.has(m.id))
+        channel.members.map((m) => (m.id || m._id || m)?.toString()),
+      );
+      return allWorkspaceMembers.filter((m) => allowedSet.has(m.id));
     }
 
-    return allWorkspaceMembers
-  }, [workspaceData?.members, channel?.isPrivate, channel?.type, channel?.members])
+    return allWorkspaceMembers;
+  }, [
+    workspaceData?.members,
+    channel?.isPrivate,
+    channel?.type,
+    channel?.members,
+  ]);
 
   const mention = useMentionInput({
     members: channelMembers,
     currentUserId: resolvedCurrentUserId,
     includeAll: true,
     channelMembers,
-  })
-  const composerTextareaRef = useRef(null)
+  });
+  const composerTextareaRef = useRef(null);
 
- 
-  const [expandedThreads, setExpandedThreads] = useState(new Set())
+  const [expandedThreads, setExpandedThreads] = useState(new Set());
 
-  const [editingState, setEditingState] = useState(null)
+  const [editingState, setEditingState] = useState(null);
 
-  const messageIdsRef = useRef(new Set())
-  const messagesEndRef = useRef(null)
-  const prevCountRef = useRef(0)
-  const prevChannelIdRef = useRef(null)
-  const apiUrl = import.meta.env.VITE_API_URL
+  const messageIdsRef = useRef(new Set());
+  const messagesContainerRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const prevCountRef = useRef(0);
+  const prevChannelIdRef = useRef(null);
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  const scrollToBottom = (behavior = "auto") => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  };
 
   const { rootMessages, repliesMap } = useMemo(() => {
-    const knownIds = new Set(messages.map((m) => m.id?.toString()))
-    const roots = []
-    const replies = {}
+    const knownIds = new Set(messages.map((m) => m.id?.toString()));
+    const roots = [];
+    const replies = {};
 
     messages.forEach((msg) => {
-      const parentId = msg.replyTo?.toString()
+      const parentId = msg.replyTo?.toString();
       if (!parentId || !knownIds.has(parentId)) {
-        roots.push(msg)
+        roots.push(msg);
       } else {
-        replies[parentId] = replies[parentId] ? [...replies[parentId], msg] : [msg]
+        replies[parentId] = replies[parentId]
+          ? [...replies[parentId], msg]
+          : [msg];
       }
-    })
+    });
 
-    roots.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    roots.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     Object.values(replies).forEach((arr) =>
-      arr.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-    )
+      arr.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    );
 
-    return { rootMessages: roots, repliesMap: replies }
-  }, [messages])
+    return { rootMessages: roots, repliesMap: replies };
+  }, [messages]);
 
- 
   useEffect(() => {
     setExpandedThreads((prev) => {
-      const next = new Set(prev)
-      Object.keys(repliesMap).forEach((id) => next.add(id))
-      return next
-    })
-  }, [repliesMap])
+      const next = new Set(prev);
+      Object.keys(repliesMap).forEach((id) => next.add(id));
+      return next;
+    });
+  }, [repliesMap]);
 
   useEffect(() => {
-    if (!channel?.id) return undefined
+    if (!channel?.id) return undefined;
 
-    let cancelled = false
+    let cancelled = false;
 
     const loadHistory = async () => {
-      setLoading(true)
-      setError(null)
-      messageIdsRef.current = new Set()
+      setLoading(true);
+      setError(null);
+      setMessages([]);
+      messageIdsRef.current = new Set();
 
       try {
-        const token = localStorage.getItem("worknestToken")
-        const response = await fetch(`${apiUrl}/messages/channels/${channel.id}`, { credentials: "include",
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.message || "Failed to load channel messages")
+        const token = localStorage.getItem("worknestToken");
+        const response = await fetch(
+          `${apiUrl}/messages/channels/${channel.id}`,
+          {
+            credentials: "include",
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(data.message || "Failed to load channel messages");
 
         if (!cancelled) {
-          const history = data.messages || []
-          setMessages(history)
-          messageIdsRef.current = new Set(history.map((m) => m.id.toString()))
+          const history = data.messages || [];
+          setMessages(history);
+          messageIdsRef.current = new Set(history.map((m) => m.id.toString()));
         }
       } catch (loadError) {
         if (!cancelled) {
-          setMessages([])
-          setError(loadError.message)
+          setMessages([]);
+          setError(loadError.message);
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoading(false);
       }
-    }
+    };
 
     const addMessage = (message) => {
-      if (message?.channelId?.toString() !== channel.id.toString()) return
-      const messageId = message.id?.toString()
-      if (!messageId || messageIdsRef.current.has(messageId)) return
-      messageIdsRef.current.add(messageId)
-      setMessages((prev) => [...prev, message])
-    }
+      if (message?.channelId?.toString() !== channel.id.toString()) return;
+      const messageId = message.id?.toString();
+      if (!messageId || messageIdsRef.current.has(messageId)) return;
+      messageIdsRef.current.add(messageId);
+      setMessages((prev) => [...prev, message]);
+    };
 
     const handleEdited = (payload) => {
-      if (payload?.channelId?.toString() !== channel.id.toString()) return
+      if (payload?.channelId?.toString() !== channel.id.toString()) return;
       setMessages((prev) =>
         prev.map((m) =>
           m.id?.toString() === payload.id?.toString()
@@ -645,211 +800,268 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                 content: payload.content,
                 isEdited: true,
                 updatedAt: payload.updatedAt,
-                mentions: payload.mentions !== undefined ? payload.mentions : m.mentions,
+                mentions:
+                  payload.mentions !== undefined
+                    ? payload.mentions
+                    : m.mentions,
               }
-            : m
-        )
-      )
-    }
+            : m,
+        ),
+      );
+    };
 
     const handleDeleted = (payload) => {
-      if (payload?.channelId?.toString() !== channel.id.toString()) return
+      if (payload?.channelId?.toString() !== channel.id.toString()) return;
       setMessages((prev) =>
         prev.map((m) =>
           m.id?.toString() === payload.id?.toString()
             ? { ...m, isDeleted: true, content: null }
-            : m
-        )
-      )
-    }
+            : m,
+        ),
+      );
+    };
 
     const handleSocketError = (socketError) => {
-      setError(socketError.message || "Unable to access this channel")
-    }
+      setError(socketError.message || "Unable to access this channel");
+    };
 
-    loadHistory()
-    socket.on("receive-channel-message", addMessage)
-    socket.on("join-channel-error", handleSocketError)
-    socket.on("send-channel-message-error", handleSocketError)
-    onChannelMessageEdited(handleEdited)
-    onChannelMessageDeleted(handleDeleted)
-    joinChannel(channel.id)
+    loadHistory();
+    socket.on("receive-channel-message", addMessage);
+    socket.on("join-channel-error", handleSocketError);
+    socket.on("send-channel-message-error", handleSocketError);
+    onChannelMessageEdited(handleEdited);
+    onChannelMessageDeleted(handleDeleted);
+    joinChannel(channel.id);
 
     return () => {
-      cancelled = true
-      socket.off("receive-channel-message", addMessage)
-      socket.off("join-channel-error", handleSocketError)
-      socket.off("send-channel-message-error", handleSocketError)
-      offChannelMessageEdited(handleEdited)
-      offChannelMessageDeleted(handleDeleted)
-    }
-  }, [apiUrl, channel?.id])
+      cancelled = true;
+      socket.off("receive-channel-message", addMessage);
+      socket.off("join-channel-error", handleSocketError);
+      socket.off("send-channel-message-error", handleSocketError);
+      offChannelMessageEdited(handleEdited);
+      offChannelMessageDeleted(handleDeleted);
+    };
+  }, [apiUrl, channel?.id]);
 
   useEffect(() => {
-    const isNewChannel = prevChannelIdRef.current !== channel?.id
-    const prevCount = prevCountRef.current
-    const currentCount = messages.length
+    if (loading) return;
+
+    const isNewChannel = prevChannelIdRef.current !== channel?.id;
+    const prevCount = prevCountRef.current;
+    const currentCount = messages.length;
 
     if (isNewChannel) {
-      prevChannelIdRef.current = channel?.id
-      prevCountRef.current = currentCount
+      prevChannelIdRef.current = channel?.id;
+      prevCountRef.current = currentCount;
       if (currentCount > 0) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+        scrollToBottom("auto");
+        const timer = setTimeout(() => {
+          scrollToBottom("auto");
+        }, 50);
+        return () => clearTimeout(timer);
       }
-      return
+      return;
     }
 
     if (currentCount > prevCount) {
-      prevCountRef.current = currentCount
+      prevCountRef.current = currentCount;
       if (prevCount === 0) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+        scrollToBottom("auto");
+        const timer = setTimeout(() => {
+          scrollToBottom("auto");
+        }, 50);
+        return () => clearTimeout(timer);
       } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        scrollToBottom("smooth");
       }
     } else {
-      prevCountRef.current = currentCount
+      prevCountRef.current = currentCount;
     }
-  }, [messages, channel?.id])
+  }, [messages, channel?.id, loading]);
 
-  
   const handleSendNewMessage = () => {
-    const text = mention.value.trim()
-    if (!text && !attachedFile) return
-    if (!channel?.id) return
-    if (!socket.connected) { setError("Socket is not connected. Please try again."); return }
+    const text = mention.value.trim();
+    if (!text && !attachedFile) return;
+    if (!channel?.id) return;
+    if (!socket.connected) {
+      setError("Socket is not connected. Please try again.");
+      return;
+    }
 
-    const attachments = attachedFile ? [attachedFile] : []
-    const mentionIds = mention.getMentionedUserIds()
+    const attachments = attachedFile ? [attachedFile] : [];
+    const mentionIds = mention.getMentionedUserIds();
 
-    sendChannelMessage(channel.id, text, null, attachments, mentionIds)
-    mention.reset()
-    setAttachedFile(null)
-  }
+    sendChannelMessage(channel.id, text, null, attachments, mentionIds);
+    mention.reset();
+    setAttachedFile(null);
+  };
 
   const handleKeyDown = (e) => {
-    if (mention.handleKeyDown(e)) return
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendNewMessage() }
-  }
+    if (mention.handleKeyDown(e)) return;
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendNewMessage();
+    }
+  };
 
-  const handleSendReply = (channelId, content, parentId, attachments = [], mentions = []) => {
-    sendChannelMessage(channelId, content, parentId, attachments, mentions)
- 
-    setExpandedThreads((prev) => new Set([...prev, parentId]))
-  }
+  const handleEmojiSelect = (emoji) => {
+    const el = composerTextareaRef.current;
+    if (!el) {
+      mention.setValue((mention.value || "") + emoji);
+      return;
+    }
+    const start = el.selectionStart ?? mention.value.length;
+    const end = el.selectionEnd ?? mention.value.length;
+    const text = mention.value || "";
+    const updated = text.substring(0, start) + emoji + text.substring(end);
+    mention.handleChange(updated, start + emoji.length);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + emoji.length, start + emoji.length);
+    }, 0);
+  };
+
+  const handleSendReply = (
+    channelId,
+    content,
+    parentId,
+    attachments = [],
+    mentions = [],
+  ) => {
+    sendChannelMessage(channelId, content, parentId, attachments, mentions);
+
+    setExpandedThreads((prev) => new Set([...prev, parentId]));
+  };
 
   const startReply = (message) => {
-    setReplyingToId(message.id?.toString())
-    setEditingState(null)
+    setReplyingToId(message.id?.toString());
+    setEditingState(null);
     // Expand the thread of the message being replied to so the composer is visible
-    setExpandedThreads((prev) => new Set([...prev, message.id?.toString()]))
-  }
+    setExpandedThreads((prev) => new Set([...prev, message.id?.toString()]));
+  };
 
-  const cancelReply = () => setReplyingToId(null)
+  const cancelReply = () => setReplyingToId(null);
 
   const startEdit = (message) => {
-    setEditingState({ messageId: message.id?.toString(), draftContent: message.content || "" })
-    setReplyingToId(null)
-  }
+    setEditingState({
+      messageId: message.id?.toString(),
+      draftContent: message.content || "",
+    });
+    setReplyingToId(null);
+  };
 
-  const cancelEdit = () => setEditingState(null)
+  const cancelEdit = () => setEditingState(null);
 
   const submitEdit = () => {
-    if (!editingState?.draftContent?.trim()) return
+    if (!editingState?.draftContent?.trim()) return;
     const mentionIds = extractMentionIdsFromText(
       editingState.draftContent,
       channelMembers,
       null,
-      { currentUserId, channelMembers }
-    )
-    editChannelMessage(editingState.messageId, editingState.draftContent.trim(), mentionIds)
-    setEditingState(null)
-  }
+      { currentUserId, channelMembers },
+    );
+    editChannelMessage(
+      editingState.messageId,
+      editingState.draftContent.trim(),
+      mentionIds,
+    );
+    setEditingState(null);
+  };
 
   const handleDelete = (message) => {
-    deleteChannelMessage(message.id?.toString())
-  }
+    deleteChannelMessage(message.id?.toString());
+  };
 
   const handleToggleStar = async (message) => {
-    if (!message || isImageOrFileMessage(message)) return
-    const msgId = (message.id || message._id)?.toString()
-    if (!msgId) return
+    if (!message || isImageOrFileMessage(message)) return;
+    const msgId = (message.id || message._id)?.toString();
+    if (!msgId) return;
 
-    const willStar = !message.isStarred
+    const willStar = !message.isStarred;
 
     setMessages((prev) =>
       prev.map((m) =>
-        (m.id || m._id)?.toString() === msgId ? { ...m, isStarred: willStar } : m
-      )
-    )
+        (m.id || m._id)?.toString() === msgId
+          ? { ...m, isStarred: willStar }
+          : m,
+      ),
+    );
 
     try {
       if (willStar) {
-        await starMessageApi(msgId, "CHANNEL")
-        toast.success("Message starred")
+        await starMessageApi(msgId, "CHANNEL");
+        toast.success("Message starred");
       } else {
-        await unstarMessageApi(msgId)
-        toast.success("Message unstarred")
+        await unstarMessageApi(msgId);
+        toast.success("Message unstarred");
       }
     } catch (err) {
-      console.error("Failed to star/unstar message:", err)
-      toast.error(err.message || "Failed to update star")
+      console.error("Failed to star/unstar message:", err);
+      toast.error(err.message || "Failed to update star");
       setMessages((prev) =>
         prev.map((m) =>
-          (m.id || m._id)?.toString() === msgId ? { ...m, isStarred: !willStar } : m
-        )
-      )
+          (m.id || m._id)?.toString() === msgId
+            ? { ...m, isStarred: !willStar }
+            : m,
+        ),
+      );
     }
-  }
+  };
 
   const toggleThread = (rootId) => {
     setExpandedThreads((prev) => {
-      const next = new Set(prev)
-      next.has(rootId) ? next.delete(rootId) : next.add(rootId)
-      return next
-    })
-  }
+      const next = new Set(prev);
+      next.has(rootId) ? next.delete(rootId) : next.add(rootId);
+      return next;
+    });
+  };
 
   const actionProps = {
     currentUserId: resolvedCurrentUserId,
+    currentUser: user,
     editingState,
     replyingToId,
     channelMembers,
     onStartEdit: startEdit,
     onCancelEdit: cancelEdit,
     onSubmitEdit: submitEdit,
-    onSetEditDraft: (draft) => setEditingState((s) => ({ ...s, draftContent: draft })),
+    onSetEditDraft: (draft) =>
+      setEditingState((s) => ({ ...s, draftContent: draft })),
     onStartReply: startReply,
     onDelete: handleDelete,
     onToggleStar: handleToggleStar,
-  }
+  };
 
-  
   if (!channel) {
     return (
       <div className="flex min-w-0 flex-1 items-center justify-center bg-white dark:bg-[#121717] text-sm text-[#52656A] dark:text-[#A5C9CA]">
         Loading channel…
       </div>
-    )
+    );
   }
 
-  const hasMessages = rootMessages.length > 0
+  const hasMessages = rootMessages.length > 0;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-[#121717] transition-colors">
-
       {/* ── Scrollable message area ─────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
-
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto">
         {/* Channel intro header */}
         <div className="px-4 sm:px-6 pt-5 sm:pt-8 pb-4 border-b border-[#E0E7E6] dark:border-[#2C3333]">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/30 text-xl text-[#395B64] dark:text-[#A5C9CA] mb-3">
-            {channel.type === "PRIVATE"
-              ? <i className="fa-solid fa-lock" />
-              : <i className="fa-solid fa-hashtag" />}
+            {channel.type === "PRIVATE" ? (
+              <i className="fa-solid fa-lock" />
+            ) : (
+              <i className="fa-solid fa-hashtag" />
+            )}
           </div>
-          <h2 className="text-xl font-bold text-[#2C3333] dark:text-white">#{channel.name}</h2>
+          <h2 className="text-xl font-bold text-[#2C3333] dark:text-white">
+            #{channel.name}
+          </h2>
           {channel.description && (
-            <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]/80 max-w-lg">{channel.description}</p>
+            <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]/80 max-w-lg">
+              {channel.description}
+            </p>
           )}
         </div>
 
@@ -875,8 +1087,12 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/30 text-2xl text-[#A5C9CA] mb-4">
               <i className="fa-regular fa-comments" />
             </div>
-            <p className="text-sm font-semibold text-[#2C3333] dark:text-white">No messages yet</p>
-            <p className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]/80">Be the first to say something in #{channel.name}.</p>
+            <p className="text-sm font-semibold text-[#2C3333] dark:text-white">
+              No messages yet
+            </p>
+            <p className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]/80">
+              Be the first to say something in #{channel.name}.
+            </p>
           </div>
         )}
 
@@ -884,19 +1100,23 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
         {!loading && hasMessages && (
           <div className="py-4 px-2">
             {rootMessages.map((rootMsg, index) => {
-              const rootId = rootMsg.id?.toString()
-              const replies = repliesMap[rootId] || []
-              const replyCount = replies.length
-              const isThreadExpanded = expandedThreads.has(rootId)
-              const isReplyingToThis = replyingToId === rootId
+              const rootId = rootMsg.id?.toString();
+              const replies = repliesMap[rootId] || [];
+              const replyCount = replies.length;
+              const isThreadExpanded = expandedThreads.has(rootId);
+              const isReplyingToThis = replyingToId === rootId;
 
-              const prevMsg = index > 0 ? rootMessages[index - 1] : null
-              const showDateSeparator = !prevMsg || !isSameDay(prevMsg.createdAt, rootMsg.createdAt)
-              const dateLabel = showDateSeparator ? formatMessageDate(rootMsg.createdAt) : null
+              const prevMsg = index > 0 ? rootMessages[index - 1] : null;
+              const showDateSeparator =
+                !prevMsg || !isSameDay(prevMsg.createdAt, rootMsg.createdAt);
+              const dateLabel = showDateSeparator
+                ? formatMessageDate(rootMsg.createdAt)
+                : null;
 
               // A thread section is shown when there are actual replies OR when
               // the user has just clicked Reply (to show the inline composer)
-              const showThread = isThreadExpanded && (replyCount > 0 || isReplyingToThis)
+              const showThread =
+                isThreadExpanded && (replyCount > 0 || isReplyingToThis);
 
               return (
                 <div key={rootMsg.id}>
@@ -911,44 +1131,66 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                       isReply={false}
                     />
 
-                  {/* ── Reply count badge (collapsed state) ───────────────── */}
-                  {replyCount > 0 && !isThreadExpanded && (
-                    <div className={`flex ${(rootMsg.senderId?._id || rootMsg.senderId?.id || rootMsg.senderId || rootMsg.sender?.id || rootMsg.sender?._id)?.toString() === resolvedCurrentUserId ? "justify-end pr-11" : "justify-start pl-11"} mt-0.5`}>
-                      <ReplyCountBadge count={replyCount} onClick={() => toggleThread(rootId)} />
-                    </div>
-                  )}
-
-                  {/* ── Thread section ────────────────────────────────────── */}
-                  {showThread && (
-                    <div className="ml-11 mt-1 mb-2 border-l-2 border-[#E0E7E6] dark:border-[#2C3333] pl-4">
-                      {/* Collapse link */}
-                      {replyCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isReplyingToThis) toggleThread(rootId)
-                          }}
-                          className="flex items-center gap-1.5 text-[11px] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:underline mb-2 transition-colors"
-                        >
-                          <i className="fa-solid fa-chevron-up text-[9px] opacity-60" />
-                          {replyCount === 1 ? "1 reply" : `${replyCount} replies`}
-                        </button>
-                      )}
-
-                      {/* Actual replies */}
-                      <div className="space-y-0.5">
-                        {replies.map((reply) => (
-                          <MessageRow
-                            key={reply.id}
-                            message={reply}
-                            {...actionProps}
-                            isReply={true}
-                          />
-                        ))}
+                    {/* ── Reply count badge (collapsed state) ───────────────── */}
+                    {replyCount > 0 && !isThreadExpanded && (
+                      <div
+                        className={`flex ${(rootMsg.senderId?._id || rootMsg.senderId?.id || rootMsg.senderId || rootMsg.sender?.id || rootMsg.sender?._id)?.toString() === resolvedCurrentUserId ? "justify-end pr-11" : "justify-start pl-11"} mt-0.5`}
+                      >
+                        <ReplyCountBadge
+                          count={replyCount}
+                          onClick={() => toggleThread(rootId)}
+                        />
                       </div>
+                    )}
 
-                      {/* Inline reply composer */}
-                      {isReplyingToThis && (
+                    {/* ── Thread section ────────────────────────────────────── */}
+                    {showThread && (
+                      <div className="ml-11 mt-1 mb-2 border-l-2 border-[#E0E7E6] dark:border-[#2C3333] pl-4">
+                        {/* Collapse link */}
+                        {replyCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!isReplyingToThis) toggleThread(rootId);
+                            }}
+                            className="flex items-center gap-1.5 text-[11px] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:underline mb-2 transition-colors"
+                          >
+                            <i className="fa-solid fa-chevron-up text-[9px] opacity-60" />
+                            {replyCount === 1
+                              ? "1 reply"
+                              : `${replyCount} replies`}
+                          </button>
+                        )}
+
+                        {/* Actual replies */}
+                        <div className="space-y-0.5">
+                          {replies.map((reply) => (
+                            <MessageRow
+                              key={reply.id}
+                              message={reply}
+                              {...actionProps}
+                              isReply={true}
+                            />
+                          ))}
+                        </div>
+
+                        {/* Inline reply composer */}
+                        {isReplyingToThis && (
+                          <InlineReplyComposer
+                            parentMessage={rootMsg}
+                            channelId={channel.id}
+                            onSend={handleSendReply}
+                            onCancel={cancelReply}
+                            members={channelMembers}
+                            currentUserId={resolvedCurrentUserId}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Composer visible but thread not yet expanded (0 replies, just opened) */}
+                    {isReplyingToThis && !showThread && (
+                      <div className="ml-11 mt-1 mb-2 pl-4 border-l-2 border-[#E0E7E6] dark:border-[#2C3333]">
                         <InlineReplyComposer
                           parentMessage={rootMsg}
                           channelId={channel.id}
@@ -957,26 +1199,11 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
                           members={channelMembers}
                           currentUserId={resolvedCurrentUserId}
                         />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Composer visible but thread not yet expanded (0 replies, just opened) */}
-                  {isReplyingToThis && !showThread && (
-                    <div className="ml-11 mt-1 mb-2 pl-4 border-l-2 border-[#E0E7E6] dark:border-[#2C3333]">
-                      <InlineReplyComposer
-                        parentMessage={rootMsg}
-                        channelId={channel.id}
-                        onSend={handleSendReply}
-                        onCancel={cancelReply}
-                        members={channelMembers}
-                        currentUserId={resolvedCurrentUserId}
-                      />
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )
+              );
             })}
 
             <div ref={messagesEndRef} />
@@ -1006,8 +1233,12 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
           <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFB] dark:bg-[#242D2D] px-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#D0DCDB] dark:border-[#395B64]/60">
             <div className="flex items-center gap-2 truncate">
               <i className="fa-solid fa-paperclip text-[#395B64] dark:text-[#A5C9CA]" />
-              <span className="font-medium truncate">{attachedFile.originalName}</span>
-              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70">({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+              <span className="font-medium truncate">
+                {attachedFile.originalName}
+              </span>
+              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                ({(attachedFile.size / 1024).toFixed(1)} KB)
+              </span>
             </div>
             <button
               type="button"
@@ -1025,7 +1256,9 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
             isOpen={mention.isOpen}
             users={mention.filteredUsers}
             activeIndex={mention.activeIndex}
-            onSelect={(user) => mention.selectUser(user, composerTextareaRef.current)}
+            onSelect={(user) =>
+              mention.selectUser(user, composerTextareaRef.current)
+            }
             positionClass="bottom-full mb-2 left-0 right-0"
           />
           <FileUpload
@@ -1035,14 +1268,17 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
           <textarea
             ref={composerTextareaRef}
             value={mention.value}
-            onChange={(e) => mention.handleChange(e.target.value, e.target.selectionStart)}
+            onChange={(e) =>
+              mention.handleChange(e.target.value, e.target.selectionStart)
+            }
             onKeyDown={handleKeyDown}
             onClick={(e) => mention.handleCursorChange(e.target.selectionStart)}
             onKeyUp={(e) => mention.handleCursorChange(e.target.selectionStart)}
             placeholder={`Message #${channel.name}`}
             rows={1}
-            className="min-w-0 flex-1 resize-none bg-transparent text-sm text-[#2C3333] dark:text-[#E7F6F2] outline-none placeholder:text-[#52656A]/50 dark:placeholder:text-[#A5C9CA]/50 leading-5 py-0.5"
+            className="min-w-0 flex-1 resize-none bg-transparent text-[15px] text-[#2C3333] dark:text-[#E7F6F2] outline-none placeholder:text-[#52656A]/50 dark:placeholder:text-[#A5C9CA]/50 leading-5 py-0.5"
           />
+          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} />
           <button
             type="button"
             onClick={handleSendNewMessage}
@@ -1054,7 +1290,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ChannelMessageThread
+export default ChannelMessageThread;

@@ -15,6 +15,7 @@ import {
   isPureAttachmentMessage,
   getMessageAttachments,
 } from "../../utils/fileUtils"
+import EmojiPickerButton from "../common/EmojiPickerButton"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
@@ -64,10 +65,36 @@ const MessageThread = ({
   const [uploadError, setUploadError] = useState(null)
   // editingState: { messageId: string, draftContent: string } | null
   const [editingState, setEditingState] = useState(null)
+  const messagesContainerRef = useRef(null)
   const messagesEndRef = useRef(null)
   const mainTextareaRef = useRef(null)
   const prevCountRef = useRef(0)
   const prevUserIdRef = useRef(null)
+
+  const scrollToBottom = (behavior = "auto") => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior })
+  }
+
+  // Keep selected user synchronized with latest profile in workspace
+  const activeSelectedUser = useMemo(() => {
+    if (!selectedUser) return null
+    const sId = (selectedUser.id || selectedUser._id)?.toString()
+    const live = (workspaceData?.members || []).find(
+      (m) => (m.id || m._id || m.userId)?.toString() === sId
+    )
+    if (live) {
+      return {
+        ...selectedUser,
+        username: live.username || selectedUser.username,
+        avatar: live.avatar || live.avatarUrl || selectedUser.avatar,
+        avatarUrl: live.avatar || live.avatarUrl || selectedUser.avatarUrl,
+      }
+    }
+    return selectedUser
+  }, [selectedUser, workspaceData?.members])
 
   // DM mentionable members: all members in current workspace
   const dmMembers = useMemo(() => {
@@ -90,6 +117,8 @@ const MessageThread = ({
   // Auto-scroll to bottom only when new messages arrive or when switching conversation,
   // not when starring, unstarring, editing, or deleting existing messages.
   useEffect(() => {
+    if (loading) return
+
     const isNewUser = prevUserIdRef.current !== selectedUser?.id
     const prevCount = prevCountRef.current
     const currentCount = messages.length
@@ -98,7 +127,11 @@ const MessageThread = ({
       prevUserIdRef.current = selectedUser?.id
       prevCountRef.current = currentCount
       if (currentCount > 0) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+        scrollToBottom("auto")
+        const timer = setTimeout(() => {
+          scrollToBottom("auto")
+        }, 50)
+        return () => clearTimeout(timer)
       }
       return
     }
@@ -106,14 +139,18 @@ const MessageThread = ({
     if (currentCount > prevCount) {
       prevCountRef.current = currentCount
       if (prevCount === 0) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+        scrollToBottom("auto")
+        const timer = setTimeout(() => {
+          scrollToBottom("auto")
+        }, 50)
+        return () => clearTimeout(timer)
       } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        scrollToBottom("smooth")
       }
     } else {
       prevCountRef.current = currentCount
     }
-  }, [messages, selectedUser?.id])
+  }, [messages, selectedUser?.id, loading])
 
   const handleSendClick = () => {
     const text = inputValue.trim()
@@ -134,6 +171,23 @@ const MessageThread = ({
       e.preventDefault()
       handleSendClick()
     }
+  }
+
+  const handleEmojiSelect = (emoji) => {
+    const el = mainTextareaRef.current
+    if (!el) {
+      setInputValue((prev) => (prev || "") + emoji)
+      return
+    }
+    const start = el.selectionStart ?? inputValue.length
+    const end = el.selectionEnd ?? inputValue.length
+    const text = inputValue || ""
+    const updated = text.substring(0, start) + emoji + text.substring(end)
+    setInputValue(updated)
+    setTimeout(() => {
+      el.focus()
+      el.setSelectionRange(start + emoji.length, start + emoji.length)
+    }, 0)
   }
 
   const startEdit = (message) => {
@@ -183,20 +237,28 @@ const MessageThread = ({
           </button>
           
           <div className="relative flex-shrink-0">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white shadow-xs">
-              {selectedUser.username?.charAt(0)?.toUpperCase() || "U"}
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white shadow-xs overflow-hidden">
+              {(activeSelectedUser.avatar || activeSelectedUser.avatarUrl || activeSelectedUser.profileImage) ? (
+                <img
+                  src={activeSelectedUser.avatar || activeSelectedUser.avatarUrl || activeSelectedUser.profileImage}
+                  alt={activeSelectedUser.username}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                activeSelectedUser.username?.charAt(0)?.toUpperCase() || "U"
+              )}
             </span>
             <span
               className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white dark:ring-[#1A2121] ${
-                isUserOnline(selectedUser.id) ? "bg-emerald-500" : "bg-gray-300"
+                isUserOnline(activeSelectedUser.id) ? "bg-emerald-500" : "bg-gray-300"
               }`}
-              title={isUserOnline(selectedUser.id) ? "Online" : "Offline"}
+              title={isUserOnline(activeSelectedUser.id) ? "Online" : "Offline"}
             />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-base text-[#2C3333] dark:text-white">
-                {selectedUser.username || "User"}
+                {activeSelectedUser.username || "User"}
               </h3>
               <span
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
@@ -233,7 +295,7 @@ const MessageThread = ({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 space-y-2 overflow-y-auto p-4">
+      <div ref={messagesContainerRef} className="flex-1 space-y-2 overflow-y-auto p-4">
         {error && (
           <div className="rounded border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-2 text-sm text-rose-700 dark:text-rose-400">
             {error}
@@ -276,8 +338,8 @@ const MessageThread = ({
                   {!isSender && (
                     <div className="flex-shrink-0 mb-0.5">
                       <Avatar
-                        username={selectedUser?.username}
-                        avatar={selectedUser?.avatar || selectedUser?.avatarUrl || selectedUser?.profileImage}
+                        username={activeSelectedUser?.username}
+                        avatar={activeSelectedUser?.avatar || activeSelectedUser?.avatarUrl || activeSelectedUser?.profileImage}
                         small
                       />
                     </div>
@@ -419,15 +481,15 @@ const MessageThread = ({
                             isSender={isSender}
                             mentions={message.mentions || []}
                             currentUserId={activeUserId}
-                            className="text-sm leading-snug break-words"
+                            className="text-[15px] sm:text-base leading-relaxed break-words"
                           />
                         </div>
-                        <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none px-0.5">
+                        <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none px-0.5">
                           <span className="whitespace-nowrap">
                             {formatMessageTime(message.createdAt)}
                           </span>
                           {message.isEdited && !isDeleted && (
-                            <span className="text-[9px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                            <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
                               (edited)
                             </span>
                           )}
@@ -477,7 +539,7 @@ const MessageThread = ({
                     <div className="flex-shrink-0 mb-0.5">
                       <Avatar
                         username={user?.username || "You"}
-                        avatar={user?.avatarUrl || user?.profileImage}
+                        avatar={user?.avatar || user?.avatarUrl || user?.profileImage}
                         small
                       />
                     </div>
@@ -553,8 +615,12 @@ const MessageThread = ({
             onSelect={mention.handleInputSelect}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 resize-none rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 px-4 py-2 focus:border-[#395B64] focus:outline-none focus:ring-2 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30"
+            className="flex-1 resize-none rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 px-4 py-2 text-[15px] sm:text-base focus:border-[#395B64] focus:outline-none focus:ring-2 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30"
             rows="2"
+          />
+
+          <EmojiPickerButton
+            onEmojiSelect={handleEmojiSelect}
           />
 
           <button

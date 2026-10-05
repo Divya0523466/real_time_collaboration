@@ -39,14 +39,18 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
 
   // Load message history when user is selected
   useEffect(() => {
-    if (!currentSelectedUser || !user) {
+    if (!currentSelectedUser?.id || !user) {
       return
     }
+
+    let cancelled = false
 
     const fetchHistory = async () => {
       try {
         setLoading(true)
         setError(null)
+        setMessages([])
+        messageIdsRef.current = new Set()
 
         const token = localStorage.getItem("worknestToken")
         const response = await fetch(`${API_URL}/messages/${currentSelectedUser.id}`, { credentials: "include",
@@ -60,21 +64,30 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
         }
 
         const data = await response.json()
-        setMessages(data.messages || [])
-
-        // Reset message IDs tracker
-        messageIdsRef.current = new Set(
-          data.messages.map((msg) => msg.id.toString()),
-        )
+        if (!cancelled) {
+          const history = data.messages || []
+          setMessages(history)
+          messageIdsRef.current = new Set(
+            history.map((msg) => msg.id.toString()),
+          )
+        }
       } catch {
-        setError("Failed to load message history")
+        if (!cancelled) {
+          setError("Failed to load message history")
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     fetchHistory()
-  }, [currentSelectedUser, user, API_URL])
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentSelectedUser?.id, user, API_URL])
 
   // Handle incoming messages
   const handleDirectMessageReceived = (message) => {

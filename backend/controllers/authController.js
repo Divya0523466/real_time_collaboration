@@ -234,4 +234,46 @@ const logout = (req, res) => {
   return res.json({ message: "Logout successful" });
 };
 
-export { register, login, logout, forgotPassword, verifyOTP, resetPassword }
+const updateProfile = async (req, res) => {
+  try {
+    const { username, avatar } = req.body;
+    const userId = req.userId;
+
+    const updates = {};
+    if (username !== undefined) {
+      const trimmed = typeof username === "string" ? username.trim() : "";
+      if (!trimmed || trimmed.length < 2) {
+        return res.status(400).json({ message: "Username must be at least 2 characters long" });
+      }
+      updates.username = trimmed;
+    }
+
+    if (avatar !== undefined) {
+      updates.avatar = typeof avatar === "string" ? avatar.trim() : "";
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updates },
+      { new: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user: {
+        id: updatedUser._id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        avatar: updatedUser.avatar,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update profile", error: error.message });
+  }
+};
+
+export { register, login, logout, forgotPassword, verifyOTP, resetPassword, updateProfile }
