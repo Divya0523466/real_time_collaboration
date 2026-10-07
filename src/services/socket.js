@@ -173,5 +173,9 @@ export const requestOnlineUsers = () => {
   socket.emit("request-online-users")
 }
 
+export const forwardMessageSocket = (targetType, targetId, content = "", forwardedFrom = null) => {
+  socket.emit("forward-message", { targetType, targetId, content, forwardedFrom })
+}
+
 export default socket
 

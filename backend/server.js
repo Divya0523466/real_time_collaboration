@@ -136,12 +136,12 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("send-channel-message", async ({ channelId, content, attachments = [], replyTo = null, mentions = [] } = {}) => {
+  socket.on("send-channel-message", async ({ channelId, content, attachments = [], replyTo = null, mentions = [], forwardedFrom = null } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
-    if (!channelId || (!trimmedContent && !hasAttachments)) {
+    if (!channelId || (!trimmedContent && !hasAttachments && !forwardedFrom)) {
       socket.emit("send-channel-message-error", {
-        message: "Channel and message content or attachment are required",
+        message: "Channel and message content, attachment, or forwarded message are required",
       });
       return;
     }
@@ -199,6 +199,7 @@ io.on("connection", async (socket) => {
         attachments: formattedAttachments,
         mentions: mentionValidation.mentions,
         replyTo: validatedReplyTo,
+        forwardedFrom: forwardedFrom || null,
       });
 
       // Populate sender and replyTo parent for the broadcast payload
@@ -322,7 +323,7 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("send-direct-message", async ({ receiverId, content, attachments = [], mentions = [] } = {}) => {
+  socket.on("send-direct-message", async ({ receiverId, content, attachments = [], mentions = [], forwardedFrom = null } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
 
@@ -338,9 +339,9 @@ io.on("connection", async (socket) => {
       });
       return;
     }
-    if (!trimmedContent && !hasAttachments) {
+    if (!trimmedContent && !hasAttachments && !forwardedFrom) {
       socket.emit("send-direct-message-error", {
-        message: "Message content or attachment is required",
+        message: "Message content, attachment, or forwarded message is required",
       });
       return;
     }
@@ -395,6 +396,7 @@ io.on("connection", async (socket) => {
         content: trimmedContent,
         attachments: formattedAttachments,
         mentions: mentionValidation.mentions,
+        forwardedFrom: forwardedFrom || null,
       });
 
       const messagePayload = {
@@ -406,6 +408,7 @@ io.on("connection", async (socket) => {
         mentions: (savedMessage.mentions || []).map((m) => ({
           userId: m.userId?.toString() || m.toString(),
         })),
+        forwardedFrom: savedMessage.forwardedFrom || null,
         isRead: false,
         createdAt: savedMessage.createdAt,
       };
@@ -467,7 +470,113 @@ io.on("connection", async (socket) => {
     }
   });
 
- 
+  socket.on("forward-message", async ({ targetType, targetId, content = "", forwardedFrom } = {}) => {
+    if (!socket.userId) {
+      socket.emit("forward-message-error", { message: "Authentication required" });
+      return;
+    }
+    if (!targetType || !targetId || !forwardedFrom) {
+      socket.emit("forward-message-error", { message: "targetType, targetId, and forwardedFrom are required" });
+      return;
+    }
+
+    try {
+      const formattedAttachments = (forwardedFrom.originalAttachments || []).map((att) => ({
+        fileId: att.fileId || att.id || att._id,
+        originalName: att.originalName || "Attachment",
+        url: att.url,
+        previewUrl: att.previewUrl || "",
+        publicId: att.publicId || "",
+        resourceType: att.resourceType || "auto",
+        format: att.format || "",
+        mimeType: att.mimeType || "",
+        size: att.size || 0,
+        extension: att.extension || "",
+      }));
+
+      const formattedForwardedFrom = {
+        originalMessageId: forwardedFrom.originalMessageId ? new mongoose.Types.ObjectId(forwardedFrom.originalMessageId) : null,
+        senderId: forwardedFrom.senderId ? new mongoose.Types.ObjectId(forwardedFrom.senderId) : null,
+        senderName: forwardedFrom.senderName || "Unknown",
+        senderAvatar: forwardedFrom.senderAvatar || "",
+        originalContent: forwardedFrom.originalContent || "",
+        originalAttachments: formattedAttachments,
+        originalCreatedAt: forwardedFrom.originalCreatedAt ? new Date(forwardedFrom.originalCreatedAt) : new Date(),
+        sourceType: forwardedFrom.sourceType || "",
+        sourceName: forwardedFrom.sourceName || "",
+        sourceId: forwardedFrom.sourceId || forwardedFrom.channelId || forwardedFrom.otherUserId || "",
+      };
+
+      const trimmedContent = typeof content === "string" ? content.trim() : "";
+
+      if (targetType === "CHANNEL") {
+        const access = await getChannelAccess(socket.userId, targetId);
+        if (!access.channel) {
+          socket.emit("forward-message-error", { message: "Access denied to channel" });
+          return;
+        }
+
+        const savedMessage = await ChannelMessage.create({
+          channelId: access.channel._id,
+          senderId: socket.userId,
+          content: trimmedContent,
+          attachments: [],
+          mentions: [],
+          forwardedFrom: formattedForwardedFrom,
+        });
+
+        const populatedMessage = await ChannelMessage.findById(savedMessage._id)
+          .populate("senderId", "username avatar");
+
+        const messagePayload = formatChannelMessage(populatedMessage, socket.userId);
+
+        const room = `channel:${access.channel._id}`;
+        io.to(room).emit("receive-channel-message", messagePayload);
+        socket.emit("forward-message-success", { message: messagePayload, targetType: "CHANNEL" });
+      } else if (targetType === "DIRECT") {
+        if (socket.userId.toString() === targetId.toString()) {
+          socket.emit("forward-message-error", { message: "Cannot forward message to yourself" });
+          return;
+        }
+
+        const targetUser = await User.findById(targetId).select("_id username avatar");
+        if (!targetUser) {
+          socket.emit("forward-message-error", { message: "User not found" });
+          return;
+        }
+
+        const savedMessage = await Message.create({
+          senderId: socket.userId,
+          receiverId: targetId,
+          content: trimmedContent,
+          attachments: [],
+          mentions: [],
+          forwardedFrom: formattedForwardedFrom,
+        });
+
+        const messagePayload = {
+          id: savedMessage._id,
+          senderId: savedMessage.senderId,
+          receiverId: savedMessage.receiverId,
+          content: savedMessage.content,
+          attachments: savedMessage.attachments || [],
+          mentions: [],
+          forwardedFrom: savedMessage.forwardedFrom || null,
+          isRead: false,
+          createdAt: savedMessage.createdAt,
+        };
+
+        io.to(`user:${targetId}`).emit("receive-direct-message", messagePayload);
+        io.to(`user:${socket.userId}`).emit("direct-message-sent", messagePayload);
+        socket.emit("forward-message-success", { message: messagePayload, targetType: "DIRECT" });
+      } else {
+        socket.emit("forward-message-error", { message: "Invalid targetType" });
+      }
+    } catch {
+      socket.emit("forward-message-error", { message: "Failed to forward message" });
+    }
+  });
+
   socket.on("edit-channel-message", async ({ messageId, content, mentions } = {}) => {
     const trimmedContent = typeof content === "string" ? content.trim() : "";
     if (!messageId || !trimmedContent) {

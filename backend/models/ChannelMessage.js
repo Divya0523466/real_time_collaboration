@@ -59,6 +59,54 @@ const mentionSchema = new mongoose.Schema(
   { _id: false }
 )
 
+const forwardedFromSchema = new mongoose.Schema(
+  {
+    originalMessageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    senderName: {
+      type: String,
+      default: "",
+    },
+    senderAvatar: {
+      type: String,
+      default: "",
+    },
+    originalContent: {
+      type: String,
+      default: "",
+    },
+    originalAttachments: {
+      type: [attachmentSchema],
+      default: [],
+    },
+    originalCreatedAt: {
+      type: Date,
+      default: null,
+    },
+    sourceType: {
+      type: String,
+      enum: ["CHANNEL", "DIRECT", ""],
+      default: "",
+    },
+    sourceName: {
+      type: String,
+      default: "",
+    },
+    sourceId: {
+      type: String,
+      default: "",
+    },
+  },
+  { _id: false }
+)
+
 const channelMessageSchema = new mongoose.Schema(
   {
     channelId: {
@@ -88,6 +136,10 @@ const channelMessageSchema = new mongoose.Schema(
     replyTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ChannelMessage",
+      default: null,
+    },
+    forwardedFrom: {
+      type: forwardedFromSchema,
       default: null,
     },
     isEdited: {

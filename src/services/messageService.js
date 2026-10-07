@@ -48,6 +48,24 @@ export const markChannelAsRead = async (channelId) => {
   return data
 }
 
+export const markChannelAsUnread = async (channelId) => {
+  const token = localStorage.getItem("worknestToken")
+  if (!token || !channelId) return null
+
+  const response = await fetch(`${API_URL}/messages/channels/${channelId}/unread`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to mark channel as unread")
+  }
+
+  return data
+}
+
 export const markDirectMessagesAsRead = async (userId) => {
   const token = localStorage.getItem("worknestToken")
   if (!token || !userId) return null
@@ -60,6 +78,24 @@ export const markDirectMessagesAsRead = async (userId) => {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
     throw new Error(data.message || "Failed to mark direct messages as read")
+  }
+
+  return data
+}
+
+export const markDirectMessagesAsUnread = async (userId) => {
+  const token = localStorage.getItem("worknestToken")
+  if (!token || !userId) return null
+
+  const response = await fetch(`${API_URL}/messages/direct/${userId}/unread`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to mark direct messages as unread")
   }
 
   return data
@@ -152,3 +188,19 @@ export const markAllMentionsAsReadApi = async (workspaceId = null) => {
   }
   return data
 }
+
+export const forwardMessageApi = async ({ targetType, targetId, content = "", forwardedFrom }) => {
+  const response = await fetch(`${API_URL}/messages/forward`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ targetType, targetId, content, forwardedFrom }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to forward message")
+  }
+  return data
+}
+

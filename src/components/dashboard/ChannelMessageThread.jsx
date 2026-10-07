@@ -33,6 +33,7 @@ import { useMentionInput } from "../../hooks/useMentionInput";
 import { extractMentionIdsFromText } from "../../utils/mentionUtils";
 import AttachmentRenderer from "../common/AttachmentRenderer";
 import EmojiPickerButton from "../common/EmojiPickerButton";
+import ForwardedMessageCard from "../common/ForwardedMessageCard";
 
 const AVATAR_COLORS = [
   "#395B64",
@@ -274,6 +275,7 @@ const InlineReplyComposer = ({
 
 const MessageRow = ({
   message,
+  channel = null,
   currentUserId = null,
   currentUser = null,
   editingState = null,
@@ -286,6 +288,8 @@ const MessageRow = ({
   onStartReply,
   onDelete,
   onToggleStar,
+  onForwardMessage,
+  onNavigateSource = null,
   isReply = false,
 }) => {
   const activeUserId = (
@@ -306,6 +310,7 @@ const MessageRow = ({
   const isDeleted = message.isDeleted === true;
   const isBeingEdited = editingState?.messageId === message.id?.toString();
   const isPureAttachment = !isDeleted && isPureAttachmentMessage(message);
+  const isPureForwarded = !isDeleted && Boolean(message.forwardedFrom && !message.content?.trim());
   const attachments = getMessageAttachments(message);
   const isImageOrFile = isImageOrFileMessage(message);
 
@@ -386,6 +391,28 @@ const MessageRow = ({
             </button>
             <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
               Reply
+            </span>
+          </div>
+
+          <div className="group/tip relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onForwardMessage && onForwardMessage(message, {
+                  sourceType: "CHANNEL",
+                  sourceName: channel?.name || "",
+                  sourceId: (channel?.id || channel?._id || "")?.toString(),
+                  channelId: (channel?.id || channel?._id || "")?.toString(),
+                });
+              }}
+              aria-label="Forward message"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+            >
+              <i className="fa-solid fa-share text-[10px]" />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+              Forward
             </span>
           </div>
 
@@ -488,7 +515,7 @@ const MessageRow = ({
       ) : (
         <div
           className={`max-w-[85%] sm:max-w-[75%] md:max-w-[65%] break-words text-left ${
-            isPureAttachment
+            isPureAttachment || isPureForwarded
               ? "bg-transparent border-0 shadow-none px-0 py-0"
               : `rounded-2xl px-3 py-1.5 shadow-xs ${
                   isSender
@@ -514,40 +541,55 @@ const MessageRow = ({
 
           {/* Content and timestamp */}
           <div className="flex flex-col">
-            <div className="min-w-0 break-words leading-relaxed">
-              <MessageContent
-                content={message.content}
-                attachments={
-                  message.attachments?.length
-                    ? message.attachments
-                    : attachments
-                }
-                mentions={message.mentions || []}
-                currentUserId={activeUserId}
+            {Boolean(message.content?.trim()) && (
+              <div className="min-w-0 break-words leading-relaxed">
+                <MessageContent
+                  content={message.content}
+                  attachments={
+                    message.attachments?.length
+                      ? message.attachments
+                      : attachments
+                  }
+                  mentions={message.mentions || []}
+                  currentUserId={activeUserId}
+                  isSender={isSender}
+                  className="text-[15px] sm:text-base leading-relaxed break-words"
+                />
+              </div>
+            )}
+            {message.forwardedFrom && (
+              <ForwardedMessageCard
+                forwardedFrom={message.forwardedFrom}
                 isSender={isSender}
-                className="text-[15px] sm:text-base leading-relaxed break-words"
+                onNavigateSource={onNavigateSource}
+                timestamp={formatMessageTime(message.createdAt)}
+                isEdited={message.isEdited && !isDeleted}
+                isStarred={message.isStarred && !isDeleted && !isImageOrFile}
+                onToggleStar={() => onToggleStar && onToggleStar(message)}
               />
-            </div>
-            <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none px-0.5">
-              <span className="whitespace-nowrap">
-                {formatMessageTime(message.createdAt)}
-              </span>
-              {message.isEdited && !isDeleted && (
-                <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
-                  (edited)
+            )}
+            {!message.forwardedFrom && (
+              <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none">
+                <span className="whitespace-nowrap">
+                  {formatMessageTime(message.createdAt)}
                 </span>
-              )}
-              {message.isStarred && !isDeleted && !isImageOrFile && (
-                <button
-                  type="button"
-                  onClick={() => onToggleStar && onToggleStar(message)}
-                  title="Starred message (click to unstar)"
-                  className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
-                >
-                  <i className="fa-solid fa-star text-[9px]" />
-                </button>
-              )}
-            </div>
+                {message.isEdited && !isDeleted && (
+                  <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                    (edited)
+                  </span>
+                )}
+                {message.isStarred && !isDeleted && !isImageOrFile && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleStar && onToggleStar(message)}
+                    title="Starred message (click to unstar)"
+                    className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                  >
+                    <i className="fa-solid fa-star text-[9px]" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -598,6 +640,28 @@ const MessageRow = ({
               Reply
             </span>
           </div>
+
+          <div className="group/tip relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onForwardMessage && onForwardMessage(message, {
+                  sourceType: "CHANNEL",
+                  sourceName: channel?.name || "",
+                  sourceId: (channel?.id || channel?._id || "")?.toString(),
+                  channelId: (channel?.id || channel?._id || "")?.toString(),
+                });
+              }}
+              aria-label="Forward message"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+            >
+              <i className="fa-solid fa-share text-[10px]" />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+              Forward
+            </span>
+          </div>
         </div>
       )}
 
@@ -627,7 +691,12 @@ const ReplyCountBadge = ({ count, onClick }) => {
   );
 };
 
-const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
+const ChannelMessageThread = ({
+  channel = null,
+  currentUserId = null,
+  onForwardMessage = () => {},
+  onNavigateSource = () => {},
+}) => {
   const { workspaceData, user } = useWorkspace();
   const resolvedCurrentUserId = (
     currentUserId?._id ||
@@ -1017,6 +1086,7 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
   };
 
   const actionProps = {
+    channel,
     currentUserId: resolvedCurrentUserId,
     currentUser: user,
     editingState,
@@ -1030,6 +1100,8 @@ const ChannelMessageThread = ({ channel = null, currentUserId = null }) => {
     onStartReply: startReply,
     onDelete: handleDelete,
     onToggleStar: handleToggleStar,
+    onForwardMessage,
+    onNavigateSource,
   };
 
   if (!channel) {

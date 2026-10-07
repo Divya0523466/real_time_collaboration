@@ -21,10 +21,13 @@ import NotificationPanel from "./NotificationPanel"
 import StarredMessagesView from "./StarredMessagesView"
 import MentionsView from "./MentionsView"
 import HomeView from "./HomeView"
+import ForwardMessageModal from "./ForwardMessageModal"
 import {
   fetchUnreadMessageCounts,
   markChannelAsRead,
+  markChannelAsUnread,
   markDirectMessagesAsRead,
+  markDirectMessagesAsUnread,
 } from "../../services/messageService"
 
 export const getWorkspaceInitials = (name) => {
@@ -73,6 +76,7 @@ const SlackShell = () => {
   const [editingChannel, setEditingChannel] = useState(null)
   const [deletingChannel, setDeletingChannel] = useState(null)
   const [activeChannelMenuId, setActiveChannelMenuId] = useState(null)
+  const [activeDMMenuId, setActiveDMMenuId] = useState(null)
   const [channelDetails, setChannelDetails] = useState(null)
   const [memberToAdd, setMemberToAdd] = useState("")
   const [channelMemberActionLoading, setChannelMemberActionLoading] = useState(false)
@@ -92,6 +96,27 @@ const SlackShell = () => {
   const [selectedDMUser, setSelectedDMUser] = useState(null)
   const [unreadDMCounts, setUnreadDMCounts] = useState({})
   const [unreadChannelCounts, setUnreadChannelCounts] = useState({})
+  const [forwardModalData, setForwardModalData] = useState({
+    isOpen: false,
+    message: null,
+    sourceContext: null,
+  })
+
+  const handleOpenForwardModal = (message, sourceContext) => {
+    setForwardModalData({
+      isOpen: true,
+      message,
+      sourceContext,
+    })
+  }
+
+  const handleCloseForwardModal = () => {
+    setForwardModalData({
+      isOpen: false,
+      message: null,
+      sourceContext: null,
+    })
+  }
   const joinedChannelIdsRef = useRef(new Set())
 
   const unreadMentionsCount = useMemo(() => {
@@ -210,6 +235,173 @@ const SlackShell = () => {
   const directMessageMembers = workspaceMembers.filter(
     (member) => member.id?.toString() !== user?.id?.toString(),
   )
+
+  const totalUnreadChannelsCount = useMemo(() => {
+    return Object.values(unreadChannelCounts).reduce(
+      (acc, count) => acc + (typeof count === "number" && count > 0 ? count : 0),
+      0
+    )
+  }, [unreadChannelCounts])
+
+  const totalUnreadDMsCount = useMemo(() => {
+    return Object.values(unreadDMCounts).reduce(
+      (acc, count) => acc + (typeof count === "number" && count > 0 ? count : 0),
+      0
+    )
+  }, [unreadDMCounts])
+
+  const handleForwardSuccess = (result) => {
+    handleCloseForwardModal()
+    if (!result?.target) return
+
+    const wsId =
+      workspaceId ||
+      selectedWorkspace ||
+      workspaceData?.id ||
+      workspaceData?._id
+
+    setIsHomeView(false)
+    setIsStarredView(false)
+    setIsMentionsView(false)
+    setShowDetailsPane(false)
+    setActiveChannelMenuId(null)
+    setIsMobileSidebarOpen(false)
+
+    if (result.target.type === "CHANNEL") {
+      setSelectedDMUser(null)
+      navigate(`/app/workspace/${wsId}/channel/${result.target.id}`)
+    } else if (result.target.type === "DIRECT") {
+      const found = workspaceMembers.find(
+        (m) => (m.id || m._id)?.toString() === result.target.id?.toString()
+      )
+      setSelectedDMUser(
+        found || {
+          id: result.target.id,
+          username: result.target.name,
+          avatar: result.target.avatar,
+        }
+      )
+      navigate(`/app/workspace/${wsId}`)
+    }
+  }
+
+  const handleNavigateSource = (forwardedFrom) => {
+    if (!forwardedFrom) return
+
+    const wsId =
+      workspaceId ||
+      selectedWorkspace ||
+      workspaceData?.id ||
+      workspaceData?._id
+
+    const rawType = (forwardedFrom.sourceType || "").toUpperCase()
+    const rawId = (
+      forwardedFrom.sourceId ||
+      forwardedFrom.channelId ||
+      forwardedFrom.otherUserId ||
+      (forwardedFrom.senderId?._id || forwardedFrom.senderId) ||
+      ""
+    )?.toString()
+
+    const rawName = (forwardedFrom.sourceName || forwardedFrom.senderName || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^[#@]/, "")
+
+    // 1. Try finding in channels if rawType is CHANNEL or if not specified
+    let targetChannel = null
+    if (rawType === "CHANNEL" || !rawType) {
+      if (rawId) {
+        targetChannel = channels.find(
+          (c) => (c.id || c._id)?.toString() === rawId
+        )
+      }
+      if (!targetChannel && rawName) {
+        targetChannel = channels.find(
+          (c) => (c.name || "").toLowerCase().replace(/^[#@]/, "") === rawName
+        )
+      }
+    }
+
+    if (targetChannel) {
+      const targetChannelId = (targetChannel.id || targetChannel._id)?.toString()
+      setIsHomeView(false)
+      setIsStarredView(false)
+      setIsMentionsView(false)
+      setSelectedDMUser(null)
+      setShowDetailsPane(false)
+      setActiveChannelMenuId(null)
+      setIsMobileSidebarOpen(false)
+      navigate(`/app/workspace/${wsId}/channel/${targetChannelId}`)
+      return
+    }
+
+    // 2. Try finding member for direct message
+    let targetMember = null
+    const currentUserId = (user?.id || user?._id)?.toString()
+    let targetUserId = rawId
+
+    if (targetUserId && targetUserId === currentUserId) {
+      const origSenderId = (
+        forwardedFrom.senderId?._id || forwardedFrom.senderId
+      )?.toString()
+      if (origSenderId && origSenderId !== currentUserId) {
+        targetUserId = origSenderId
+      }
+    }
+
+    if (targetUserId) {
+      targetMember = workspaceMembers.find(
+        (m) => (m.id || m._id)?.toString() === targetUserId
+      )
+    }
+
+    if (!targetMember && rawName) {
+      targetMember = workspaceMembers.find(
+        (m) =>
+          (m.username || "").toLowerCase().replace(/^[#@]/, "") === rawName ||
+          (m.displayName || "").toLowerCase().replace(/^[#@]/, "") === rawName
+      )
+    }
+
+    if (targetMember) {
+      setIsHomeView(false)
+      setIsStarredView(false)
+      setIsMentionsView(false)
+      setSelectedDMUser(targetMember)
+      setShowDetailsPane(false)
+      setActiveChannelMenuId(null)
+      setIsMobileSidebarOpen(false)
+      navigate(`/app/workspace/${wsId}`)
+      return
+    }
+
+    // 3. Fallback: if rawType is CHANNEL but not in accessible channels
+    if (rawType === "CHANNEL") {
+      toast.info(
+        rawName
+          ? `You do not have access to #${rawName}`
+          : "You do not have access to this private channel"
+      )
+      return
+    }
+
+    // 4. Fallback for DM: open with available user ID
+    if (rawId) {
+      setIsHomeView(false)
+      setIsStarredView(false)
+      setIsMentionsView(false)
+      setSelectedDMUser({
+        id: rawId,
+        username: forwardedFrom.sourceName || forwardedFrom.senderName || "User",
+        avatar: forwardedFrom.senderAvatar || null,
+      })
+      setShowDetailsPane(false)
+      setActiveChannelMenuId(null)
+      setIsMobileSidebarOpen(false)
+      navigate(`/app/workspace/${wsId}`)
+    }
+  }
 
   useEffect(() => {
     const handleDirectMessage = (message) => {
@@ -342,8 +534,73 @@ const SlackShell = () => {
     })
     markChannelAsRead(chan.id).catch(() => {})
     setActiveChannelMenuId(null)
+    setActiveDMMenuId(null)
     setIsMobileSidebarOpen(false)
     navigate(`/app/workspace/${workspaceId}/channel/${chan.id}`)
+  }
+
+  const handleToggleChannelRead = async (chan, e) => {
+    e?.stopPropagation()
+    setActiveChannelMenuId(null)
+    const chanIdStr = chan.id.toString()
+    const isCurrentlyUnread = (unreadChannelCounts[chanIdStr] || 0) > 0
+
+    if (isCurrentlyUnread) {
+      // Mark as read
+      setUnreadChannelCounts((counts) => {
+        const next = { ...counts }
+        delete next[chanIdStr]
+        return next
+      })
+      try {
+        await markChannelAsRead(chan.id)
+      } catch (err) {
+        console.error("Failed to mark channel as read:", err)
+      }
+    } else {
+      // Mark as unread
+      setUnreadChannelCounts((counts) => ({
+        ...counts,
+        [chanIdStr]: 1,
+      }))
+      try {
+        await markChannelAsUnread(chan.id)
+      } catch (err) {
+        console.error("Failed to mark channel as unread:", err)
+      }
+    }
+  }
+
+  const handleToggleDMRead = async (member, e) => {
+    e?.stopPropagation()
+    setActiveDMMenuId(null)
+    const memberIdStr = member.id.toString()
+    const isCurrentlyUnread = (unreadDMCounts[memberIdStr] || 0) > 0
+
+    if (isCurrentlyUnread) {
+      // Mark as read
+      setUnreadDMCounts((counts) => {
+        const next = { ...counts }
+        delete next[memberIdStr]
+        return next
+      })
+      try {
+        await markDirectMessagesAsRead(member.id)
+      } catch (err) {
+        console.error("Failed to mark DM as read:", err)
+      }
+    } else {
+      // Mark as unread
+      setUnreadDMCounts((counts) => ({
+        ...counts,
+        [memberIdStr]: 1,
+      }))
+      try {
+        await markDirectMessagesAsUnread(member.id)
+      } catch (err) {
+        console.error("Failed to mark DM as unread:", err)
+      }
+    }
   }
 
   const handleChannelDeleted = () => {
@@ -726,10 +983,15 @@ const SlackShell = () => {
                 <button
                   type="button"
                   onClick={() => setIsChannelsCollapsed((prev) => !prev)}
-                  className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#A5C9CA] hover:text-white transition"
+                  className="group flex items-center gap-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
                 >
-                  <i className={`fa-solid fa-chevron-${isChannelsCollapsed ? "right" : "down"} text-[9px] w-3`} />
+                  <i className={`fa-solid fa-chevron-${isChannelsCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
                   <span>Channels</span>
+                  {totalUnreadChannelsCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white bg-emerald-600/90 rounded-full shadow-xs">
+                      {totalUnreadChannelsCount}
+                    </span>
+                  )}
                 </button>
                 {permissions.canCreateChannels && (
                   <button
@@ -751,29 +1013,76 @@ const SlackShell = () => {
                   ) : (
                     channels.map((chan) => {
                       const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView
+                      const isMenuOpen = activeChannelMenuId === chan.id
+                      const isUnread = (unreadChannelCounts[chan.id.toString()] || 0) > 0
                       return (
-                        <div
-                          key={chan.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleSelectChannel(chan)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectChannel(chan) } }}
-                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
-                            isActive
-                              ? "bg-[#395B64] text-white shadow-xs font-semibold"
-                              : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
-                          }`}
-                        >
-                          {chan.type === "PRIVATE" ? (
-                            <i className="fa-solid fa-lock text-[10px] text-[#A5C9CA] w-3.5" />
-                          ) : (
-                            <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center">#</span>
-                          )}
-                          <span className="min-w-0 flex-1 truncate">{chan.name}</span>
-                          {unreadChannelCounts[chan.id.toString()] > 0 && (
-                            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                              {unreadChannelCounts[chan.id.toString()] > 99 ? "99+" : unreadChannelCounts[chan.id.toString()]}
-                            </span>
+                        <div key={chan.id} className="relative group">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleSelectChannel(chan)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectChannel(chan) } }}
+                            className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                              isActive
+                                ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                                : isUnread
+                                ? "text-white font-semibold hover:bg-[#2C3333]"
+                                : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                            }`}
+                          >
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              {chan.type === "PRIVATE" ? (
+                                <i className="fa-solid fa-lock text-[10px] text-[#A5C9CA] w-3.5" />
+                              ) : (
+                                <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center">#</span>
+                              )}
+                              <span className="min-w-0 flex-1 truncate">{chan.name}</span>
+                              {isUnread && (
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs" title="Unread messages" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleChannelRead(chan, e)}
+                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                  isMenuOpen ? "flex" : "hidden group-hover:flex"
+                                }`}
+                                title={isUnread ? "Mark as read" : "Mark as unread"}
+                              >
+                                <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveChannelMenuId(isMenuOpen ? null : chan.id)
+                                }}
+                                className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
+                                title="Channel options"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {isMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setActiveChannelMenuId(null)}
+                              />
+                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-44 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleChannelRead(chan, e)}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                                >
+                                  <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`} />
+                                  {isUnread ? "Mark as read" : "Mark as unread"}
+                                </button>
+                              </div>
+                            </>
                           )}
                         </div>
                       )
@@ -788,10 +1097,15 @@ const SlackShell = () => {
                 <button
                   type="button"
                   onClick={() => setIsDMsCollapsed((prev) => !prev)}
-                  className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#A5C9CA] hover:text-white transition"
+                  className="group flex items-center gap-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
                 >
-                  <i className={`fa-solid fa-chevron-${isDMsCollapsed ? "right" : "down"} text-[9px] w-3`} />
+                  <i className={`fa-solid fa-chevron-${isDMsCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
                   <span>Direct Messages</span>
+                  {totalUnreadDMsCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white bg-emerald-600/90 rounded-full shadow-xs">
+                      {totalUnreadDMsCount}
+                    </span>
+                  )}
                 </button>
               </div>
               {!isDMsCollapsed && (
@@ -799,41 +1113,105 @@ const SlackShell = () => {
                   {directMessageMembers.length > 0 ? (
                     directMessageMembers.map((member) => {
                       const isSelected = selectedDMUser?.id === member.id
+                      const isMenuOpen = activeDMMenuId === member.id
+                      const isUnread = (unreadDMCounts[member.id?.toString()] || 0) > 0
                       return (
-                        <button
-                          key={member.id}
-                          type="button"
-                          onClick={() => {
-                            setIsHomeView(false)
-                            setIsStarredView(false)
-                            setIsMentionsView(false)
-                            setSelectedDMUser(member)
-                            setShowDetailsPane(false)
-                            setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
-                            markDirectMessagesAsRead(member.id).catch(() => {})
-                            setActiveChannelMenuId(null)
-                            setIsMobileSidebarOpen(false)
-                          }}
-                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
-                            isSelected ? "bg-[#395B64] text-white font-semibold" : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
-                          }`}
-                        >
-                          <span className="relative flex-shrink-0">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
-                              {member.username?.charAt(0)?.toUpperCase() || "U"}
+                        <div key={member.id} className="relative group">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              setIsHomeView(false)
+                              setIsStarredView(false)
+                              setIsMentionsView(false)
+                              setSelectedDMUser(member)
+                              setShowDetailsPane(false)
+                              setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
+                              markDirectMessagesAsRead(member.id).catch(() => {})
+                              setActiveChannelMenuId(null)
+                              setActiveDMMenuId(null)
+                              setIsMobileSidebarOpen(false)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                setIsHomeView(false)
+                                setIsStarredView(false)
+                                setIsMentionsView(false)
+                                setSelectedDMUser(member)
+                                setShowDetailsPane(false)
+                                setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
+                                markDirectMessagesAsRead(member.id).catch(() => {})
+                                setActiveChannelMenuId(null)
+                                setActiveDMMenuId(null)
+                                setIsMobileSidebarOpen(false)
+                              }
+                            }}
+                            className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs transition cursor-pointer ${
+                              isSelected
+                                ? "bg-[#395B64] text-white font-semibold"
+                                : isUnread
+                                ? "text-white font-semibold hover:bg-[#2C3333]"
+                                : "text-[#A5C9CA]/90 font-medium hover:bg-[#2C3333] hover:text-white"
+                            }`}
+                          >
+                            <span className="relative flex-shrink-0">
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white">
+                                {member.username?.charAt(0)?.toUpperCase() || "U"}
+                              </span>
+                              <span
+                                className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"}`}
+                                title={isUserOnline(member.id) ? "Online" : "Offline"}
+                              />
                             </span>
-                            <span
-                              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"}`}
-                              title={isUserOnline(member.id) ? "Online" : "Offline"}
-                            />
-                          </span>
-                          <span className="min-w-0 flex-1 truncate">{member.username}</span>
-                          {unreadDMCounts[member.id?.toString()] > 0 && (
-                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                              {unreadDMCounts[member.id.toString()] > 99 ? "99+" : unreadDMCounts[member.id.toString()]}
-                            </span>
+                            <span className="min-w-0 flex-1 truncate">{member.username}</span>
+                            {isUnread && (
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs" title="Unread messages" />
+                            )}
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleDMRead(member, e)}
+                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                  isMenuOpen ? "flex" : "hidden group-hover:flex"
+                                }`}
+                                title={isUnread ? "Mark as read" : "Mark as unread"}
+                              >
+                                <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveDMMenuId(isMenuOpen ? null : member.id)
+                                }}
+                                className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
+                                title="DM options"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {isMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setActiveDMMenuId(null)}
+                              />
+                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-44 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleDMRead(member, e)}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                                >
+                                  <i className={`fa-regular ${(unreadDMCounts[member.id?.toString()] || 0) > 0 ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`} />
+                                  {(unreadDMCounts[member.id?.toString()] || 0) > 0 ? "Mark as read" : "Mark as unread"}
+                                </button>
+                              </div>
+                            </>
                           )}
-                        </button>
+                        </div>
                       )
                     })
                   ) : (
@@ -1178,10 +1556,15 @@ const SlackShell = () => {
               <button
                 type="button"
                 onClick={() => setIsChannelsCollapsed((prev) => !prev)}
-                className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#A5C9CA] hover:text-white transition"
+                className="group flex items-center gap-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
               >
-                <i className={`fa-solid fa-chevron-${isChannelsCollapsed ? "right" : "down"} text-[9px] w-3`} />
+                <i className={`fa-solid fa-chevron-${isChannelsCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
                 <span>Channels</span>
+                {totalUnreadChannelsCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white bg-emerald-600/90 rounded-full shadow-xs">
+                    {totalUnreadChannelsCount}
+                  </span>
+                )}
               </button>
               {permissions.canCreateChannels && (
                 <button
@@ -1205,6 +1588,7 @@ const SlackShell = () => {
                   channels.map((chan) => {
                     const isActive = currentChannel?.id === chan.id && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView
                     const isMenuOpen = activeChannelMenuId === chan.id
+                    const isUnread = (unreadChannelCounts[chan.id.toString()] || 0) > 0
                     return (
                       <div key={chan.id} className="relative group">
                         <div
@@ -1217,10 +1601,12 @@ const SlackShell = () => {
                               handleSelectChannel(chan)
                             }
                           }}
-                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-md font-medium transition ${
+                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm transition ${
                             isActive
                               ? "bg-[#395B64] text-white shadow-xs font-semibold"
-                              : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                              : isUnread
+                              ? "text-white font-semibold hover:bg-[#2C3333]"
+                              : "text-[#A5C9CA]/90 font-medium hover:bg-[#2C3333] hover:text-white"
                           }`}
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1230,30 +1616,38 @@ const SlackShell = () => {
                               <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center">#</span>
                             )}
                             <span className="min-w-0 flex-1 truncate">{chan.name}</span>
-                            {unreadChannelCounts[chan.id.toString()] > 0 && (
-                              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                                {unreadChannelCounts[chan.id.toString()] > 99
-                                  ? "99+"
-                                  : unreadChannelCounts[chan.id.toString()]}
-                              </span>
+                            {isUnread && (
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs" title="Unread messages" />
                             )}
                           </div>
-                          {/* Channel action buttons */}
-                          {(selectedRole === "OWNER" || selectedRole === "ADMIN") && (
+                          {/* Channel action buttons: Read/unread toggle button visible ONLY on hover (or when menu is open) */}
+                          <div className="flex items-center gap-0.5 shrink-0">
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setActiveChannelMenuId(isMenuOpen ? null : chan.id)
-                              }}
+                              onClick={(e) => handleToggleChannelRead(chan, e)}
                               className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
                                 isMenuOpen ? "flex" : "hidden group-hover:flex"
                               }`}
-                              title="Channel options"
+                              title={isUnread ? "Mark as read" : "Mark as unread"}
                             >
-                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                              <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`} />
                             </button>
-                          )}
+                            {(selectedRole === "OWNER" || selectedRole === "ADMIN") && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveChannelMenuId(isMenuOpen ? null : chan.id)
+                                }}
+                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                  isMenuOpen ? "flex" : "hidden group-hover:flex"
+                                }`}
+                                title="Channel options"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* Channel Context Menu */}
@@ -1264,29 +1658,44 @@ const SlackShell = () => {
                               onClick={() => setActiveChannelMenuId(null)}
                             />
                             <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-44 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs">
+                              {/* Toggle Read / Unread */}
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setEditingChannel(chan)
-                                  setActiveChannelMenuId(null)
-                                }}
+                                onClick={(e) => handleToggleChannelRead(chan, e)}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                               >
-                                <i className="fa-solid fa-pen-to-square text-[#A5C9CA] w-3.5" />
-                                Edit channel
+                                <i className={`fa-regular ${(unreadChannelCounts[chan.id.toString()] || 0) > 0 ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`} />
+                                {(unreadChannelCounts[chan.id.toString()] || 0) > 0 ? "Mark as read" : "Mark as unread"}
                               </button>
-                              {channels.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDeletingChannel(chan)
-                                    setActiveChannelMenuId(null)
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                >
-                                  <i className="fa-solid fa-trash-can w-3.5" />
-                                  Delete channel
-                                </button>
+
+                              {(selectedRole === "OWNER" || selectedRole === "ADMIN") && (
+                                <>
+                                  <div className="h-px bg-[#395B64]/50 my-1" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingChannel(chan)
+                                      setActiveChannelMenuId(null)
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                                  >
+                                    <i className="fa-solid fa-pen-to-square text-[#A5C9CA] w-3.5" />
+                                    Edit channel
+                                  </button>
+                                  {channels.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDeletingChannel(chan)
+                                        setActiveChannelMenuId(null)
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
+                                    >
+                                      <i className="fa-solid fa-trash-can w-3.5" />
+                                      Delete channel
+                                    </button>
+                                  )}
+                                </>
                               )}
                             </div>
                           </>
@@ -1303,10 +1712,15 @@ const SlackShell = () => {
               <button
                 type="button"
                 onClick={() => setIsDMsCollapsed((prev) => !prev)}
-                className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#A5C9CA] hover:text-white transition"
+                className="group flex items-center gap-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
               >
-                <i className={`fa-solid fa-chevron-${isDMsCollapsed ? "right" : "down"} text-[9px] w-3`} />
+                <i className={`fa-solid fa-chevron-${isDMsCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
                 <span>Direct Messages</span>
+                {totalUnreadDMsCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white bg-emerald-600/90 rounded-full shadow-xs">
+                    {totalUnreadDMsCount}
+                  </span>
+                )}
               </button>
               {selectedRole === "OWNER" && (
                 <button
@@ -1325,57 +1739,126 @@ const SlackShell = () => {
                 {directMessageMembers.length > 0 ? (
                   directMessageMembers.map((member) => {
                     const isSelected = selectedDMUser?.id === member.id
+                    const isMenuOpen = activeDMMenuId === member.id
+                    const isUnread = (unreadDMCounts[member.id?.toString()] || 0) > 0
                     return (
-                      <button
-                        key={member.id}
-                        type="button"
-                        onClick={() => {
-                          setIsHomeView(false)
-                          setIsStarredView(false)
-                          setIsMentionsView(false)
-                          setSelectedDMUser(member)
-                          setShowDetailsPane(false)
-                          setUnreadDMCounts((counts) => {
-                            const nextCounts = { ...counts }
-                            delete nextCounts[member.id?.toString()]
-                            return nextCounts
-                          })
-                          markDirectMessagesAsRead(member.id).catch(() => {})
-                          setActiveChannelMenuId(null)
-                          setIsMobileSidebarOpen(false)
-                        }}
-                        className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs font-medium transition ${
-                          isSelected
-                            ? "bg-[#395B64] text-white font-semibold"
-                            : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
-                        }`}
-                      >
-                        <span className="relative flex-shrink-0">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
-                            {(member.avatar || member.avatarUrl) ? (
-                              <img src={member.avatar || member.avatarUrl} alt={member.username} className="h-full w-full object-cover" />
-                            ) : (
-                              member.username?.charAt(0)?.toUpperCase() || "U"
-                            )}
+                      <div key={member.id} className="relative group">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setIsHomeView(false)
+                            setIsStarredView(false)
+                            setIsMentionsView(false)
+                            setSelectedDMUser(member)
+                            setShowDetailsPane(false)
+                            setUnreadDMCounts((counts) => {
+                              const nextCounts = { ...counts }
+                              delete nextCounts[member.id?.toString()]
+                              return nextCounts
+                            })
+                            markDirectMessagesAsRead(member.id).catch(() => {})
+                            setActiveChannelMenuId(null)
+                            setActiveDMMenuId(null)
+                            setIsMobileSidebarOpen(false)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault()
+                              setIsHomeView(false)
+                              setIsStarredView(false)
+                              setIsMentionsView(false)
+                              setSelectedDMUser(member)
+                              setShowDetailsPane(false)
+                              setUnreadDMCounts((counts) => {
+                                const nextCounts = { ...counts }
+                                delete nextCounts[member.id?.toString()]
+                                return nextCounts
+                              })
+                              markDirectMessagesAsRead(member.id).catch(() => {})
+                              setActiveChannelMenuId(null)
+                              setActiveDMMenuId(null)
+                              setIsMobileSidebarOpen(false)
+                            }
+                          }}
+                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-xs transition cursor-pointer ${
+                            isSelected
+                              ? "bg-[#395B64] text-white font-semibold"
+                              : isUnread
+                              ? "text-white font-semibold hover:bg-[#2C3333]"
+                              : "text-[#A5C9CA]/90 font-medium hover:bg-[#2C3333] hover:text-white"
+                          }`}
+                        >
+                          <span className="relative flex-shrink-0">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
+                              {(member.avatar || member.avatarUrl) ? (
+                                <img src={member.avatar || member.avatarUrl} alt={member.username} className="h-full w-full object-cover" />
+                              ) : (
+                                member.username?.charAt(0)?.toUpperCase() || "U"
+                              )}
+                            </span>
+                            <span
+                              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${
+                                isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"
+                              }`}
+                              title={isUserOnline(member.id) ? "Online" : "Offline"}
+                            />
                           </span>
-                          <span
-                            className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${
-                              isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"
-                            }`}
-                            title={isUserOnline(member.id) ? "Online" : "Offline"}
-                          />
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">
-                          {member.username}
-                        </span>
-                        {unreadDMCounts[member.id?.toString()] > 0 && (
-                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                            {unreadDMCounts[member.id.toString()] > 99
-                              ? "99+"
-                              : unreadDMCounts[member.id.toString()]}
+                          <span className="min-w-0 flex-1 truncate">
+                            {member.username}
                           </span>
+                          {isUnread && (
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs" title="Unread messages" />
+                          )}
+                          {/* DM action buttons: Read/unread toggle button visible ONLY on hover (or when menu is open) */}
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleDMRead(member, e)}
+                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                isMenuOpen ? "flex" : "hidden group-hover:flex"
+                              }`}
+                              title={isUnread ? "Mark as read" : "Mark as unread"}
+                            >
+                              <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActiveDMMenuId(isMenuOpen ? null : member.id)
+                              }}
+                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                isMenuOpen ? "flex" : "hidden group-hover:flex"
+                              }`}
+                              title="DM options"
+                            >
+                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* DM Context Menu */}
+                        {isMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setActiveDMMenuId(null)}
+                            />
+                            <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-44 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs">
+                              {/* Toggle Read / Unread */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleDMRead(member, e)}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                              >
+                                <i className={`fa-regular ${(unreadDMCounts[member.id?.toString()] || 0) > 0 ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`} />
+                                {(unreadDMCounts[member.id?.toString()] || 0) > 0 ? "Mark as read" : "Mark as unread"}
+                              </button>
+                            </div>
+                          </>
                         )}
-                      </button>
+                      </div>
                     )
                     })
                 ) : (
@@ -1502,6 +1985,8 @@ const SlackShell = () => {
                   setSelectedDMUser(found || { id: otherUserId, username: "User" })
                 }
               }}
+              onForwardMessage={handleOpenForwardModal}
+              onNavigateSource={handleNavigateSource}
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
             />
           ) : isMentionsView ? (
@@ -1535,9 +2020,16 @@ const SlackShell = () => {
             <DirectMessaging 
               externalSelectedUser={selectedDMUser} 
               onOpenSidebar={() => setIsMobileSidebarOpen(true)} 
+              onForwardMessage={handleOpenForwardModal}
+              onNavigateSource={handleNavigateSource}
             />
           ) : (
-            <ChannelMessageThread channel={activeChannel || currentChannel} currentUserId={user?.id || user?._id} />
+            <ChannelMessageThread
+              channel={activeChannel || currentChannel}
+              currentUserId={user?.id || user?._id}
+              onForwardMessage={handleOpenForwardModal}
+              onNavigateSource={handleNavigateSource}
+            />
           )}
 
           {/* Mobile backdrop for Details Pane */}
@@ -1766,6 +2258,19 @@ const SlackShell = () => {
       {showEditProfileModal && (
         <ProfileModal
           onClose={() => setShowEditProfileModal(false)}
+        />
+      )}
+
+      {/* Forward Message Modal */}
+      {forwardModalData.isOpen && (
+        <ForwardMessageModal
+          isOpen={forwardModalData.isOpen}
+          onClose={handleCloseForwardModal}
+          message={forwardModalData.message}
+          sourceContext={forwardModalData.sourceContext}
+          channels={channels}
+          members={workspaceMembers}
+          onForwardSuccess={handleForwardSuccess}
         />
       )}
 

@@ -98,7 +98,8 @@ const getDirectMessages = async (req, res) => {
         { senderId: otherUserId, receiverId: currentUserId },
       ],
     })
-      .select("_id senderId receiverId content attachments mentions createdAt updatedAt isEdited isDeleted isRead starredBy")
+      .populate("senderId", "username avatar")
+      .select("_id senderId receiverId content attachments mentions forwardedFrom createdAt updatedAt isEdited isDeleted isRead starredBy")
       .sort({ createdAt: 1 })
 
     const populatedMessages = await populateLegacyMessageAttachments(messages);
@@ -112,7 +113,14 @@ const getDirectMessages = async (req, res) => {
     return res.json({
       messages: populatedMessages.map((msg) => ({
         id: msg._id,
-        senderId: msg.senderId,
+        senderId: msg.senderId?._id || msg.senderId,
+        sender: msg.senderId?._id
+          ? {
+              id: msg.senderId._id,
+              username: msg.senderId.username,
+              avatar: msg.senderId.avatar,
+            }
+          : undefined,
         receiverId: msg.receiverId,
         content: msg.isDeleted ? null : msg.content,
         attachments: msg.isDeleted ? [] : (msg.attachments || []),
@@ -121,6 +129,7 @@ const getDirectMessages = async (req, res) => {
           : (msg.mentions || []).map((m) => ({
               userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
             })),
+        forwardedFrom: msg.isDeleted ? null : (msg.forwardedFrom || null),
         createdAt: msg.createdAt,
         updatedAt: msg.updatedAt,
         isEdited: msg.isEdited || false,
@@ -187,6 +196,7 @@ const formatChannelMessage = (message, currentUserId = null) => ({
       })),
   replyTo: message.replyTo?._id || message.replyTo || null,
   replyToMessage: buildReplyToMessage(message.replyTo?._id ? message.replyTo : null),
+  forwardedFrom: message.isDeleted ? null : (message.forwardedFrom || null),
   isEdited: message.isEdited || false,
   isDeleted: message.isDeleted || false,
   isStarred: Boolean(
@@ -357,6 +367,30 @@ const markChannelAsRead = async (req, res) => {
   }
 }
 
+const markChannelAsUnread = async (req, res) => {
+  try {
+    const { channelId } = req.params
+    const userId = req.userId
+
+    const access = await getChannelAccess(userId, channelId)
+    if (!access.channel) {
+      return res.status(403).json({ message: "Access denied to channel" })
+    }
+
+    // Set lastReadAt to past (epoch 0) so all messages are considered unread
+    const past = new Date(0)
+    await ChannelReadState.findOneAndUpdate(
+      { channelId, userId },
+      { $set: { lastReadAt: past } },
+      { upsert: true, new: true }
+    )
+
+    return res.json({ success: true, channelId, lastReadAt: past })
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message })
+  }
+}
+
 const markDirectMessagesAsRead = async (req, res) => {
   try {
     const { userId: senderUserId } = req.params
@@ -386,6 +420,33 @@ const markDirectMessagesAsRead = async (req, res) => {
       },
       { $set: { isRead: true } }
     )
+
+    return res.json({ success: true })
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message })
+  }
+}
+
+const markDirectMessagesAsUnread = async (req, res) => {
+  try {
+    const { userId: senderUserId } = req.params
+    const currentUserId = req.userId
+
+    if (!mongoose.isValidObjectId(senderUserId)) {
+      return res.status(400).json({ message: "Invalid user ID" })
+    }
+
+    // Find the latest message between senderUserId and currentUserId (or received from senderUserId)
+    const latestMessage = await Message.findOne({
+      senderId: senderUserId,
+      receiverId: currentUserId,
+      isDeleted: false,
+    }).sort({ createdAt: -1 })
+
+    if (latestMessage) {
+      latestMessage.isRead = false
+      await latestMessage.save()
+    }
 
     return res.json({ success: true })
   } catch (error) {
@@ -914,6 +975,155 @@ const markAllMentionsAsRead = async (req, res) => {
   }
 };
 
+const forwardMessage = async (req, res) => {
+  try {
+    const currentUserId = req.userId;
+    const { targetType, targetId, content = "", forwardedFrom } = req.body;
+
+    if (!targetType || !targetId || !forwardedFrom) {
+      return res.status(400).json({ message: "targetType, targetId, and forwardedFrom are required" });
+    }
+
+    if (!["CHANNEL", "DIRECT"].includes(targetType)) {
+      return res.status(400).json({ message: "Invalid targetType. Must be CHANNEL or DIRECT." });
+    }
+
+    const io = req.app.get("io");
+    const currentUser = await User.findById(currentUserId).select("username avatar").lean();
+    const senderName = currentUser?.username || "Someone";
+
+    const formattedAttachments = (forwardedFrom.originalAttachments || []).map((att) => ({
+      fileId: att.fileId || att.id || att._id,
+      originalName: att.originalName || "Attachment",
+      url: att.url,
+      previewUrl: att.previewUrl || "",
+      publicId: att.publicId || "",
+      resourceType: att.resourceType || "auto",
+      format: att.format || "",
+      mimeType: att.mimeType || "",
+      size: att.size || 0,
+      extension: att.extension || "",
+    }));
+
+    let origSenderName = forwardedFrom.senderName || "";
+    let origSenderAvatar = forwardedFrom.senderAvatar || "";
+
+    if (forwardedFrom.senderId && (!origSenderName || origSenderName === "User" || origSenderName === "Unknown")) {
+      try {
+        const origUser = await User.findById(forwardedFrom.senderId).select("username avatar").lean();
+        if (origUser) {
+          origSenderName = origUser.username || origSenderName;
+          origSenderAvatar = origUser.avatar || origSenderAvatar;
+        }
+      } catch (err) {
+        console.warn("Could not populate original sender:", err.message);
+      }
+    }
+
+    const formattedForwardedFrom = {
+      originalMessageId: forwardedFrom.originalMessageId ? new mongoose.Types.ObjectId(forwardedFrom.originalMessageId) : null,
+      senderId: forwardedFrom.senderId ? new mongoose.Types.ObjectId(forwardedFrom.senderId) : null,
+      senderName: origSenderName || "User",
+      senderAvatar: origSenderAvatar || "",
+      originalContent: forwardedFrom.originalContent || "",
+      originalAttachments: formattedAttachments,
+      originalCreatedAt: forwardedFrom.originalCreatedAt ? new Date(forwardedFrom.originalCreatedAt) : new Date(),
+      sourceType: forwardedFrom.sourceType || "",
+      sourceName: forwardedFrom.sourceName || "",
+      sourceId: forwardedFrom.sourceId || forwardedFrom.channelId || forwardedFrom.otherUserId || "",
+    };
+
+    const trimmedContent = typeof content === "string" ? content.trim() : "";
+
+    if (targetType === "CHANNEL") {
+      const access = await getChannelAccess(currentUserId, targetId);
+      if (!access.channel) {
+        return res.status(403).json({ message: "Access denied to target channel" });
+      }
+
+      const savedMessage = await ChannelMessage.create({
+        channelId: access.channel._id,
+        senderId: currentUserId,
+        content: trimmedContent,
+        attachments: [],
+        mentions: [],
+        forwardedFrom: formattedForwardedFrom,
+      });
+
+      const populatedMessage = await ChannelMessage.findById(savedMessage._id)
+        .populate("senderId", "username avatar");
+
+      const messagePayload = formatChannelMessage(populatedMessage, currentUserId);
+
+      // Update sender read state
+      ChannelReadState.findOneAndUpdate(
+        { channelId: access.channel._id, userId: currentUserId },
+        { $set: { lastReadAt: new Date() } },
+        { upsert: true }
+      ).catch(() => {});
+
+      if (io) {
+        const room = `channel:${access.channel._id}`;
+        io.to(room).emit("receive-channel-message", messagePayload);
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: messagePayload,
+        targetType: "CHANNEL",
+        channelId: access.channel._id,
+      });
+    } else {
+      // DIRECT
+      if (currentUserId.toString() === targetId.toString()) {
+        return res.status(400).json({ message: "Cannot forward message to yourself" });
+      }
+
+      const targetUser = await User.findById(targetId).select("_id username avatar");
+      if (!targetUser) {
+        return res.status(404).json({ message: "Target user not found" });
+      }
+
+      const savedMessage = await Message.create({
+        senderId: currentUserId,
+        receiverId: targetId,
+        content: trimmedContent,
+        attachments: [],
+        mentions: [],
+        forwardedFrom: formattedForwardedFrom,
+      });
+
+      const messagePayload = {
+        id: savedMessage._id,
+        senderId: savedMessage.senderId,
+        receiverId: savedMessage.receiverId,
+        content: savedMessage.content,
+        attachments: savedMessage.attachments || [],
+        mentions: [],
+        forwardedFrom: savedMessage.forwardedFrom || null,
+        isRead: false,
+        isStarred: false,
+        createdAt: savedMessage.createdAt,
+      };
+
+      if (io) {
+        io.to(`user:${targetId}`).emit("receive-direct-message", messagePayload);
+        io.to(`user:${currentUserId}`).emit("direct-message-sent", messagePayload);
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: messagePayload,
+        targetType: "DIRECT",
+        receiverId: targetId,
+      });
+    }
+  } catch (error) {
+    console.error("Error in forwardMessage:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export {
   getDirectMessages,
   getChannelMessages,
@@ -921,11 +1131,14 @@ export {
   buildReplyToMessage,
   getUnreadMessageCounts,
   markChannelAsRead,
+  markChannelAsUnread,
   markDirectMessagesAsRead,
+  markDirectMessagesAsUnread,
   starMessage,
   unstarMessage,
   getStarredMessages,
   getUserMentions,
   markMentionAsRead,
   markAllMentionsAsRead,
+  forwardMessage,
 }

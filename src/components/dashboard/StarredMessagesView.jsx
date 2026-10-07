@@ -16,6 +16,7 @@ const StarredMessagesView = ({
   workspaceId,
   onNavigateChannel,
   onNavigateDM,
+  onForwardMessage = () => {},
   onOpenSidebar,
 }) => {
   const { toggleTheme, isDark } = useTheme()
@@ -212,19 +213,42 @@ const StarredMessagesView = ({
                         </span>
                       </div>
 
-                      {/* Green Star Button to unstar */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.currentTarget.blur()
-                          handleUnstar(e, msg)
-                        }}
-                        title="Unstar message"
-                        aria-label="Unstar message"
-                        className="text-emerald-500 hover:text-emerald-600 p-1 flex-shrink-0 transition-colors"
-                      >
-                        <i className="fa-solid fa-star text-sm" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {/* Forward button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.currentTarget.blur()
+                            onForwardMessage && onForwardMessage(msg, {
+                              sourceType: msg.type === "CHANNEL" ? "CHANNEL" : "DIRECT",
+                              sourceName: msg.type === "CHANNEL" ? msg.channelName : msg.otherUserName,
+                              sourceId: (msg.type === "CHANNEL" ? msg.channelId : msg.otherUserId)?.toString() || "",
+                              channelId: msg.channelId,
+                              otherUserId: msg.otherUserId,
+                            })
+                          }}
+                          title="Forward message"
+                          aria-label="Forward message"
+                          className="text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white p-1 flex-shrink-0 transition-colors"
+                        >
+                          <i className="fa-solid fa-share text-xs" />
+                        </button>
+
+                        {/* Green Star Button to unstar */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.currentTarget.blur()
+                            handleUnstar(e, msg)
+                          }}
+                          title="Unstar message"
+                          aria-label="Unstar message"
+                          className="text-emerald-500 hover:text-emerald-600 p-1 flex-shrink-0 transition-colors"
+                        >
+                          <i className="fa-solid fa-star text-sm" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Message text with mention highlighting */}

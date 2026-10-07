@@ -16,6 +16,7 @@ import {
   getMessageAttachments,
 } from "../../utils/fileUtils"
 import EmojiPickerButton from "../common/EmojiPickerButton"
+import ForwardedMessageCard from "../common/ForwardedMessageCard"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
@@ -54,6 +55,8 @@ const MessageThread = ({
   onEditMessage = () => {},
   onDeleteMessage = () => {},
   onToggleStar = () => {},
+  onForwardMessage = () => {},
+  onNavigateSource = () => {},
   currentUserId = null,
   onOpenSidebar = () => {},
 }) => {
@@ -318,6 +321,7 @@ const MessageThread = ({
             const isDeleted = message.isDeleted === true
             const isBeingEdited = editingState?.messageId === message.id?.toString()
             const isPureAttachment = !isDeleted && isPureAttachmentMessage(message)
+            const isPureForwarded = !isDeleted && Boolean(message.forwardedFrom && !message.content?.trim())
             const attachments = getMessageAttachments(message)
 
             const prevMessage = index > 0 ? messages[index - 1] : null
@@ -369,6 +373,27 @@ const MessageThread = ({
                           </span>
                         </div>
                       )}
+                      <div className="group/tip relative">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.currentTarget.blur()
+                            onForwardMessage && onForwardMessage(message, {
+                              sourceType: "DIRECT",
+                              sourceName: activeSelectedUser?.username || "Direct Message",
+                              sourceId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
+                              otherUserId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
+                            })
+                          }}
+                          aria-label="Forward message"
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
+                        >
+                          <i className="fa-solid fa-share text-[10px]" />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                          Forward
+                        </span>
+                      </div>
                       {!isImageOrFileMessage(message) && (
                         <div className="group/tip relative">
                           <button
@@ -464,7 +489,7 @@ const MessageThread = ({
                   ) : (
                     <div
                       className={`max-w-[85%] sm:max-w-[75%] md:max-w-[65%] break-words text-left ${
-                        isPureAttachment
+                        isPureAttachment || isPureForwarded
                           ? "bg-transparent border-0 shadow-none px-0 py-0"
                           : `rounded-2xl px-3 py-1.5 shadow-xs ${
                               isSender
@@ -474,61 +499,99 @@ const MessageThread = ({
                       }`}
                     >
                       <div className="flex flex-col">
-                        <div className="min-w-0 break-words leading-relaxed">
-                          <MessageContent
-                            content={message.content}
-                            attachments={message.attachments?.length ? message.attachments : attachments}
+                        {Boolean(message.content?.trim()) && (
+                          <div className="min-w-0 break-words leading-relaxed">
+                            <MessageContent
+                              content={message.content}
+                              attachments={message.attachments?.length ? message.attachments : attachments}
+                              isSender={isSender}
+                              mentions={message.mentions || []}
+                              currentUserId={activeUserId}
+                              className="text-[15px] sm:text-base leading-relaxed break-words"
+                            />
+                          </div>
+                        )}
+                        {message.forwardedFrom && (
+                          <ForwardedMessageCard
+                            forwardedFrom={message.forwardedFrom}
                             isSender={isSender}
-                            mentions={message.mentions || []}
-                            currentUserId={activeUserId}
-                            className="text-[15px] sm:text-base leading-relaxed break-words"
+                            onNavigateSource={onNavigateSource}
+                            timestamp={formatMessageTime(message.createdAt)}
+                            isEdited={message.isEdited && !isDeleted}
+                            isStarred={message.isStarred && !isDeleted && !isImageOrFileMessage(message)}
+                            onToggleStar={() => onToggleStar(message)}
                           />
-                        </div>
-                        <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none px-0.5">
-                          <span className="whitespace-nowrap">
-                            {formatMessageTime(message.createdAt)}
-                          </span>
-                          {message.isEdited && !isDeleted && (
-                            <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
-                              (edited)
+                        )}
+                        {!message.forwardedFrom && (
+                          <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none">
+                            <span className="whitespace-nowrap">
+                              {formatMessageTime(message.createdAt)}
                             </span>
-                          )}
-                          {message.isStarred && !isDeleted && !isImageOrFileMessage(message) && (
-                            <button
-                              type="button"
-                              onClick={() => onToggleStar(message)}
-                              title="Starred message (click to unstar)"
-                              className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
-                            >
-                              <i className="fa-solid fa-star text-[9px]" />
-                            </button>
-                          )}
-                        </div>
+                            {message.isEdited && !isDeleted && (
+                              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                                (edited)
+                              </span>
+                            )}
+                            {message.isStarred && !isDeleted && !isImageOrFileMessage(message) && (
+                              <button
+                                type="button"
+                                onClick={() => onToggleStar(message)}
+                                title="Starred message (click to unstar)"
+                                className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                              >
+                                <i className="fa-solid fa-star text-[9px]" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
                   {/* Hover action toolbar for receiver — floats beside bubble */}
-                  {!isSender && !isDeleted && !isImageOrFileMessage(message) && (
+                  {!isSender && !isDeleted && (
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-0.5 pointer-events-none group-hover:pointer-events-auto">
+                      {!isImageOrFileMessage(message) && (
+                        <div className="group/tip relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.currentTarget.blur()
+                              onToggleStar(message)
+                            }}
+                            aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                              message.isStarred
+                                ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                            }`}
+                          >
+                            <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                          </button>
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                            {message.isStarred ? "Unstar" : "Star"}
+                          </span>
+                        </div>
+                      )}
                       <div className="group/tip relative">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.currentTarget.blur()
-                            onToggleStar(message)
+                            onForwardMessage && onForwardMessage(message, {
+                              sourceType: "DIRECT",
+                              sourceName: activeSelectedUser?.username || "Direct Message",
+                              sourceId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
+                              otherUserId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
+                            })
                           }}
-                          aria-label={message.isStarred ? "Unstar message" : "Star message"}
-                          className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                            message.isStarred
-                              ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                              : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
-                          }`}
+                          aria-label="Forward message"
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
                         >
-                          <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                          <i className="fa-solid fa-share text-[10px]" />
                         </button>
                         <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
-                          {message.isStarred ? "Unstar" : "Star"}
+                          Forward
                         </span>
                       </div>
                     </div>

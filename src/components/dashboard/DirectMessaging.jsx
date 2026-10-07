@@ -24,7 +24,12 @@ import { isImageOrFileMessage } from "../../utils/fileUtils"
 import { toast } from "react-toastify"
 import MessageThread from "./MessageThread"
 
-const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
+const DirectMessaging = ({
+  externalSelectedUser = null,
+  onOpenSidebar,
+  onForwardMessage = () => {},
+  onNavigateSource = () => {},
+}) => {
   const { workspaceData, user } = useWorkspace()
   const [selectedUser, setSelectedUser] = useState(externalSelectedUser)
   const [messages, setMessages] = useState([])
@@ -250,6 +255,8 @@ const DirectMessaging = ({ externalSelectedUser = null, onOpenSidebar }) => {
       onEditMessage={handleEditMessage}
       onDeleteMessage={handleDeleteMessage}
       onToggleStar={handleToggleStar}
+      onForwardMessage={onForwardMessage}
+      onNavigateSource={onNavigateSource}
       currentUserId={user?.id || user?._id}
       onOpenSidebar={onOpenSidebar}
     />
