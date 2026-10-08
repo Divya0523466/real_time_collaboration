@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { toast } from "react-toastify";
 import { showDesktopNotification } from "../utils/desktopNotification";
+import { isSuperAdminUser, isDeactivatedAccount } from "../utils/adminAuth";
 import socket, {
   connectSocket,
   onOnlineUsers,
@@ -57,17 +58,42 @@ const getAuthHeaders = (extraHeaders = {}) => {
 };
 
 export const WorkspaceProvider = ({ children }) => {
-  const [user, setUser] = useState(() => readStoredValue("worknestUser", null));
+  const [user, setUser] = useState(() => {
+    const stored = readStoredValue("worknestUser", null);
+    if (isDeactivatedAccount(stored)) {
+      try {
+        localStorage.removeItem("worknestUser");
+        localStorage.removeItem("worknestWorkspaces");
+        localStorage.removeItem("worknestWorkspaceData");
+        localStorage.removeItem("worknestToken");
+      } catch {}
+      return null;
+    }
+    if (stored && isSuperAdminUser(stored)) {
+      return { ...stored, platformRole: "super_admin", role: "admin", isSuperAdmin: true };
+    }
+    return stored;
+  });
   const [workspaces, setWorkspaces] = useState(() => readStoredValue("worknestWorkspaces", []));
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
-  const [workspaceData, setWorkspaceData] = useState(null);
+  const [workspaceData, setWorkspaceData] = useState(() => readStoredValue("worknestWorkspaceData", null));
   const [channels, setChannels] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(() => {
+    try {
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      if (urlParams?.get("token")) return true;
+      const token = typeof localStorage !== "undefined" ? localStorage.getItem("worknestToken") : null;
+      const storedUser = typeof localStorage !== "undefined" ? localStorage.getItem("worknestUser") : null;
+      return Boolean(token && token !== "null" && token !== "undefined" && !storedUser);
+    } catch {
+      return false;
+    }
+  });
 
   // Automatically fetch the user session on mount
   useEffect(() => {
@@ -86,8 +112,10 @@ export const WorkspaceProvider = ({ children }) => {
         if (!token || token === "null" || token === "undefined") {
           setUser(null);
           setWorkspaces([]);
+          setWorkspaceData(null);
           localStorage.removeItem("worknestUser");
           localStorage.removeItem("worknestWorkspaces");
+          localStorage.removeItem("worknestWorkspaceData");
           localStorage.removeItem("worknestToken");
           setIsInitializing(false);
           return;
@@ -101,9 +129,37 @@ export const WorkspaceProvider = ({ children }) => {
 
         if (response.ok) {
           const data = await response.json();
-          setUser(data.user);
+          let isDeact = data.user?.isActive === false || data.user?.status === "inactive";
+          try {
+            const stored = localStorage.getItem("worknest_deactivated_users");
+            const deactList = stored ? JSON.parse(stored) : [];
+            const deactSet = new Set(deactList.map((x) => String(x).toLowerCase().trim()));
+            const uid = String(data.user?.id || data.user?._id || "").toLowerCase().trim();
+            const uemail = String(data.user?.email || "").toLowerCase().trim();
+            if (deactSet.has(uid) || deactSet.has(uemail)) {
+              isDeact = true;
+            }
+          } catch {
+            // ignore
+          }
+
+          if (isDeact) {
+            setUser(null);
+            setWorkspaces([]);
+            setWorkspaceData(null);
+            localStorage.removeItem("worknestUser");
+            localStorage.removeItem("worknestWorkspaces");
+            localStorage.removeItem("worknestWorkspaceData");
+            localStorage.removeItem("worknestToken");
+            setIsInitializing(false);
+            return;
+          }
+          const effectiveUser = isSuperAdminUser(data.user)
+            ? { ...data.user, platformRole: "super_admin", role: "admin", isSuperAdmin: true }
+            : data.user;
+          setUser(effectiveUser);
           setWorkspaces(data.workspaces || []);
-          localStorage.setItem("worknestUser", JSON.stringify(data.user));
+          localStorage.setItem("worknestUser", JSON.stringify(effectiveUser));
           localStorage.setItem("worknestWorkspaces", JSON.stringify(data.workspaces || []));
           if (data.token) {
             localStorage.setItem("worknestToken", data.token);
@@ -111,8 +167,10 @@ export const WorkspaceProvider = ({ children }) => {
         } else if (response.status === 401 || response.status === 403) {
           setUser(null);
           setWorkspaces([]);
+          setWorkspaceData(null);
           localStorage.removeItem("worknestUser");
           localStorage.removeItem("worknestWorkspaces");
+          localStorage.removeItem("worknestWorkspaceData");
           localStorage.removeItem("worknestToken");
         }
       } catch (err) {
@@ -260,6 +318,7 @@ export const WorkspaceProvider = ({ children }) => {
     localStorage.removeItem("worknestToken");
     localStorage.removeItem("worknestUser");
     localStorage.removeItem("worknestWorkspaces");
+    localStorage.removeItem("worknestWorkspaceData");
     setUser(null);
     setWorkspaces([]);
     setSelectedWorkspace(null);
@@ -276,9 +335,12 @@ export const WorkspaceProvider = ({ children }) => {
     if (token) {
       localStorage.setItem("worknestToken", token);
     }
-    localStorage.setItem("worknestUser", JSON.stringify(userData));
+    const effectiveUser = isSuperAdminUser(userData)
+      ? { ...userData, platformRole: "super_admin", role: "admin", isSuperAdmin: true }
+      : userData;
+    localStorage.setItem("worknestUser", JSON.stringify(effectiveUser));
     localStorage.setItem("worknestWorkspaces", JSON.stringify(userWorkspaces || []));
-    setUser(userData);
+    setUser(effectiveUser);
     setWorkspaces(Array.isArray(userWorkspaces) ? userWorkspaces : []);
     setSelectedWorkspace(null);
     setWorkspaceData(null);
@@ -350,11 +412,18 @@ export const WorkspaceProvider = ({ children }) => {
         return;
       }
 
-      setLoading(true);
       setError(null);
-      // Immediately reset channels and set selectedWorkspace to avoid cross-workspace race conditions
-      setChannels([]);
       setSelectedWorkspace(workspaceId);
+
+      // Keep existing data if it already matches the requested workspace, otherwise reset
+      setWorkspaceData((prev) => {
+        if (prev && (prev.id?.toString() === workspaceId?.toString() || prev._id?.toString() === workspaceId?.toString())) {
+          return prev;
+        }
+        return null;
+      });
+      setChannels([]);
+      setLoading(true);
 
       try {
         const [workspaceResponse, channelsResponse] = await Promise.all([
@@ -376,6 +445,9 @@ export const WorkspaceProvider = ({ children }) => {
         const data = await workspaceResponse.json();
         const normalizedWorkspace = normalizeWorkspaceData(data, workspaceId);
         setWorkspaceData(normalizedWorkspace);
+        try {
+          localStorage.setItem("worknestWorkspaceData", JSON.stringify(normalizedWorkspace));
+        } catch {}
 
         if (channelsResponse.ok) {
           const channelsData = await channelsResponse.json();

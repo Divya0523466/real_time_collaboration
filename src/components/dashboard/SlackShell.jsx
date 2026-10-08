@@ -4,6 +4,7 @@ import { FiSun, FiMoon } from "react-icons/fi"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { useTheme } from "../../context/ThemeContext"
 import { getPermissions, getRoleDisplayName } from "../../utils/permissions"
+import { isSuperAdminUser } from "../../utils/adminAuth"
 import { toast } from "react-toastify"
 import socket, { joinChannel, leaveChannel } from "../../services/socket"
 import CreateChannelModal from "./CreateChannelModal"
@@ -707,12 +708,10 @@ const SlackShell = () => {
 
   if (loading && !workspaceData) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#2C3333] text-[#E7F6F2]">
-        <div className="text-center">
-          <div className="mb-4 inline-flex h-12 w-12 animate-spin items-center justify-center rounded-full border-3 border-[#395B64] border-t-[#A5C9CA]">
-            <i className="fa-solid fa-layer-group text-sm text-[#A5C9CA]" />
-          </div>
-          <p className="text-sm font-medium text-[#A5C9CA]">Loading WorkNest workspace...</p>
+      <div className="flex h-screen items-center justify-center bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 dark:border-gray-700 border-t-[#395B64] dark:border-t-[#A5C9CA]" />
+          <span className="text-sm text-[#52656A] dark:text-[#A5C9CA]">Loading...</span>
         </div>
       </div>
     )
@@ -849,6 +848,20 @@ const SlackShell = () => {
                   </div>
 
                   <div className="h-px bg-[#395B64]/50 my-2" />
+
+                  {isSuperAdminUser(user) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false)
+                        navigate("/admin")
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-400 hover:bg-[#395B64]/40 transition mb-1 cursor-pointer"
+                    >
+                      <i className="fa-solid fa-shield-halved text-xs text-emerald-400" />
+                      <span>Super Admin Dashboard</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -1340,6 +1353,20 @@ const SlackShell = () => {
                 </div>
 
                 <div className="h-px bg-[#395B64]/50 my-2" />
+
+                {isSuperAdminUser(user) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false)
+                      navigate("/admin")
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-400 hover:bg-[#395B64]/40 transition mb-1 cursor-pointer"
+                  >
+                    <i className="fa-solid fa-shield-halved text-xs text-emerald-400" />
+                    <span>Super Admin Dashboard</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

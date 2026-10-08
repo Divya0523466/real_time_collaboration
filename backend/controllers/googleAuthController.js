@@ -69,6 +69,10 @@ export const googleOAuthCallback = async (req, res) => {
     let user = await User.findOne({ email: normalizedEmail });
 
     if (user) {
+      if (user.isActive === false || user.status === "inactive") {
+        const cleanFrontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+        return res.redirect(`${cleanFrontendUrl}?error=account_deactivated`);
+      }
       if (!user.googleId) {
         user.googleId = googleId;
         user.authProvider = "google";

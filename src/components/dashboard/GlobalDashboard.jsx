@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import CreateWorkspaceModal from "./CreateWorkspaceModal"
 import GlobalNav from "./GlobalNav"
 import { getWorkspaceInitials } from "./SlackShell"
+import { isSuperAdminUser } from "../../utils/adminAuth"
 
 const GlobalDashboard = () => {
   const navigate = useNavigate()
@@ -26,14 +27,17 @@ const GlobalDashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
-    // Rely on WorkspaceContext's isInitializing and user state for auth verification.
+    if (isSuperAdminUser(user)) {
+      navigate("/admin", { replace: true })
+      return
+    }
 
     fetchUserWorkspaces().catch(() => {})
 
     if (user?.email) {
       fetchPendingInvitations().catch(() => {})
     }
-  }, [clearAuth, fetchUserWorkspaces, fetchPendingInvitations, navigate, user?.email])
+  }, [clearAuth, fetchUserWorkspaces, fetchPendingInvitations, navigate, user])
 
   const handleSelectWorkspace = (workspace) => {
     selectWorkspace(workspace.id)
@@ -206,10 +210,10 @@ const GlobalDashboard = () => {
           </div>
 
 
-          {loading && (
-            <div className="rounded-2xl border border-dashed border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] p-8 text-center text-sm text-[#52656A] dark:text-[#A5C9CA]">
-              <i className="fa-solid fa-spinner animate-spin text-xl text-[#395B64] mb-2 block" />
-              Loading workspaces...
+          {loading && workspaces.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-[#52656A] dark:text-[#A5C9CA]">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 dark:border-gray-700 border-t-[#395B64] dark:border-t-[#A5C9CA] mb-2" />
+              <p className="text-sm">Loading...</p>
             </div>
           )}
 

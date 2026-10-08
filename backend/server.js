@@ -20,6 +20,7 @@ import channelRoutes from "./routes/channelRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
 import { validateChannelMentions, validateDirectMentions } from "./utils/mentionValidation.js";
 
@@ -59,6 +60,7 @@ app.use("/api/workspaces", channelRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
 
 
 

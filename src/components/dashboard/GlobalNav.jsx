@@ -4,6 +4,7 @@ import { useWorkspace } from "../../context/WorkspaceContext"
 import { toast } from "react-toastify"
 import NotificationPanel from "./NotificationPanel"
 import ProfileModal from "./ProfileModal"
+import { isSuperAdminUser } from "../../utils/adminAuth"
 
 const GlobalNav = ({ user }) => {
   const navigate = useNavigate()
@@ -71,6 +72,19 @@ const GlobalNav = ({ user }) => {
             </span>
           )}
         </button>
+        {isSuperAdminUser(user) && (
+          <button
+            type="button"
+            onClick={() => navigate("/admin")}
+            className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-emerald-400 hover:bg-[#2C3333] transition flex items-center gap-2.5"
+          >
+            <i className="fa-solid fa-shield-halved w-4 text-center text-emerald-400" />
+            <span className="flex-1">Super Admin</span>
+            <span className="rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400 uppercase">
+              Admin
+            </span>
+          </button>
+        )}
       </nav>
 
    

@@ -21,6 +21,20 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
+      // Check if this email is already marked deactivated
+      try {
+        const stored = localStorage.getItem("worknest_deactivated_users")
+        const deactList = stored ? JSON.parse(stored) : []
+        const deactSet = new Set(deactList.map((x) => String(x).toLowerCase().trim()))
+        if (deactSet.has(email.toLowerCase().trim())) {
+          setError("Your account has been deactivated. Please contact the administrator.");
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        // continue
+      }
+
       const response = await fetch(`${API_URL}/auth/login`, { credentials: "include",
         method: "POST",
         headers: {
@@ -39,8 +53,38 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
         return;
       }
 
+      // Check if user is deactivated via API data or local deactivated store
+      let isDeactivated = data.user?.isActive === false || data.user?.status === "inactive"
+      try {
+        const stored = localStorage.getItem("worknest_deactivated_users")
+        const deactList = stored ? JSON.parse(stored) : []
+        const deactSet = new Set(deactList.map((x) => String(x).toLowerCase().trim()))
+        const uid = String(data.user?.id || data.user?._id || "").toLowerCase().trim()
+        const uemail = String(data.user?.email || email || "").toLowerCase().trim()
+        if (deactSet.has(uid) || deactSet.has(uemail)) {
+          isDeactivated = true
+        }
+      } catch {
+        // ignore
+      }
+
+      if (isDeactivated) {
+        localStorage.removeItem("worknestToken");
+        localStorage.removeItem("worknestUser");
+        localStorage.removeItem("worknestWorkspaces");
+        setError("Your account has been deactivated. Please contact the administrator.");
+        return;
+      }
+
       if (data.token) {
         localStorage.setItem("worknestToken", data.token);
+        if (
+          data.user?.email?.toLowerCase() === "admin@gmail.com" ||
+          data.user?.role === "super_admin" ||
+          data.user?.platformRole === "super_admin"
+        ) {
+          localStorage.setItem("worknest_admin_token", data.token);
+        }
       }
       localStorage.setItem("worknestUser", JSON.stringify(data.user));
       localStorage.setItem("worknestWorkspaces", JSON.stringify(data.workspaces || []));
