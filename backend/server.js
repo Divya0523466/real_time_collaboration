@@ -13,16 +13,20 @@ import ChannelReadState from "./models/ChannelReadState.js";
 import getChannelAccess from "./utils/channelAccess.js";
 import { formatChannelMessage } from "./controllers/messageController.js";
 import WorkspaceMembership from "./models/WorkspaceMembership.js";
+import SpaceReadState from "./models/SpaceReadState.js";
 import authRoutes from "./routes/authRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import workspaceRoutes from "./routes/workspaceRoutes.js";
 import channelRoutes from "./routes/channelRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
+import spaceRoutes from "./routes/spaceRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
-import { validateChannelMentions, validateDirectMentions } from "./utils/mentionValidation.js";
+import { validateChannelMentions, validateDirectMentions, validateSpaceMentions } from "./utils/mentionValidation.js";
+import getSpaceAccess from "./utils/spaceAccess.js";
+import { formatSpaceMessage } from "./controllers/spaceController.js";
 
 
 if (process.env.FRONTEND_URL) {
@@ -58,6 +62,7 @@ app.use("/api/workspaces", invitationRoutes);
 app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/workspaces", channelRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/spaces", spaceRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
@@ -94,6 +99,7 @@ io.on("connection", async (socket) => {
 
   socket.join(userRoom);
   const activeChannelRooms = new Set();
+  const activeSpaceRooms = new Set();
 
   // Send current list of online users to newly connected client
   const onlineUsersList = await getOnlineUserIds();
@@ -135,6 +141,31 @@ io.on("connection", async (socket) => {
     if (room) {
       socket.leave(room);
       activeChannelRooms.delete(room);
+    }
+  });
+
+  socket.on("join-space", async ({ spaceId } = {}) => {
+    try {
+      const { space } = await getSpaceAccess(socket.userId, spaceId);
+      if (!space) {
+        socket.emit("join-space-error", { message: "Access denied to Space" });
+        return;
+      }
+
+      const room = `space:${space._id}`;
+      socket.join(room);
+      activeSpaceRooms.add(room);
+      socket.emit("space-joined", { spaceId: space._id });
+    } catch {
+      socket.emit("join-space-error", { message: "Unable to join Space" });
+    }
+  });
+
+  socket.on("leave-space", ({ spaceId } = {}) => {
+    const room = spaceId ? `space:${spaceId}` : null;
+    if (room) {
+      socket.leave(room);
+      activeSpaceRooms.delete(room);
     }
   });
 
@@ -322,6 +353,179 @@ io.on("connection", async (socket) => {
       })();
     } catch {
       socket.emit("send-channel-message-error", { message: "Failed to send channel message" });
+    }
+  });
+
+  socket.on("send-space-message", async ({ spaceId, content, attachments = [], replyTo = null, mentions = [], forwardedFrom = null } = {}) => {
+    const trimmedContent = typeof content === "string" ? content.trim() : "";
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    if (!spaceId || (!trimmedContent && !hasAttachments && !forwardedFrom)) {
+      socket.emit("send-space-message-error", {
+        message: "Space and message content, attachment, or forwarded message are required",
+      });
+      return;
+    }
+
+    try {
+      const { space } = await getSpaceAccess(socket.userId, spaceId);
+      if (!space) {
+        socket.emit("send-space-message-error", { message: "Access denied to Space" });
+        return;
+      }
+
+      const mentionValidation = await validateSpaceMentions(mentions, space, socket.userId);
+      if (!mentionValidation.isValid) {
+        socket.emit("send-space-message-error", { message: mentionValidation.error });
+        return;
+      }
+
+      const room = `space:${space._id}`;
+      if (!activeSpaceRooms.has(room)) {
+        socket.join(room);
+        activeSpaceRooms.add(room);
+      }
+
+      let validatedReplyTo = null;
+      if (replyTo) {
+        const parent = await ChannelMessage.findOne({
+          _id: replyTo,
+          spaceId: space._id,
+        }).populate("senderId", "username");
+        if (!parent) {
+          socket.emit("send-space-message-error", { message: "Referenced message not found in this Space" });
+          return;
+        }
+        validatedReplyTo = parent._id;
+      }
+
+      const formattedAttachments = (attachments || []).map((att) => {
+        const rawFileId = att.fileId || att.id || att._id;
+        const validFileId = rawFileId && mongoose.isValidObjectId(rawFileId) ? rawFileId : undefined;
+        return {
+          fileId: validFileId,
+          originalName: att.originalName || "Attachment",
+          url: att.url,
+          previewUrl: att.previewUrl || "",
+          publicId: att.publicId || "",
+          resourceType: att.resourceType || "auto",
+          format: att.format || "",
+          mimeType: att.mimeType || "",
+          size: att.size || 0,
+          extension: att.extension || "",
+        };
+      });
+
+      const savedMessage = await ChannelMessage.create({
+        spaceId: space._id,
+        senderId: socket.userId,
+        content: trimmedContent,
+        attachments: formattedAttachments,
+        mentions: mentionValidation.mentions,
+        replyTo: validatedReplyTo,
+        forwardedFrom: forwardedFrom || null,
+      });
+
+      const populatedMessage = await ChannelMessage.findById(savedMessage._id)
+        .populate("senderId", "username avatar")
+        .populate({ path: "replyTo", populate: { path: "senderId", select: "username" } });
+
+      const messagePayload = formatSpaceMessage(populatedMessage, socket.userId);
+
+      // Update sender's read cursor
+      SpaceReadState.findOneAndUpdate(
+        { spaceId: space._id, userId: socket.userId },
+        { $set: { lastReadAt: new Date() } },
+        { upsert: true }
+      ).catch(() => {});
+
+      io.to(room).emit("receive-space-message", messagePayload);
+      socket.emit("space-message-sent", messagePayload);
+
+      // Dispatch notifications for space mentions and other members
+      (async () => {
+        try {
+          const sender = await User.findById(socket.userId).select("username");
+          const senderName = sender?.username || "Someone";
+          const memberUserIds = (space.members || []).map((m) => m.toString());
+
+          // Parse text mentions
+          const mentionMatches = trimmedContent.match(/@([a-zA-Z0-9_.-]+)/g);
+          const mentionedUsernames = mentionMatches
+            ? [...new Set(mentionMatches.map((m) => m.slice(1).toLowerCase()))]
+            : [];
+
+          let textMentionUserIds = [];
+          if (mentionedUsernames.length > 0) {
+            const mentionedUsers = await User.find({
+              username: { $in: mentionedUsernames.map((u) => new RegExp(`^${u}$`, "i")) },
+            }).select("_id username");
+            textMentionUserIds = mentionedUsers
+              .map((u) => u._id.toString())
+              .filter((id) => memberUserIds.includes(id) && id !== socket.userId.toString());
+          }
+
+          const explicitMentionIds = (savedMessage.mentions || [])
+            .map((m) => (m.userId?._id || m.userId || m)?.toString())
+            .filter((id) => id && memberUserIds.includes(id) && id !== socket.userId.toString());
+
+          const mentionedUserIds = [...new Set([...explicitMentionIds, ...textMentionUserIds])];
+
+          if (mentionedUserIds.length > 0) {
+            await ChannelMessage.updateOne(
+              { _id: savedMessage._id },
+              {
+                $addToSet: {
+                  mentions: {
+                    $each: mentionedUserIds.map((id) => ({
+                      userId: new mongoose.Types.ObjectId(id),
+                    })),
+                  },
+                },
+              }
+            ).catch(() => {});
+          }
+
+          const snippet = trimmedContent
+            ? (trimmedContent.length > 60 ? trimmedContent.slice(0, 57) + "..." : trimmedContent)
+            : (hasAttachments ? `[Attachment: ${formattedAttachments[0]?.originalName || "File"}]` : "Sent a message");
+
+          // Notify mentioned users
+          for (const mUserId of mentionedUserIds) {
+            await createAndSendNotification(io, {
+              recipientId: mUserId,
+              actorId: socket.userId,
+              type: "SPACE_MENTION",
+              title: `@${senderName} mentioned you in Space "${space.name}"`,
+              message: snippet,
+              workspaceId: space.workspaceId,
+              spaceId: space._id,
+              messageId: savedMessage._id,
+            });
+          }
+
+          // Notify other space members
+          const otherMemberIds = memberUserIds.filter(
+            (id) => id !== socket.userId.toString() && !mentionedUserIds.includes(id)
+          );
+
+          for (const recipientId of otherMemberIds) {
+            await createAndSendNotification(io, {
+              recipientId,
+              actorId: socket.userId,
+              type: "SPACE_MESSAGE",
+              title: `New message in Space "${space.name}"`,
+              message: `${senderName}: ${snippet}`,
+              workspaceId: space.workspaceId,
+              spaceId: space._id,
+              messageId: savedMessage._id,
+            });
+          }
+        } catch (notifErr) {
+          console.error("Error dispatching space notifications:", notifErr);
+        }
+      })();
+    } catch {
+      socket.emit("send-space-message-error", { message: "Failed to send space message" });
     }
   });
 
@@ -571,6 +775,30 @@ io.on("connection", async (socket) => {
         io.to(`user:${targetId}`).emit("receive-direct-message", messagePayload);
         io.to(`user:${socket.userId}`).emit("direct-message-sent", messagePayload);
         socket.emit("forward-message-success", { message: messagePayload, targetType: "DIRECT" });
+      } else if (targetType === "SPACE") {
+        const { space } = await getSpaceAccess(socket.userId, targetId);
+        if (!space) {
+          socket.emit("forward-message-error", { message: "Access denied to Space" });
+          return;
+        }
+
+        const savedMessage = await ChannelMessage.create({
+          spaceId: space._id,
+          senderId: socket.userId,
+          content: trimmedContent,
+          attachments: [],
+          mentions: [],
+          forwardedFrom: formattedForwardedFrom,
+        });
+
+        const populatedMessage = await ChannelMessage.findById(savedMessage._id)
+          .populate("senderId", "username avatar");
+
+        const messagePayload = formatSpaceMessage(populatedMessage, socket.userId);
+
+        const room = `space:${space._id}`;
+        io.to(room).emit("receive-space-message", messagePayload);
+        socket.emit("forward-message-success", { message: messagePayload, targetType: "SPACE" });
       } else {
         socket.emit("forward-message-error", { message: "Invalid targetType" });
       }
@@ -670,6 +898,100 @@ io.on("connection", async (socket) => {
       io.to(room).emit("channel-message-deleted", payload);
     } catch {
       socket.emit("delete-channel-message-error", { message: "Failed to delete message" });
+    }
+  });
+
+  socket.on("edit-space-message", async ({ messageId, content, mentions } = {}) => {
+    const trimmedContent = typeof content === "string" ? content.trim() : "";
+    if (!messageId || !trimmedContent) {
+      socket.emit("edit-space-message-error", { message: "Message ID and content are required" });
+      return;
+    }
+
+    try {
+      const message = await ChannelMessage.findById(messageId);
+      if (!message || !message.spaceId) {
+        socket.emit("edit-space-message-error", { message: "Message not found" });
+        return;
+      }
+      if (message.senderId.toString() !== socket.userId) {
+        socket.emit("edit-space-message-error", { message: "You can only edit your own messages" });
+        return;
+      }
+      if (message.isDeleted) {
+        socket.emit("edit-space-message-error", { message: "Cannot edit a deleted message" });
+        return;
+      }
+
+      const { space } = await getSpaceAccess(socket.userId, message.spaceId.toString());
+      if (!space) {
+        socket.emit("edit-space-message-error", { message: "Access denied to Space" });
+        return;
+      }
+
+      if (mentions !== undefined) {
+        const mentionValidation = await validateSpaceMentions(mentions, space, socket.userId);
+        if (!mentionValidation.isValid) {
+          socket.emit("edit-space-message-error", { message: mentionValidation.error });
+          return;
+        }
+        message.mentions = mentionValidation.mentions;
+      }
+
+      message.content = trimmedContent;
+      message.isEdited = true;
+      await message.save();
+
+      const payload = {
+        id: message._id,
+        spaceId: message.spaceId,
+        content: message.content,
+        mentions: (message.mentions || []).map((m) => ({
+          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+        })),
+        isEdited: true,
+        updatedAt: message.updatedAt,
+      };
+
+      const room = `space:${message.spaceId}`;
+      io.to(room).emit("space-message-edited", payload);
+    } catch {
+      socket.emit("edit-space-message-error", { message: "Failed to edit message" });
+    }
+  });
+
+  socket.on("delete-space-message", async ({ messageId } = {}) => {
+    if (!messageId) {
+      socket.emit("delete-space-message-error", { message: "Message ID is required" });
+      return;
+    }
+
+    try {
+      const message = await ChannelMessage.findById(messageId);
+      if (!message || !message.spaceId) {
+        socket.emit("delete-space-message-error", { message: "Message not found" });
+        return;
+      }
+
+      const { space, isSuperAdmin: isSuper } = await getSpaceAccess(socket.userId, message.spaceId.toString());
+      if (!space) {
+        socket.emit("delete-space-message-error", { message: "Access denied to Space" });
+        return;
+      }
+
+      if (message.senderId.toString() !== socket.userId && !isSuper) {
+        socket.emit("delete-space-message-error", { message: "You can only delete your own messages" });
+        return;
+      }
+
+      message.isDeleted = true;
+      await message.save();
+
+      const payload = { id: message._id, spaceId: message.spaceId };
+      const room = `space:${message.spaceId}`;
+      io.to(room).emit("space-message-deleted", payload);
+    } catch {
+      socket.emit("delete-space-message-error", { message: "Failed to delete message" });
     }
   });
 

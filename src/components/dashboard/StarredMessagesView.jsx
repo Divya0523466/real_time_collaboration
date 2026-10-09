@@ -15,6 +15,7 @@ const avatarColor = (username) =>
 const StarredMessagesView = ({
   workspaceId,
   onNavigateChannel,
+  onNavigateSpace,
   onNavigateDM,
   onForwardMessage = () => {},
   onOpenSidebar,
@@ -80,6 +81,8 @@ const StarredMessagesView = ({
   const handleCardClick = (msg) => {
     if (msg.type === "CHANNEL" && msg.channelId && onNavigateChannel) {
       onNavigateChannel(msg.channelId)
+    } else if (msg.type === "SPACE" && msg.spaceId && onNavigateSpace) {
+      onNavigateSpace(msg.spaceId)
     } else if (msg.type === "DIRECT" && msg.otherUserId && onNavigateDM) {
       onNavigateDM(msg.otherUserId, {
         id: msg.otherUserId,
@@ -178,8 +181,11 @@ const StarredMessagesView = ({
             {messages.map((msg) => {
               const senderName = msg.sender?.username || "Unknown"
               const isChannel = msg.type === "CHANNEL"
+              const isSpace = msg.type === "SPACE"
               const locationLabel = isChannel
                 ? `#${msg.channelName || "channel"}`
+                : isSpace
+                ? `✦ ${msg.spaceName || "Space"}`
                 : `@${msg.otherUserName || "Direct Message"}`
 
               return (
@@ -208,7 +214,13 @@ const StarredMessagesView = ({
                           {formatMessageTime(msg.createdAt)} · {formatMessageDate(msg.createdAt)}
                         </span>
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded text-[#395B64] dark:text-[#A5C9CA] bg-[#E7F6F2] dark:bg-[#2C3333]/80">
-                          <i className={isChannel ? "fa-solid fa-hashtag text-[9px]" : "fa-solid fa-user text-[9px]"} />
+                          {isChannel ? (
+                            <i className="fa-solid fa-hashtag text-[9px]" />
+                          ) : isSpace ? (
+                            <span className="text-[10px] text-amber-400">✦</span>
+                          ) : (
+                            <i className="fa-solid fa-user text-[9px]" />
+                          )}
                           <span>{locationLabel}</span>
                         </span>
                       </div>

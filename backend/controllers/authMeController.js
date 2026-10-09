@@ -29,6 +29,11 @@ export const getMe = async (req, res) => {
         role: m.role,
       }));
 
+    const isSuperAdmin =
+      user.role === "super_admin" ||
+      user.role === "admin" ||
+      user.email?.toLowerCase() === "admin@gmail.com";
+
     return res.json({
       token: req.token,
       user: {
@@ -36,7 +41,9 @@ export const getMe = async (req, res) => {
         username: user.username,
         email: user.email,
         avatar: user.avatar,
-        role: user.role || "user",
+        role: isSuperAdmin ? "admin" : (user.role || "user"),
+        platformRole: isSuperAdmin ? "super_admin" : "user",
+        isSuperAdmin,
         isActive: user.isActive !== false,
         status: user.status || "active",
       },

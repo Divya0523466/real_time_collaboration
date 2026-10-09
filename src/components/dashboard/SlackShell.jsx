@@ -23,6 +23,18 @@ import StarredMessagesView from "./StarredMessagesView"
 import MentionsView from "./MentionsView"
 import HomeView from "./HomeView"
 import ForwardMessageModal from "./ForwardMessageModal"
+import CreateSpaceModal from "./CreateSpaceModal"
+import EditSpaceModal from "./EditSpaceModal"
+import SpaceMembersModal from "./SpaceMembersModal"
+import DeleteSpaceModal from "./DeleteSpaceModal"
+import SpaceMessageThread from "./SpaceMessageThread"
+import {
+  fetchSpaces,
+  fetchSpace,
+  markSpaceAsReadApi,
+  markSpaceAsUnreadApi,
+  fetchSpaceUnreadCountsApi,
+} from "../../services/spaceService"
 import {
   fetchUnreadMessageCounts,
   markChannelAsRead,
@@ -43,7 +55,7 @@ export const getWorkspaceInitials = (name) => {
 
 const SlackShell = () => {
   const navigate = useNavigate()
-  const { workspaceId, channelId } = useParams()
+  const { workspaceId, channelId, spaceId } = useParams()
   const {
     user,
     workspaces,
@@ -82,17 +94,30 @@ const SlackShell = () => {
   const [memberToAdd, setMemberToAdd] = useState("")
   const [channelMemberActionLoading, setChannelMemberActionLoading] = useState(false)
 
+  // ── Space states ──────────────────────────────────────────────────
+  const [spaces, setSpaces] = useState([])
+  const [selectedSpace, setSelectedSpace] = useState(null)
+  const [unreadSpaceCounts, setUnreadSpaceCounts] = useState({})
+  const [isSpacesCollapsed, setIsSpacesCollapsed] = useState(false)
+  const [showCreateSpaceModal, setShowCreateSpaceModal] = useState(false)
+  const [showEditSpaceModal, setShowEditSpaceModal] = useState(false)
+  const [showManageSpaceMembersModal, setShowManageSpaceMembersModal] = useState(false)
+  const [showDeleteSpaceModal, setShowDeleteSpaceModal] = useState(false)
+  const [activeSpaceForAction, setActiveSpaceForAction] = useState(null)
 
   const [showDetailsPane, setShowDetailsPane] = useState(false)
   const [showMembersPanel, setShowMembersPanel] = useState(false)
   const [showActivityPanel, setShowActivityPanel] = useState(false)
   const [isStarredView, setIsStarredView] = useState(false)
   const [isMentionsView, setIsMentionsView] = useState(false)
-  const [isHomeView, setIsHomeView] = useState(!channelId)
+  const [isHomeView, setIsHomeView] = useState(!channelId && !spaceId)
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null)
 
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false)
   const [isDMsCollapsed, setIsDMsCollapsed] = useState(false)
+  const [isShortcutsCollapsed, setIsShortcutsCollapsed] = useState(false)
+  const [showNewChatModal, setShowNewChatModal] = useState(false)
+  const [newChatSearch, setNewChatSearch] = useState("")
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
   const [selectedDMUser, setSelectedDMUser] = useState(null)
   const [unreadDMCounts, setUnreadDMCounts] = useState({})
@@ -124,7 +149,7 @@ const SlackShell = () => {
     return (notifications || []).filter(
       (n) =>
         !n.isRead &&
-        (n.type === "CHANNEL_MENTION" || n.type === "DM_MENTION") &&
+        (n.type === "CHANNEL_MENTION" || n.type === "DM_MENTION" || n.type === "SPACE_MENTION") &&
         (!workspaceId ||
           !n.workspaceId ||
           (n.workspaceId?._id || n.workspaceId?.id || n.workspaceId)?.toString() ===
@@ -140,6 +165,7 @@ const SlackShell = () => {
   }, [workspaceId, selectedWorkspace, selectWorkspace])
 
   const currentChannel = useMemo(() => {
+    if (selectedSpace || spaceId) return null
     if (isHomeView && !channelId) return null
     if (!channels || channels.length === 0) return null
     if (channelId) {
@@ -148,7 +174,7 @@ const SlackShell = () => {
     }
     if (isHomeView) return null
     return channels[0]
-  }, [channels, channelId, isHomeView])
+  }, [channels, channelId, isHomeView, selectedSpace, spaceId])
 
   const refreshChannelDetails = async () => {
     if (!currentChannel?.id || !workspaceId) return null
@@ -232,6 +258,7 @@ const SlackShell = () => {
 
   const selectedRole = workspaceData?.userRole || "MEMBER"
   const permissions = useMemo(() => getPermissions(selectedRole), [selectedRole])
+  const isSuperAdmin = useMemo(() => isSuperAdminUser(user), [user])
   const workspaceMembers = workspaceData?.members || []
   const directMessageMembers = workspaceMembers.filter(
     (member) => member.id?.toString() !== user?.id?.toString(),
@@ -250,6 +277,59 @@ const SlackShell = () => {
       0
     )
   }, [unreadDMCounts])
+
+  const totalUnreadSpacesCount = useMemo(() => {
+    return Object.values(unreadSpaceCounts).reduce(
+      (acc, count) => acc + (typeof count === "number" && count > 0 ? count : 0),
+      0
+    )
+  }, [unreadSpaceCounts])
+
+  const handleSelectSpace = (sp) => {
+    setSelectedSpace(sp)
+    setIsHomeView(false)
+    setIsStarredView(false)
+    setIsMentionsView(false)
+    setSelectedDMUser(null)
+    const spId = (sp._id || sp.id).toString()
+    setUnreadSpaceCounts((prev) => {
+      const next = { ...prev }
+      delete next[spId]
+      return next
+    })
+    markSpaceAsReadApi(spId).catch(() => {})
+    setIsMobileSidebarOpen(false)
+    navigate(`/app/workspace/${workspaceId}/space/${spId}`)
+  }
+
+  const handleToggleSpaceRead = async (sp, e) => {
+    e?.stopPropagation()
+    const spId = (sp._id || sp.id).toString()
+    const isCurrentlyUnread = (unreadSpaceCounts[spId] || 0) > 0
+
+    if (isCurrentlyUnread) {
+      setUnreadSpaceCounts((prev) => {
+        const next = { ...prev }
+        delete next[spId]
+        return next
+      })
+      try {
+        await markSpaceAsReadApi(spId)
+      } catch (err) {
+        console.error("Failed to mark space as read:", err)
+      }
+    } else {
+      setUnreadSpaceCounts((prev) => ({
+        ...prev,
+        [spId]: 1,
+      }))
+      try {
+        await markSpaceAsUnreadApi(spId)
+      } catch (err) {
+        console.error("Failed to mark space as unread:", err)
+      }
+    }
+  }
 
   const handleForwardSuccess = (result) => {
     handleCloseForwardModal()
@@ -270,8 +350,17 @@ const SlackShell = () => {
 
     if (result.target.type === "CHANNEL") {
       setSelectedDMUser(null)
+      setSelectedSpace(null)
       navigate(`/app/workspace/${wsId}/channel/${result.target.id}`)
+    } else if (result.target.type === "SPACE") {
+      setSelectedDMUser(null)
+      const foundSpace = spaces.find(
+        (s) => (s._id || s.id)?.toString() === result.target.id?.toString()
+      )
+      setSelectedSpace(foundSpace || { id: result.target.id, name: result.target.name })
+      navigate(`/app/workspace/${wsId}/space/${result.target.id}`)
     } else if (result.target.type === "DIRECT") {
+      setSelectedSpace(null)
       const found = workspaceMembers.find(
         (m) => (m.id || m._id)?.toString() === result.target.id?.toString()
       )
@@ -308,6 +397,19 @@ const SlackShell = () => {
       .trim()
       .toLowerCase()
       .replace(/^[#@]/, "")
+
+    // 0. Try finding in spaces if rawType is SPACE
+    if (rawType === "SPACE") {
+      const foundSpace = spaces.find(
+        (s) =>
+          (s._id || s.id)?.toString() === rawId ||
+          (s.name || "").toLowerCase() === rawName
+      )
+      if (foundSpace) {
+        handleSelectSpace(foundSpace)
+        return
+      }
+    }
 
     // 1. Try finding in channels if rawType is CHANNEL or if not specified
     let targetChannel = null
@@ -517,6 +619,184 @@ const SlackShell = () => {
     markDirectMessagesAsRead(selectedDMUser.id).catch(() => {})
   }, [selectedDMUser?.id])
 
+  // Load spaces and space unread counts
+  useEffect(() => {
+    if (!workspaceId) return
+    let cancelled = false
+
+    fetchSpaces(workspaceId)
+      .then((res) => {
+        if (!cancelled && res?.spaces) {
+          setSpaces(res.spaces)
+        }
+      })
+      .catch((err) => console.warn("Failed to load spaces:", err.message))
+
+    fetchSpaceUnreadCountsApi(workspaceId)
+      .then((counts) => {
+        if (!cancelled && counts) {
+          setUnreadSpaceCounts(counts)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId])
+
+  // URL spaceId sync
+  useEffect(() => {
+    if (!spaceId) {
+      if (!channelId) {
+        // Not in a space URL
+      }
+      return
+    }
+
+    setIsHomeView(false)
+    setIsStarredView(false)
+    setIsMentionsView(false)
+    setSelectedDMUser(null)
+
+    const existing = spaces.find((s) => (s._id || s.id)?.toString() === spaceId.toString())
+    if (existing) {
+      setSelectedSpace(existing)
+    } else {
+      fetchSpace(spaceId)
+        .then((res) => {
+          if (res?.space) setSelectedSpace(res.space)
+        })
+        .catch((err) => {
+          console.warn("Failed to fetch space:", err)
+          toast.error("Could not load Space or you do not have permission.")
+          navigate(`/app/workspace/${workspaceId}`, { replace: true })
+        })
+    }
+
+    setUnreadSpaceCounts((prev) => {
+      const next = { ...prev }
+      delete next[spaceId.toString()]
+      return next
+    })
+    markSpaceAsReadApi(spaceId).catch(() => {})
+  }, [spaceId, spaces, workspaceId, navigate])
+
+  // Space real-time socket events
+  useEffect(() => {
+    const handleSpaceCreated = (data) => {
+      const sp = data?.space || data
+      if (!sp || (!sp._id && !sp.id)) return
+      const spWsId = (sp.workspaceId?._id || sp.workspaceId)?.toString()
+      if (workspaceId && spWsId && spWsId !== workspaceId.toString()) return
+
+      setSpaces((prev) => {
+        const idStr = (sp._id || sp.id).toString()
+        const exists = prev.some((s) => (s._id || s.id).toString() === idStr)
+        if (exists) {
+          return prev.map((s) => ((s._id || s.id).toString() === idStr ? sp : s))
+        }
+        return [sp, ...prev]
+      })
+    }
+
+    const handleSpaceUpdated = (data) => {
+      const sp = data?.space || data
+      if (!sp || (!sp._id && !sp.id)) return
+      const idStr = (sp._id || sp.id).toString()
+      setSpaces((prev) =>
+        prev.map((s) => ((s._id || s.id).toString() === idStr ? sp : s))
+      )
+      setSelectedSpace((prev) => {
+        if (!prev) return prev
+        const prevId = (prev._id || prev.id).toString()
+        return prevId === idStr ? sp : prev
+      })
+    }
+
+    const handleSpaceDeleted = (data) => {
+      if (!data?.spaceId) return
+      const delId = data.spaceId.toString()
+      setSpaces((prev) => prev.filter((s) => (s._id || s.id).toString() !== delId))
+      setSelectedSpace((prev) => {
+        if (!prev) return prev
+        const prevId = (prev._id || prev.id).toString()
+        if (prevId === delId) {
+          toast.info("This Space has been deleted")
+          setIsHomeView(true)
+          navigate(`/app/workspace/${workspaceId}`, { replace: true })
+          return null
+        }
+        return prev
+      })
+    }
+
+    const handleSpaceMemberRemoved = (data) => {
+      if (!data?.spaceId) return
+      const spId = data.spaceId.toString()
+      const currentUserId = (user?.id || user?._id)?.toString()
+      if (data.userId?.toString() === currentUserId && !isSuperAdmin) {
+        setSpaces((prev) => prev.filter((s) => (s._id || s.id).toString() !== spId))
+        setSelectedSpace((prev) => {
+          if (!prev) return prev
+          const prevId = (prev._id || prev.id).toString()
+          if (prevId === spId) {
+            toast.info(`You have been removed from Space "${data.spaceName || "Space"}"`)
+            setIsHomeView(true)
+            navigate(`/app/workspace/${workspaceId}`, { replace: true })
+            return null
+          }
+          return prev
+        })
+      } else {
+        fetchSpace(spId)
+          .then((res) => {
+            if (res?.space) {
+              setSpaces((prev) =>
+                prev.map((s) => ((s._id || s.id).toString() === spId ? res.space : s))
+              )
+              setSelectedSpace((prev) =>
+                prev && (prev._id || prev.id).toString() === spId ? res.space : prev
+              )
+            }
+          })
+          .catch(() => {})
+      }
+    }
+
+    const handleReceiveSpaceMessage = (data) => {
+      const msg = data?.message || data
+      const msgSpaceId = (msg?.spaceId?._id || msg?.spaceId)?.toString()
+      const currentUserId = (user?.id || user?._id)?.toString()
+      if (!msgSpaceId) return
+      if (msg?.senderId?.toString() === currentUserId) return
+
+      const activeSpaceId = selectedSpace
+        ? (selectedSpace._id || selectedSpace.id)?.toString()
+        : null
+      if (activeSpaceId !== msgSpaceId) {
+        setUnreadSpaceCounts((prev) => ({
+          ...prev,
+          [msgSpaceId]: (prev[msgSpaceId] || 0) + 1,
+        }))
+      }
+    }
+
+    socket.on("space-created", handleSpaceCreated)
+    socket.on("space-updated", handleSpaceUpdated)
+    socket.on("space-deleted", handleSpaceDeleted)
+    socket.on("space-member-removed", handleSpaceMemberRemoved)
+    socket.on("receive-space-message", handleReceiveSpaceMessage)
+
+    return () => {
+      socket.off("space-created", handleSpaceCreated)
+      socket.off("space-updated", handleSpaceUpdated)
+      socket.off("space-deleted", handleSpaceDeleted)
+      socket.off("space-member-removed", handleSpaceMemberRemoved)
+      socket.off("receive-space-message", handleReceiveSpaceMessage)
+    }
+  }, [workspaceId, isSuperAdmin, selectedSpace, user, navigate])
+
   const handleSelectWorkspace = async (id) => {
     if (!id || id === workspaceId) return
     await selectWorkspace(id)
@@ -528,6 +808,7 @@ const SlackShell = () => {
     setIsStarredView(false)
     setIsMentionsView(false)
     setSelectedDMUser(null)
+    setSelectedSpace(null)
     setUnreadChannelCounts((counts) => {
       const nextCounts = { ...counts }
       delete nextCounts[chan.id.toString()]
@@ -912,82 +1193,111 @@ const SlackShell = () => {
               <i className={`fa-solid fa-chevron-down text-xs text-[#A5C9CA] transition-transform ${showWorkspaceMenu ? "rotate-180" : ""}`} />
             </button>
           </div>
-          <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-1">
-            {/* Home button */}
+          {/* New chat + Shortcuts for mobile */}
+          <div className="px-3 pt-3 pb-1">
             <button
               type="button"
-              onClick={() => {
-                setIsHomeView(true)
-                setIsStarredView(false)
-                setIsMentionsView(false)
-                setSelectedDMUser(null)
-                setIsMobileSidebarOpen(false)
-                navigate(`/app/workspace/${workspaceId}`)
-              }}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
-                isHomeView && !isStarredView && !isMentionsView && !selectedDMUser
-                  ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                  : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-              }`}
+              onClick={() => { setShowNewChatModal(true); setNewChatSearch(""); setIsMobileSidebarOpen(false) }}
+              className="flex w-full items-center gap-2 rounded-xl border border-[#395B64]/60 bg-[#2C3333]/50 px-3 py-2 text-sm font-semibold text-[#E7F6F2] hover:bg-[#395B64]/60 transition"
             >
-              <i className="fa-solid fa-house w-4 text-center" />
-              <span className="flex-1 text-left">Home</span>
+              <i className="fa-regular fa-pen-to-square text-[#A5C9CA] text-xs" />
+              <span>New chat</span>
+            </button>
+          </div>
+
+          <div className="border-b border-[#2C3333] px-3 py-2 space-y-0.5">
+            <button
+              type="button"
+              onClick={() => setIsShortcutsCollapsed((prev) => !prev)}
+              className="group flex w-full items-center gap-1.5 px-2 pb-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
+            >
+              <i className={`fa-solid fa-chevron-${isShortcutsCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
+              <span>Shortcuts</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => { setShowActivityPanel(true); setIsMobileSidebarOpen(false) }}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
-            >
-              <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
-              <span className="flex-1 text-left">Notifications</span>
-              {unreadNotificationsCount > 0 && (
-                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
-                  {unreadNotificationsCount}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsHomeView(false)
-                setIsStarredView(true)
-                setIsMentionsView(false)
-                setSelectedDMUser(null)
-                setIsMobileSidebarOpen(false)
-              }}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
-                isStarredView
-                  ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                  : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-              }`}
-            >
-              <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
-              <span className="flex-1 text-left">Starred</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsHomeView(false)
-                setIsMentionsView(true)
-                setIsStarredView(false)
-                setSelectedDMUser(null)
-                setIsMobileSidebarOpen(false)
-              }}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
-                isMentionsView
-                  ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                  : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-              }`}
-            >
-              <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
-              <span className="flex-1 text-left">Mentions</span>
-              {unreadMentionsCount > 0 && (
-                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
-                  {unreadMentionsCount}
-                </span>
-              )}
-            </button>
+            {!isShortcutsCollapsed && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHomeView(true)
+                    setIsStarredView(false)
+                    setIsMentionsView(false)
+                    setSelectedDMUser(null)
+                    setSelectedSpace(null)
+                    setIsMobileSidebarOpen(false)
+                    navigate(`/app/workspace/${workspaceId}`)
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                    isHomeView && !isStarredView && !isMentionsView && !selectedDMUser && !selectedSpace
+                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                  }`}
+                >
+                  <i className="fa-solid fa-house w-4 text-center" />
+                  <span className="flex-1 text-left">Home</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setShowActivityPanel(true); setIsMobileSidebarOpen(false) }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+                >
+                  <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
+                  <span className="flex-1 text-left">Notifications</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHomeView(false)
+                    setIsStarredView(true)
+                    setIsMentionsView(false)
+                    setSelectedDMUser(null)
+                    setSelectedSpace(null)
+                    setIsMobileSidebarOpen(false)
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                    isStarredView
+                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                  }`}
+                >
+                  <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
+                  <span className="flex-1 text-left">Starred</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHomeView(false)
+                    setIsMentionsView(true)
+                    setIsStarredView(false)
+                    setSelectedDMUser(null)
+                    setSelectedSpace(null)
+                    setIsMobileSidebarOpen(false)
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                    isMentionsView
+                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                  }`}
+                >
+                  <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
+                  <span className="flex-1 text-left">Mentions</span>
+                  {unreadMentionsCount > 0 && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                      {unreadMentionsCount}
+                    </span>
+                  )}
+                </button>
+              </>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
             {/* Channels */}
@@ -1138,6 +1448,7 @@ const SlackShell = () => {
                               setIsStarredView(false)
                               setIsMentionsView(false)
                               setSelectedDMUser(member)
+                              setSelectedSpace(null)
                               setShowDetailsPane(false)
                               setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
                               markDirectMessagesAsRead(member.id).catch(() => {})
@@ -1152,6 +1463,7 @@ const SlackShell = () => {
                                 setIsStarredView(false)
                                 setIsMentionsView(false)
                                 setSelectedDMUser(member)
+                                setSelectedSpace(null)
                                 setShowDetailsPane(false)
                                 setUnreadDMCounts((counts) => { const n = { ...counts }; delete n[member.id?.toString()]; return n })
                                 markDirectMessagesAsRead(member.id).catch(() => {})
@@ -1231,6 +1543,194 @@ const SlackShell = () => {
                     <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                       No members yet
                     </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Spaces */}
+            <div>
+              <div className="flex items-center justify-between px-2 pb-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsSpacesCollapsed((prev) => !prev)}
+                  className="group flex items-center gap-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
+                >
+                  <i className={`fa-solid fa-chevron-${isSpacesCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
+                  <i className="fa-solid fa-table-cells-large text-[11px] text-[#A5C9CA]/80 group-hover:text-white" />
+                  <span>Spaces</span>
+                  {totalUnreadSpacesCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white bg-emerald-600/90 rounded-full shadow-xs">
+                      {totalUnreadSpacesCount}
+                    </span>
+                  )}
+                </button>
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateSpaceModal(true)
+                      setIsMobileSidebarOpen(false)
+                    }}
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
+                    title="Create space"
+                  >
+                    <i className="fa-solid fa-plus" />
+                  </button>
+                )}
+              </div>
+
+              {!isSpacesCollapsed && (
+                <div className="space-y-0.5 pt-1">
+                  {spaces.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                      {isSuperAdmin ? (
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span>No Spaces yet</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCreateSpaceModal(true)
+                              setIsMobileSidebarOpen(false)
+                            }}
+                            className="text-[11px] font-semibold text-[#E7F6F2] hover:text-white underline underline-offset-2"
+                          >
+                            Create a Space
+                          </button>
+                        </div>
+                      ) : (
+                        <span>You haven't been added to any Spaces yet</span>
+                      )}
+                    </div>
+                  ) : (
+                    spaces.map((sp) => {
+                      const spId = (sp._id || sp.id)?.toString()
+                      const isActive = selectedSpace && (selectedSpace._id || selectedSpace.id)?.toString() === spId
+                      const isMenuOpen = activeSpaceForAction?.type === "menu" && activeSpaceForAction?.id === spId
+                      const isUnread = (unreadSpaceCounts[spId] || 0) > 0
+                      const memberCount = sp.members?.length || 0
+
+                      return (
+                        <div key={spId} className="relative group">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleSelectSpace(sp)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                handleSelectSpace(sp)
+                              }
+                            }}
+                            className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                              isActive
+                                ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                                : isUnread
+                                ? "text-white font-semibold hover:bg-[#2C3333]"
+                                : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                            }`}
+                          >
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <i className="fa-solid fa-table-cells-large text-xs w-3.5 text-center flex-shrink-0 text-[#A5C9CA]" />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm leading-tight">{sp.name}</div>
+                                <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
+                                  {memberCount} {memberCount === 1 ? "member" : "members"}
+                                </div>
+                              </div>
+                              {isUnread && (
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs" title="Unread messages" />
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleSpaceRead(sp, e)}
+                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                  isMenuOpen ? "flex" : "hidden group-hover:flex"
+                                }`}
+                                title={isUnread ? "Mark as read" : "Mark as unread"}
+                              >
+                                <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveSpaceForAction(
+                                    isMenuOpen ? null : { type: "menu", id: spId, space: sp }
+                                  )
+                                }}
+                                className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
+                                title="Space options"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {isMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setActiveSpaceForAction(null)}
+                              />
+                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-44 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    handleToggleSpaceRead(sp, e)
+                                    setActiveSpaceForAction(null)
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                                >
+                                  <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`} />
+                                  {isUnread ? "Mark as read" : "Mark as unread"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSpaceForAction(sp)
+                                    setShowManageSpaceMembersModal(true)
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                                >
+                                  <i className="fa-solid fa-users text-[#A5C9CA] w-3.5" />
+                                  {isSuperAdmin ? "Manage Members" : "View Members"}
+                                </button>
+                                {isSuperAdmin && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveSpaceForAction(sp)
+                                        setShowEditSpaceModal(true)
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                                    >
+                                      <i className="fa-solid fa-pen text-[#A5C9CA] w-3.5" />
+                                      Edit Space
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveSpaceForAction(sp)
+                                        setShowDeleteSpaceModal(true)
+                                      }}
+                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
+                                    >
+                                      <i className="fa-solid fa-trash text-rose-400 w-3.5" />
+                                      Delete Space
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               )}
@@ -1499,82 +1999,112 @@ const SlackShell = () => {
             </>
           )}
         </div>
-        <div className="border-b border-[#2C3333] px-3 py-2.5 space-y-1">
-          {/* Home button */}
+        {/* New chat button + collapsible Shortcuts */}
+        <div className="px-3 pt-3 pb-1">
           <button
             type="button"
-            onClick={() => {
-              setIsHomeView(true)
-              setIsStarredView(false)
-              setIsMentionsView(false)
-              setSelectedDMUser(null)
-              setIsMobileSidebarOpen(false)
-              navigate(`/app/workspace/${workspaceId}`)
-            }}
-            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
-              isHomeView && !isStarredView && !isMentionsView && !selectedDMUser
-                ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-            }`}
+            onClick={() => { setShowNewChatModal(true); setNewChatSearch("") }}
+            className="flex w-full items-center gap-2 rounded-xl border border-[#395B64]/60 bg-[#2C3333]/50 px-3 py-2 text-sm font-semibold text-[#E7F6F2] hover:bg-[#395B64]/60 hover:border-[#A5C9CA]/40 transition"
           >
-            <i className="fa-solid fa-house w-4 text-center" />
-            <span className="flex-1 text-left">Home</span>
+            <i className="fa-regular fa-pen-to-square text-[#A5C9CA] text-xs" />
+            <span>New chat</span>
+          </button>
+        </div>
+
+        <div className="border-b border-[#2C3333] px-3 py-2 space-y-0.5">
+          {/* Shortcuts collapsible header */}
+          <button
+            type="button"
+            onClick={() => setIsShortcutsCollapsed((prev) => !prev)}
+            className="group flex w-full items-center gap-1.5 px-2 pb-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
+          >
+            <i className={`fa-solid fa-chevron-${isShortcutsCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
+            <span>Shortcuts</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowActivityPanel(true)}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
-          >
-            <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
-            <span className="flex-1 text-left">Notifications</span>
-            {unreadNotificationsCount > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
-                {unreadNotificationsCount}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsHomeView(false)
-              setIsStarredView(true)
-              setIsMentionsView(false)
-              setSelectedDMUser(null)
-              setIsMobileSidebarOpen(false)
-            }}
-            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
-              isStarredView
-                ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-            }`}
-          >
-            <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
-            <span className="flex-1 text-left">Starred</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsHomeView(false)
-              setIsMentionsView(true)
-              setIsStarredView(false)
-              setSelectedDMUser(null)
-              setIsMobileSidebarOpen(false)
-            }}
-            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
-              isMentionsView
-                ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-            }`}
-          >
-            <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
-            <span className="flex-1 text-left">Mentions</span>
-            {unreadMentionsCount > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
-                {unreadMentionsCount}
-              </span>
-            )}
-          </button>
+          {!isShortcutsCollapsed && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHomeView(true)
+                  setIsStarredView(false)
+                  setIsMentionsView(false)
+                  setSelectedDMUser(null)
+                  setSelectedSpace(null)
+                  setIsMobileSidebarOpen(false)
+                  navigate(`/app/workspace/${workspaceId}`)
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                  isHomeView && !isStarredView && !isMentionsView && !selectedDMUser && !selectedSpace
+                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                }`}
+              >
+                <i className="fa-solid fa-house w-4 text-center" />
+                <span className="flex-1 text-left">Home</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowActivityPanel(true)}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+              >
+                <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
+                <span className="flex-1 text-left">Notifications</span>
+                {unreadNotificationsCount > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHomeView(false)
+                  setIsStarredView(true)
+                  setIsMentionsView(false)
+                  setSelectedDMUser(null)
+                  setSelectedSpace(null)
+                  setIsMobileSidebarOpen(false)
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                  isStarredView
+                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                }`}
+              >
+                <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
+                <span className="flex-1 text-left">Starred</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHomeView(false)
+                  setIsMentionsView(true)
+                  setIsStarredView(false)
+                  setSelectedDMUser(null)
+                  setSelectedSpace(null)
+                  setIsMobileSidebarOpen(false)
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                  isMentionsView
+                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                }`}
+              >
+                <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
+                <span className="flex-1 text-left">Mentions</span>
+                {unreadMentionsCount > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                    {unreadMentionsCount}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
@@ -1778,6 +2308,7 @@ const SlackShell = () => {
                             setIsStarredView(false)
                             setIsMentionsView(false)
                             setSelectedDMUser(member)
+                            setSelectedSpace(null)
                             setShowDetailsPane(false)
                             setUnreadDMCounts((counts) => {
                               const nextCounts = { ...counts }
@@ -1796,6 +2327,7 @@ const SlackShell = () => {
                               setIsStarredView(false)
                               setIsMentionsView(false)
                               setSelectedDMUser(member)
+                              setSelectedSpace(null)
                               setShowDetailsPane(false)
                               setUnreadDMCounts((counts) => {
                                 const nextCounts = { ...counts }
@@ -1896,12 +2428,193 @@ const SlackShell = () => {
               </div>
             )}
           </div>
+
+          {/* Spaces */}
+          <div>
+            <div className="flex items-center justify-between px-2 pb-1.5">
+              <button
+                type="button"
+                onClick={() => setIsSpacesCollapsed((prev) => !prev)}
+                className="group flex items-center gap-1.5 text-xs font-semibold text-[#A5C9CA]/80 hover:text-white transition"
+              >
+                <i className={`fa-solid fa-chevron-${isSpacesCollapsed ? "right" : "down"} text-[9px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`} />
+                <span>Spaces</span>
+                {totalUnreadSpacesCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white bg-emerald-600/90 rounded-full shadow-xs">
+                    {totalUnreadSpacesCount}
+                  </span>
+                )}
+              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateSpaceModal(true)}
+                  className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
+                  title="Create space"
+                >
+                  <i className="fa-solid fa-plus" />
+                </button>
+              )}
+            </div>
+
+            {!isSpacesCollapsed && (
+              <div className="space-y-0.5 pt-1">
+                {spaces.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                    {isSuperAdmin ? (
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span>No Spaces yet</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateSpaceModal(true)}
+                          className="text-[11px] font-semibold text-[#E7F6F2] hover:text-white underline underline-offset-2"
+                        >
+                          Create a Space
+                        </button>
+                      </div>
+                    ) : (
+                      <span>You haven't been added to any Spaces yet</span>
+                    )}
+                  </div>
+                ) : (
+                  spaces.map((sp) => {
+                    const spId = (sp._id || sp.id)?.toString()
+                    const isActive = selectedSpace && (selectedSpace._id || selectedSpace.id)?.toString() === spId
+                    const isMenuOpen = activeSpaceForAction?.type === "menu" && activeSpaceForAction?.id === spId
+                    const isUnread = (unreadSpaceCounts[spId] || 0) > 0
+                    const memberCount = sp.members?.length || 0
+
+                    return (
+                      <div key={spId} className="relative group">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleSelectSpace(sp)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault()
+                              handleSelectSpace(sp)
+                            }
+                          }}
+                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                            isActive
+                              ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                              : isUnread
+                              ? "text-white font-semibold hover:bg-[#2C3333]"
+                              : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                          }`}
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <span className="text-amber-400 text-xs w-3.5 text-center flex-shrink-0">✦</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm leading-tight">{sp.name}</div>
+                              <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
+                                {memberCount} {memberCount === 1 ? "member" : "members"}
+                              </div>
+                            </div>
+                            {isUnread && (
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs" title="Unread messages" />
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleSpaceRead(sp, e)}
+                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                isMenuOpen ? "flex" : "hidden group-hover:flex"
+                              }`}
+                              title={isUnread ? "Mark as read" : "Mark as unread"}
+                            >
+                              <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActiveSpaceForAction(
+                                  isMenuOpen ? null : { type: "menu", id: spId, space: sp }
+                                )
+                              }}
+                              className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
+                              title="Space options"
+                            >
+                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {isMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setActiveSpaceForAction(null)}
+                            />
+                            <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-44 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  handleToggleSpaceRead(sp, e)
+                                  setActiveSpaceForAction(null)
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                              >
+                                <i className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`} />
+                                {isUnread ? "Mark as read" : "Mark as unread"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveSpaceForAction(sp)
+                                  setShowManageSpaceMembersModal(true)
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                              >
+                                <i className="fa-solid fa-users text-[#A5C9CA] w-3.5" />
+                                {isSuperAdmin ? "Manage Members" : "View Members"}
+                              </button>
+                              {isSuperAdmin && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveSpaceForAction(sp)
+                                      setShowEditSpaceModal(true)
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                                  >
+                                    <i className="fa-solid fa-pen text-[#A5C9CA] w-3.5" />
+                                    Edit Space
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveSpaceForAction(sp)
+                                      setShowDeleteSpaceModal(true)
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
+                                  >
+                                    <i className="fa-solid fa-trash text-rose-400 w-3.5" />
+                                    Delete Space
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
 
       <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB] dark:bg-[#121717] transition-colors">
-        {!selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && (
+        {!selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && !selectedSpace && (
           <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-3 sm:px-6 shadow-xs select-none transition-colors gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Hamburger — mobile only */}
@@ -1994,11 +2707,21 @@ const SlackShell = () => {
                 setIsHomeView(false)
                 setIsStarredView(false)
                 setSelectedDMUser(null)
+                setSelectedSpace(null)
                 navigate(`/app/workspace/${workspaceId}/channel/${cId}`)
+              }}
+              onNavigateSpace={(sId) => {
+                setIsHomeView(false)
+                setIsStarredView(false)
+                setSelectedDMUser(null)
+                const found = spaces.find((s) => (s._id || s.id)?.toString() === sId?.toString())
+                setSelectedSpace(found || { id: sId, name: "Space" })
+                navigate(`/app/workspace/${workspaceId}/space/${sId}`)
               }}
               onNavigateDM={(otherUserId, otherUser) => {
                 setIsHomeView(false)
                 setIsStarredView(false)
+                setSelectedSpace(null)
                 if (otherUser && (otherUser.id || otherUser._id)) {
                   setSelectedDMUser({
                     id: otherUser.id || otherUser._id,
@@ -2023,11 +2746,21 @@ const SlackShell = () => {
                 setIsHomeView(false)
                 setIsMentionsView(false)
                 setSelectedDMUser(null)
+                setSelectedSpace(null)
                 navigate(`/app/workspace/${workspaceId}/channel/${cId}`)
+              }}
+              onNavigateSpace={(sId) => {
+                setIsHomeView(false)
+                setIsMentionsView(false)
+                setSelectedDMUser(null)
+                const found = spaces.find((s) => (s._id || s.id)?.toString() === sId?.toString())
+                setSelectedSpace(found || { id: sId, name: "Space" })
+                navigate(`/app/workspace/${workspaceId}/space/${sId}`)
               }}
               onNavigateDM={(otherUserId, otherUser) => {
                 setIsHomeView(false)
                 setIsMentionsView(false)
+                setSelectedSpace(null)
                 if (otherUser && (otherUser.id || otherUser._id)) {
                   setSelectedDMUser({
                     id: otherUser.id || otherUser._id,
@@ -2050,6 +2783,27 @@ const SlackShell = () => {
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
             />
+          ) : selectedSpace ? (
+            <SpaceMessageThread
+              space={selectedSpace}
+              currentUserId={user?.id || user?._id}
+              isSuperAdmin={isSuperAdmin}
+              onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+              onManageMembers={() => {
+                setActiveSpaceForAction(selectedSpace)
+                setShowManageSpaceMembersModal(true)
+              }}
+              onEditSpace={() => {
+                setActiveSpaceForAction(selectedSpace)
+                setShowEditSpaceModal(true)
+              }}
+              onDeleteSpace={() => {
+                setActiveSpaceForAction(selectedSpace)
+                setShowDeleteSpaceModal(true)
+              }}
+              onForwardMessage={handleOpenForwardModal}
+              onNavigateSource={handleNavigateSource}
+            />
           ) : (
             <ChannelMessageThread
               channel={activeChannel || currentChannel}
@@ -2060,14 +2814,14 @@ const SlackShell = () => {
           )}
 
           {/* Mobile backdrop for Details Pane */}
-          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && (
+          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && !selectedSpace && (
             <div
               className="absolute inset-0 z-10 bg-black/50 sm:hidden"
               onClick={() => setShowDetailsPane(false)}
             />
           )}
 
-          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && (
+          {showDetailsPane && !selectedDMUser && !isStarredView && !isMentionsView && !isHomeView && !selectedSpace && (
             <aside className="absolute inset-y-0 right-0 w-[85%] sm:relative sm:w-72 md:w-80 border-l border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex flex-col h-full overflow-y-auto z-20 shadow-lg transition-colors sm:inset-auto sm:shadow-none">
               <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-5 py-4">
                 <h3 className="text-base font-bold text-[#2C3333] dark:text-white">Channel Details</h3>
@@ -2296,8 +3050,89 @@ const SlackShell = () => {
           message={forwardModalData.message}
           sourceContext={forwardModalData.sourceContext}
           channels={channels}
+          spaces={spaces}
           members={workspaceMembers}
           onForwardSuccess={handleForwardSuccess}
+        />
+      )}
+
+      {/* Space Modals */}
+      {showCreateSpaceModal && (
+        <CreateSpaceModal
+          workspaceId={workspaceId}
+          workspaceMembers={workspaceMembers}
+          onClose={() => setShowCreateSpaceModal(false)}
+          onSpaceCreated={(newSpace) => {
+            setSpaces((prev) => [newSpace, ...prev.filter((s) => (s._id || s.id)?.toString() !== (newSpace._id || newSpace.id)?.toString())])
+            handleSelectSpace(newSpace)
+          }}
+        />
+      )}
+
+      {showEditSpaceModal && activeSpaceForAction && (
+        <EditSpaceModal
+          space={activeSpaceForAction}
+          onClose={() => {
+            setShowEditSpaceModal(false)
+            setActiveSpaceForAction(null)
+          }}
+          onSpaceUpdated={(updatedSpace) => {
+            setSpaces((prev) =>
+              prev.map((s) =>
+                (s._id || s.id)?.toString() === (updatedSpace._id || updatedSpace.id)?.toString()
+                  ? updatedSpace
+                  : s
+              )
+            )
+            if (selectedSpace && (selectedSpace._id || selectedSpace.id)?.toString() === (updatedSpace._id || updatedSpace.id)?.toString()) {
+              setSelectedSpace(updatedSpace)
+            }
+          }}
+        />
+      )}
+
+      {showManageSpaceMembersModal && activeSpaceForAction && (
+        <SpaceMembersModal
+          space={activeSpaceForAction}
+          workspaceMembers={workspaceMembers}
+          currentUserId={user?.id || user?._id}
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => {
+            setShowManageSpaceMembersModal(false)
+            setActiveSpaceForAction(null)
+          }}
+          onMembersUpdated={(updatedSpace) => {
+            setActiveSpaceForAction(updatedSpace)
+            setSpaces((prev) =>
+              prev.map((s) =>
+                (s._id || s.id)?.toString() === (updatedSpace._id || updatedSpace.id)?.toString()
+                  ? updatedSpace
+                  : s
+              )
+            )
+            if (selectedSpace && (selectedSpace._id || selectedSpace.id)?.toString() === (updatedSpace._id || updatedSpace.id)?.toString()) {
+              setSelectedSpace(updatedSpace)
+            }
+          }}
+        />
+      )}
+
+      {showDeleteSpaceModal && activeSpaceForAction && (
+        <DeleteSpaceModal
+          space={activeSpaceForAction}
+          onClose={() => {
+            setShowDeleteSpaceModal(false)
+            setActiveSpaceForAction(null)
+          }}
+          onSpaceDeleted={(deletedSpaceId) => {
+            const delId = deletedSpaceId.toString()
+            setSpaces((prev) => prev.filter((s) => (s._id || s.id)?.toString() !== delId))
+            if (selectedSpace && (selectedSpace._id || selectedSpace.id)?.toString() === delId) {
+              setSelectedSpace(null)
+              setIsHomeView(true)
+              navigate(`/app/workspace/${workspaceId}`, { replace: true })
+            }
+          }}
         />
       )}
 
@@ -2453,6 +3288,99 @@ const SlackShell = () => {
           }
         }}
       />
+      {/* ── New Chat Modal ─────────────────────────────────────────────── */}
+      {showNewChatModal && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/50"
+            onClick={() => setShowNewChatModal(false)}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-sm rounded-2xl border border-[#395B64] bg-[#1E2525] shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#2C3333]">
+                <h2 className="text-base font-bold text-white">New chat</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowNewChatModal(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+                >
+                  <i className="fa-solid fa-xmark text-sm" />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-2 rounded-xl bg-[#2C3333] px-3 py-2 border border-[#395B64]/40">
+                  <i className="fa-solid fa-magnifying-glass text-[#A5C9CA] text-xs" />
+                  <input
+                    type="text"
+                    placeholder="Search people..."
+                    value={newChatSearch}
+                    onChange={(e) => setNewChatSearch(e.target.value)}
+                    autoFocus
+                    className="flex-1 bg-transparent text-sm text-[#E7F6F2] placeholder-[#A5C9CA]/60 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Members list */}
+              <div className="max-h-72 overflow-y-auto px-2 pb-3 space-y-0.5">
+                {directMessageMembers
+                  .filter((m) =>
+                    !newChatSearch.trim() ||
+                    m.username?.toLowerCase().includes(newChatSearch.toLowerCase())
+                  )
+                  .map((member) => (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => {
+                        setIsHomeView(false)
+                        setIsStarredView(false)
+                        setIsMentionsView(false)
+                        setSelectedDMUser(member)
+                        setSelectedSpace(null)
+                        setShowDetailsPane(false)
+                        setActiveChannelMenuId(null)
+                        setActiveDMMenuId(null)
+                        setShowNewChatModal(false)
+                        navigate(`/app/workspace/${workspaceId}`)
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[#2C3333] transition"
+                    >
+                      <span className="relative flex-shrink-0">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white overflow-hidden">
+                          {(member.avatar || member.avatarUrl) ? (
+                            <img src={member.avatar || member.avatarUrl} alt={member.username} className="h-full w-full object-cover" />
+                          ) : (
+                            member.username?.charAt(0)?.toUpperCase() || "U"
+                          )}
+                        </span>
+                        <span
+                          className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${
+                            isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"
+                          }`}
+                        />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-[#E7F6F2]">{member.username}</div>
+                        <div className="truncate text-xs text-[#A5C9CA]">{member.email}</div>
+                      </div>
+                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-600"}`} />
+                    </button>
+                  ))}
+                {directMessageMembers.filter((m) =>
+                  !newChatSearch.trim() ||
+                  m.username?.toLowerCase().includes(newChatSearch.toLowerCase())
+                ).length === 0 && (
+                  <div className="py-6 text-center text-sm text-[#A5C9CA]">No members found</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

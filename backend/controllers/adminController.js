@@ -54,15 +54,18 @@ export const getAdminStats = async (req, res) => {
       );
       const isOnline = onlineUserIds.includes(u._id.toString());
       const isDeactivated = u.isActive === false || u.status === "inactive";
+      const isSuper =
+        u.role === "super_admin" ||
+        u.role === "admin" ||
+        u.email?.toLowerCase() === "admin@gmail.com";
       return {
         id: u._id,
         username: u.username,
         email: u.email,
         avatar: u.avatar,
-        role:
-          u.role ||
-          (uMemberships.some((m) => m.role === "OWNER") ? "OWNER" : "USER"),
-        platformRole: u.role || "user",
+        role: isSuper ? "admin" : (uMemberships.some((m) => m.role === "OWNER") ? "OWNER" : "member"),
+        platformRole: isSuper ? "super_admin" : (u.role || "user"),
+        isSuperAdmin: isSuper,
         isActive: !isDeactivated,
         status: isDeactivated ? "inactive" : (isOnline ? "Online" : "Active"),
         authProvider: u.authProvider || "local",
@@ -123,15 +126,18 @@ export const getAdminUsers = async (req, res) => {
       );
       const isOnline = onlineUserIds.includes(u._id.toString());
       const isDeactivated = u.isActive === false || u.status === "inactive";
+      const isSuper =
+        u.role === "super_admin" ||
+        u.role === "admin" ||
+        u.email?.toLowerCase() === "admin@gmail.com";
       return {
         id: u._id,
         username: u.username,
         email: u.email,
         avatar: u.avatar,
-        role:
-          u.role ||
-          (uMemberships.some((m) => m.role === "OWNER") ? "OWNER" : "USER"),
-        platformRole: u.role || "user",
+        role: isSuper ? "admin" : (uMemberships.some((m) => m.role === "OWNER") ? "OWNER" : "member"),
+        platformRole: isSuper ? "super_admin" : (u.role || "user"),
+        isSuperAdmin: isSuper,
         isActive: !isDeactivated,
         status: isDeactivated ? "inactive" : (isOnline ? "Online" : "Active"),
         authProvider: u.authProvider || "local",

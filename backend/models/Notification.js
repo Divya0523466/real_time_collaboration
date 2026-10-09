@@ -30,6 +30,11 @@ const notificationSchema = new mongoose.Schema(
         "CHANNEL_MENTION",
         "DM_NEW_MESSAGE",
         "DM_MENTION",
+        "SPACE_INVITED",
+        "SPACE_ADDED",
+        "SPACE_REMOVED",
+        "SPACE_MESSAGE",
+        "SPACE_MENTION",
       ],
     },
     title: {
@@ -48,6 +53,11 @@ const notificationSchema = new mongoose.Schema(
     channelId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Channel",
+      default: null,
+    },
+    spaceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Space",
       default: null,
     },
     messageId: {

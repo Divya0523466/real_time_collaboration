@@ -8,6 +8,7 @@ export const createAndSendNotification = async (io, {
   message,
   workspaceId = null,
   channelId = null,
+  spaceId = null,
   messageId = null,
   metadata = {},
 }) => {
@@ -27,6 +28,7 @@ export const createAndSendNotification = async (io, {
       message,
       workspaceId,
       channelId,
+      spaceId,
       messageId,
       metadata,
       isRead: false,
@@ -35,7 +37,8 @@ export const createAndSendNotification = async (io, {
     const populated = await Notification.findById(notification._id)
       .populate("actorId", "username email avatar")
       .populate("workspaceId", "name")
-      .populate("channelId", "name type");
+      .populate("channelId", "name type")
+      .populate("spaceId", "name");
 
     if (io) {
       io.to(`user:${recipientId}`).emit("receive-notification", populated);

@@ -177,5 +177,43 @@ export const forwardMessageSocket = (targetType, targetId, content = "", forward
   socket.emit("forward-message", { targetType, targetId, content, forwardedFrom })
 }
 
+// ── Spaces Socket Helpers ──────────────────────────────────────────
+export const joinSpace = (spaceId) => {
+  socket.emit("join-space", { spaceId })
+}
+
+export const leaveSpace = (spaceId) => {
+  socket.emit("leave-space", { spaceId })
+}
+
+export const sendSpaceMessage = (spaceId, content, replyTo = null, attachments = [], mentions = []) => {
+  socket.emit("send-space-message", { spaceId, content, replyTo, attachments, mentions })
+}
+
+export const editSpaceMessage = (messageId, content, mentions = undefined) => {
+  socket.emit("edit-space-message", { messageId, content, mentions })
+}
+
+export const deleteSpaceMessage = (messageId) => {
+  socket.emit("delete-space-message", { messageId })
+}
+
+export const onSpaceMessageEdited = (callback) => {
+  socket.on("space-message-edited", callback)
+}
+
+export const offSpaceMessageEdited = (callback) => {
+  socket.off("space-message-edited", callback)
+}
+
+export const onSpaceMessageDeleted = (callback) => {
+  socket.on("space-message-deleted", callback)
+}
+
+export const offSpaceMessageDeleted = (callback) => {
+  socket.off("space-message-deleted", callback)
+}
+
 export default socket
+
 

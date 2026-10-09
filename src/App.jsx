@@ -51,12 +51,12 @@ const LandingPage = () => {
               toast.error("Your account has been deactivated. Please contact the administrator.");
               return;
             }
-            if (user?.email?.toLowerCase() === "admin@gmail.com" && token) {
-              localStorage.setItem("worknest_admin_token", token);
-            }
             const effectiveUser = isSuperAdminUser(user)
               ? { ...user, platformRole: "super_admin", role: "admin", isSuperAdmin: true }
               : user;
+            if (isSuperAdminUser(effectiveUser) && token) {
+              localStorage.setItem("worknest_admin_token", token);
+            }
             initializeFromAuth(effectiveUser, workspaces || [], token)
             if (isSuperAdminUser(effectiveUser)) {
               navigate("/admin")
@@ -148,6 +148,7 @@ const AppRoutes = () => {
       <Route path="/app/dashboard" element={<ProtectedRoute><GlobalDashboard /></ProtectedRoute>} />
       <Route path="/app/workspace/:workspaceId" element={<ProtectedRoute><SlackShell /></ProtectedRoute>} />
       <Route path="/app/workspace/:workspaceId/channel/:channelId" element={<ProtectedRoute><SlackShell /></ProtectedRoute>} />
+      <Route path="/app/workspace/:workspaceId/space/:spaceId" element={<ProtectedRoute><SlackShell /></ProtectedRoute>} />
       <Route path="/admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
       <Route path="/super-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
       <Route path="/app/admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />

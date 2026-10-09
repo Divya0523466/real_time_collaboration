@@ -8,6 +8,7 @@ import WorkspaceMembership from "../models/WorkspaceMembership.js"
 import File from "../models/File.js"
 import Notification from "../models/Notification.js"
 import getChannelAccess from "../utils/channelAccess.js"
+import getSpaceAccess from "../utils/spaceAccess.js"
 
 const populateLegacyMessageAttachments = async (messages) => {
   if (!messages || messages.length === 0) return messages;
@@ -495,9 +496,16 @@ const starMessage = async (req, res) => {
     }
 
     if (type === "CHANNEL") {
-      const access = await getChannelAccess(userId, message.channelId);
-      if (!access.channel) {
-        return res.status(403).json({ message: "Access denied to channel" });
+      if (message.spaceId) {
+        const { space } = await getSpaceAccess(userId, message.spaceId);
+        if (!space) {
+          return res.status(403).json({ message: "Access denied to Space" });
+        }
+      } else {
+        const access = await getChannelAccess(userId, message.channelId);
+        if (!access.channel) {
+          return res.status(403).json({ message: "Access denied to channel" });
+        }
       }
       await ChannelMessage.findByIdAndUpdate(messageId, {
         $addToSet: { starredBy: userObjId },
@@ -647,7 +655,50 @@ const getStarredMessages = async (req, res) => {
         };
       });
 
-    const allStarred = [...validChannelMessages, ...validDmMessages].sort(
+    // 1b. Space messages starred by current user
+    const spaceMessages = await ChannelMessage.find({
+      spaceId: { $ne: null },
+      $or: [{ starredBy: userId }, { starredBy: userObjId }],
+      isDeleted: false,
+    })
+      .populate("spaceId", "name workspaceId")
+      .populate("senderId", "username avatar")
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const validSpaceMessages = [];
+    for (const msg of spaceMessages) {
+      if (!msg.spaceId) continue;
+      if (isFileMessageRecord(msg)) continue;
+      if (wsIdStr && msg.spaceId.workspaceId?.toString() !== wsIdStr) {
+        continue;
+      }
+
+      const { space } = await getSpaceAccess(userId, msg.spaceId._id);
+      if (space) {
+        validSpaceMessages.push({
+          id: msg._id,
+          messageId: msg._id,
+          type: "SPACE",
+          spaceId: msg.spaceId._id,
+          spaceName: msg.spaceId.name,
+          workspaceId: msg.spaceId.workspaceId,
+          content: msg.content,
+          mentions: (msg.mentions || []).map((m) => ({
+            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+          })),
+          sender: {
+            id: msg.senderId?._id,
+            username: msg.senderId?.username || "Unknown",
+            avatar: msg.senderId?.avatar,
+          },
+          createdAt: msg.createdAt,
+          isStarred: true,
+        });
+      }
+    }
+
+    const allStarred = [...validChannelMessages, ...validSpaceMessages, ...validDmMessages].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     );
 

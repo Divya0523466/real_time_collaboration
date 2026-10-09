@@ -14,9 +14,15 @@ export const isSuperAdminUser = (user) => {
     .toLowerCase()
     .trim();
   if (email === "admin@gmail.com") return true;
+
+  const role = String(user.role || "").toLowerCase().trim();
+  const platformRole = String(user.platformRole || "").toLowerCase().trim();
+
   if (
-    user.platformRole === "super_admin" ||
-    user.role === "admin" ||
+    role === "super_admin" ||
+    role === "admin" ||
+    platformRole === "super_admin" ||
+    platformRole === "admin" ||
     user.isSuperAdmin === true
   ) {
     return true;
@@ -130,8 +136,10 @@ export const getCachedAdminUsers = () => {
             u.status === "inactive";
           const isSuper =
             uemail === "admin@gmail.com" ||
-            u.platformRole === "super_admin" ||
+            u.role === "super_admin" ||
             u.role === "admin" ||
+            u.platformRole === "super_admin" ||
+            u.platformRole === "admin" ||
             u.isSuperAdmin === true ||
             (uid && superAdminSet.has(uid)) ||
             (uemail && superAdminSet.has(uemail));
@@ -168,8 +176,10 @@ export const getCachedAdminUsers = () => {
 
     const isSuper =
       uemail === "admin@gmail.com" ||
-      u.platformRole === "super_admin" ||
+      u.role === "super_admin" ||
       u.role === "admin" ||
+      u.platformRole === "super_admin" ||
+      u.platformRole === "admin" ||
       u.isSuperAdmin === true ||
       (uid && superAdminSet.has(uid)) ||
       (uemail && superAdminSet.has(uemail));

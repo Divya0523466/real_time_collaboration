@@ -22,6 +22,7 @@ const ForwardMessageModal = ({
   sourceContext = null,
   channels = [],
   members = [],
+  spaces = [],
   onForwardSuccess = () => {},
 }) => {
   const { user, isUserOnline } = useWorkspace()
@@ -81,8 +82,19 @@ const ForwardMessageModal = ({
       })
     })
 
+    // 3. Spaces
+    ;(spaces || []).forEach((sp) => {
+      const spId = (sp.id || sp._id)?.toString()
+      list.push({
+        type: "SPACE",
+        id: spId,
+        name: sp.name || "Space",
+        description: sp.description || "",
+      })
+    })
+
     return list
-  }, [channels, directMessageMembers, isUserOnline])
+  }, [channels, directMessageMembers, spaces, isUserOnline])
 
   // Filtered by search query
   const filteredDestinations = useMemo(() => {
@@ -294,6 +306,10 @@ const ForwardMessageModal = ({
                         ) : (
                           "#"
                         )}
+                      </span>
+                    ) : dest.type === "SPACE" ? (
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#00897b]/15 dark:bg-[#395B64]/30 text-[#00897b] dark:text-[#A5C9CA] text-xs font-bold shrink-0">
+                        <i className="fa-solid fa-table-cells-large text-xs" />
                       </span>
                     ) : (
                       <div className="relative shrink-0">

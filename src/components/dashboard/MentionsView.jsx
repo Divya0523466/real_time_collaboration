@@ -27,6 +27,7 @@ const formatChatDate = (dateInput) => {
 const MentionsView = ({
   workspaceId,
   onNavigateChannel,
+  onNavigateSpace,
   onNavigateDM,
   onOpenSidebar,
 }) => {
@@ -53,7 +54,7 @@ const MentionsView = ({
     fetchNotifications().catch(() => {})
 
     const handleNewNotification = (notif) => {
-      if (notif?.type === "CHANNEL_MENTION" || notif?.type === "DM_MENTION") {
+      if (notif?.type === "CHANNEL_MENTION" || notif?.type === "DM_MENTION" || notif?.type === "SPACE_MENTION") {
         loadMentions()
       }
     }
@@ -69,12 +70,15 @@ const MentionsView = ({
   const mentionItems = useMemo(() => {
     const items = (dbMentions || []).map((m) => {
       const isChannel = m.type === "CHANNEL" || m.type === "CHANNEL_MENTION"
+      const isSpace = m.type === "SPACE" || m.type === "SPACE_MENTION"
       const cId = m.channelId?._id || m.channelId?.id || m.channelId
+      const sId = m.spaceId?._id || m.spaceId?.id || m.spaceId
       const cName =
         m.channelName ||
         m.channelId?.name ||
         channels?.find((c) => (c.id || c._id)?.toString() === cId?.toString())?.name ||
         "channel"
+      const sName = m.spaceName || m.spaceId?.name || "Space"
 
       // Cross-check notification state in real-time
       const matchingNotif = (notifications || []).find(
@@ -88,8 +92,11 @@ const MentionsView = ({
         id: m.id || m._id,
         messageId: m.messageId || m.id || m._id,
         isChannel,
+        isSpace,
         channelId: cId,
         channelName: cName,
+        spaceId: sId,
+        spaceName: sName,
         otherUserId: m.otherUserId || m.sender?.id,
         otherUserName: m.otherUserName || m.sender?.username || "Direct Message",
         senderName: m.sender?.username || m.otherUserName || "Someone",
@@ -173,7 +180,11 @@ const MentionsView = ({
       handleMarkAsRead(item)
     }
 
-    if (item.isChannel) {
+    if (item.isSpace) {
+      if (item.spaceId && onNavigateSpace) {
+        onNavigateSpace(item.spaceId.toString())
+      }
+    } else if (item.isChannel) {
       if (item.channelId && onNavigateChannel) {
         onNavigateChannel(item.channelId.toString())
       }
@@ -237,7 +248,7 @@ const MentionsView = ({
           <div className="w-full divide-y divide-[#E0E7E6] dark:divide-[#2C3333]">
             {mentionItems.map((item) => {
               const actorName = item.senderName || "Someone"
-              const title = item.isChannel ? item.channelName : item.otherUserName
+              const title = item.isSpace ? `✦ ${item.spaceName}` : item.isChannel ? `#${item.channelName}` : `@${item.otherUserName}`
               const isUnread = !item.isRead
 
               return (

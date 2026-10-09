@@ -199,3 +199,44 @@ export const validateDirectMentions = async (
     })),
   };
 };
+
+export const validateSpaceMentions = async (rawMentions, space, senderId = null) => {
+  if (!rawMentions || !Array.isArray(rawMentions) || rawMentions.length === 0) {
+    return { isValid: true, mentions: [] };
+  }
+
+  const uniqueUserIds = extractMentionUserIds(rawMentions).filter(
+    (id) => !senderId || id !== senderId.toString()
+  );
+  if (uniqueUserIds.length === 0) {
+    return { isValid: true, mentions: [] };
+  }
+
+  const allValidObjectIds = uniqueUserIds.every((id) => mongoose.isValidObjectId(id));
+  if (!allValidObjectIds) {
+    return {
+      isValid: false,
+      error: "One or more mentioned users are invalid.",
+      statusCode: 400,
+    };
+  }
+
+  const spaceMemberIds = new Set((space.members || []).map((m) => m.toString()));
+  const allAreSpaceMembers = uniqueUserIds.every((id) => spaceMemberIds.has(id.toString()));
+
+  if (!allAreSpaceMembers) {
+    return {
+      isValid: false,
+      error: "Only members of this Space can be mentioned.",
+      statusCode: 400,
+    };
+  }
+
+  return {
+    isValid: true,
+    mentions: uniqueUserIds.map((id) => ({
+      userId: new mongoose.Types.ObjectId(id),
+    })),
+  };
+};
+

@@ -36,6 +36,15 @@ const getNotificationIcon = (type) => {
       return { icon: "fa-solid fa-user-minus", bg: "bg-rose-100 text-rose-700" };
     case "WORKSPACE_ROLE_CHANGED":
       return { icon: "fa-solid fa-shield-halved", bg: "bg-indigo-100 text-indigo-700" };
+    case "SPACE_MENTION":
+      return { icon: "fa-solid fa-at", bg: "bg-amber-100 text-amber-700" };
+    case "SPACE_MESSAGE":
+      return { icon: "fa-solid fa-sparkles", bg: "bg-teal-100 text-teal-700" };
+    case "SPACE_INVITED":
+    case "SPACE_ADDED":
+      return { icon: "fa-solid fa-user-plus", bg: "bg-emerald-100 text-emerald-700" };
+    case "SPACE_REMOVED":
+      return { icon: "fa-solid fa-user-minus", bg: "bg-rose-100 text-rose-700" };
     case "WORKSPACE_INVITED":
     case "WORKSPACE_ADDED":
       return { icon: "fa-solid fa-layer-group", bg: "bg-purple-100 text-purple-700" };
@@ -102,6 +111,21 @@ const NotificationPanel = ({
         const wId = notif.workspaceId?._id || notif.workspaceId;
         const cId = notif.channelId?._id || notif.channelId;
         navigate(`/app/workspace/${wId}/channel/${cId}`);
+        onClose();
+        return;
+      }
+    }
+
+    if (
+      notif.type === "SPACE_MESSAGE" ||
+      notif.type === "SPACE_MENTION" ||
+      notif.type === "SPACE_ADDED" ||
+      notif.type === "SPACE_INVITED"
+    ) {
+      const sId = notif.spaceId?._id || notif.spaceId;
+      const wId = notif.workspaceId?._id || notif.workspaceId;
+      if (sId && wId) {
+        navigate(`/app/workspace/${wId}/space/${sId}`);
         onClose();
         return;
       }

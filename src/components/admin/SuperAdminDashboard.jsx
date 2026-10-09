@@ -6,7 +6,14 @@ import { useTheme } from "../../context/ThemeContext"
 import { toast } from "react-toastify"
 import ProfileModal from "../dashboard/ProfileModal"
 import CreateWorkspaceModal from "../dashboard/CreateWorkspaceModal"
+import CreateSpaceModal from "../dashboard/CreateSpaceModal"
 import { getWorkspaceInitials } from "../dashboard/SlackShell"
+import {
+  fetchSpaces,
+  deleteSpaceApi,
+  addSpaceMemberByEmailApi,
+  removeSpaceMemberApi,
+} from "../../services/spaceService"
 import {
   isSuperAdminUser,
   addSuperAdmin,
@@ -69,14 +76,25 @@ const SuperAdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("")
   const [userRoleFilter, setUserRoleFilter] = useState("all")
 
+  // Space management states
+  const [spaces, setSpaces] = useState([])
+  const [isSpacesLoading, setIsSpacesLoading] = useState(false)
+  const [showCreateSpaceModal, setShowCreateSpaceModal] = useState(false)
+  const [activeMembersModalSpace, setActiveMembersModalSpace] = useState(null)
+  const [addMemberEmail, setAddMemberEmail] = useState("")
+  const [isAddingMember, setIsAddingMember] = useState(false)
+  const [addMemberError, setAddMemberError] = useState("")
+  const [removingMemberId, setRemovingMemberId] = useState(null)
+  const [deleteSpaceConfirm, setDeleteSpaceConfirm] = useState(null)
+
   // Modal for delete user action
   const [deleteUserConfirm, setDeleteUserConfirm] = useState(null)
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 
-  // Automatically remember admin token when admin@gmail.com is in session
+  // Automatically remember admin token when super admin is in session
   useEffect(() => {
-    if (user?.email?.toLowerCase() === "admin@gmail.com") {
+    if (isSuperAdminUser(user)) {
       const curToken = localStorage.getItem("worknestToken")
       if (curToken) {
         localStorage.setItem("worknest_admin_token", curToken)
@@ -266,11 +284,75 @@ const SuperAdminDashboard = () => {
     setAllWorkspaces(cached)
   }, [API_URL, user?.email])
 
+  const fetchAdminSpaces = useCallback(async () => {
+    try {
+      setIsSpacesLoading(true)
+      const data = await fetchSpaces()
+      setSpaces(data.spaces || [])
+    } catch (err) {
+      console.error("Failed to fetch admin spaces:", err)
+    } finally {
+      setIsSpacesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     fetchStats()
     fetchUsers()
     fetchWorkspaces()
-  }, [fetchStats, fetchUsers, fetchWorkspaces])
+    fetchAdminSpaces()
+  }, [fetchStats, fetchUsers, fetchWorkspaces, fetchAdminSpaces])
+
+  useEffect(() => {
+    if (activeTab === "spaces") {
+      fetchAdminSpaces()
+    }
+  }, [activeTab, fetchAdminSpaces])
+
+  const handleAddMemberByEmail = async (e) => {
+    e.preventDefault()
+    if (!activeMembersModalSpace || !addMemberEmail.trim()) return
+    setAddMemberError("")
+    setIsAddingMember(true)
+    try {
+      const data = await addSpaceMemberByEmailApi(activeMembersModalSpace._id, addMemberEmail.trim())
+      toast.success("Member added to Space")
+      setAddMemberEmail("")
+      setActiveMembersModalSpace(data.space)
+      setSpaces((prev) => prev.map((s) => (s._id === data.space._id ? data.space : s)))
+    } catch (err) {
+      setAddMemberError(err.message || "Failed to add member")
+    } finally {
+      setIsAddingMember(false)
+    }
+  }
+
+  const handleRemoveMemberFromSpace = async (spaceId, memberId, username) => {
+    try {
+      setRemovingMemberId(memberId)
+      const data = await removeSpaceMemberApi(spaceId, memberId)
+      toast.success(`Removed ${username || "member"} from Space`)
+      setActiveMembersModalSpace(data.space)
+      setSpaces((prev) => prev.map((s) => (s._id === data.space._id ? data.space : s)))
+    } catch (err) {
+      toast.error(err.message || "Failed to remove member")
+    } finally {
+      setRemovingMemberId(null)
+    }
+  }
+
+  const handleDeleteSpace = async () => {
+    if (!deleteSpaceConfirm) return
+    const targetSpace = deleteSpaceConfirm
+    try {
+      await deleteSpaceApi(targetSpace._id)
+      toast.success(`Space #${targetSpace.name} deleted successfully`)
+      setSpaces((prev) => prev.filter((s) => s._id !== targetSpace._id))
+      setDeleteSpaceConfirm(null)
+    } catch (err) {
+      toast.error(err.message || "Failed to delete space")
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -289,7 +371,11 @@ const SuperAdminDashboard = () => {
   }
 
   const handleRoleToggle = async (targetUser) => {
-    const isCurrentlyAdmin = targetUser.platformRole === "super_admin" || targetUser.role === "admin"
+    const isCurrentlyAdmin =
+      targetUser.platformRole === "super_admin" ||
+      targetUser.role === "admin" ||
+      targetUser.role === "super_admin" ||
+      targetUser.isSuperAdmin === true
     const newRole = isCurrentlyAdmin ? "user" : "super_admin"
     const newRoleDisplay = newRole === "super_admin" ? "admin" : "member"
 
@@ -324,7 +410,7 @@ const SuperAdminDashboard = () => {
     setAllUsers((prev) => {
       const updated = prev.map((u) =>
         String(u.id || u._id) === String(targetUser.id || targetUser._id)
-          ? { ...u, platformRole: newRole, role: newRoleDisplay }
+          ? { ...u, platformRole: newRole, role: newRoleDisplay, isSuperAdmin: newRole === "super_admin" }
           : u
       )
       try {
@@ -335,7 +421,7 @@ const SuperAdminDashboard = () => {
     setRecentUsers((prev) =>
       prev.map((u) =>
         String(u.id || u._id) === String(targetUser.id || targetUser._id)
-          ? { ...u, platformRole: newRole, role: newRoleDisplay }
+          ? { ...u, platformRole: newRole, role: newRoleDisplay, isSuperAdmin: newRole === "super_admin" }
           : u
       )
     )
@@ -343,14 +429,19 @@ const SuperAdminDashboard = () => {
     toast.success(newRole === "super_admin" ? "Made Admin successfully" : "Made Member successfully")
 
     try {
-      await fetch(`${API_URL}/admin/users/${targetUser.id || targetUser._id}/role`, {
+      const targetUserId = targetUser.id || targetUser._id
+      const res = await fetch(`${API_URL}/admin/users/${targetUserId}/role`, {
         method: "PATCH",
         headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({ role: newRole }),
       })
-    } catch {
-      // network errors ignored since local persistence & optimistic update are done
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        console.warn("Failed to persist user role to backend:", errData.message)
+      }
+    } catch (err) {
+      console.warn("Network error persisting user role to backend:", err)
     }
   }
 
@@ -629,6 +720,11 @@ const SuperAdminDashboard = () => {
           >
             <i className="fa-solid fa-table-cells-large w-5 text-center text-sm text-[#A5C9CA]" />
             <span className="flex-1">Spaces</span>
+            {spaces.length > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2C3333] px-1.5 text-xs font-medium text-[#A5C9CA]">
+                {spaces.length}
+              </span>
+            )}
           </button>
         </nav>
 
@@ -764,7 +860,7 @@ const SuperAdminDashboard = () => {
                   </p>
                 </div>
 
-                {/* 4. Total Spaces (distinct from workspaces, currently 0) */}
+                {/* 4. Total Spaces */}
                 <div
                   onClick={() => setActiveTab("spaces")}
                   className="rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition cursor-pointer group"
@@ -776,10 +872,10 @@ const SuperAdminDashboard = () => {
                     <i className="fa-solid fa-arrow-up-right-from-square text-xs text-[#52656A] dark:text-[#A5C9CA] group-hover:text-[#395B64] dark:group-hover:text-white transition" />
                   </div>
                   <div className="mt-3 text-3xl font-semibold text-[#2C3333] dark:text-white tracking-tight">
-                    0
+                    {spaces.length}
                   </div>
                   <p className="mt-2 text-xs text-[#52656A] dark:text-[#A5C9CA]/80">
-                    No spaces created yet
+                    {spaces.length === 1 ? "1 active space" : `${spaces.length} active spaces`}
                   </p>
                 </div>
 
@@ -831,11 +927,11 @@ const SuperAdminDashboard = () => {
 
                         <div className="flex items-center gap-4 sm:gap-6 flex-shrink-0">
                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            u.platformRole === "super_admin" || u.role === "admin"
+                            u.platformRole === "super_admin" || u.role === "admin" || u.role === "super_admin" || u.isSuperAdmin === true
                               ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
                               : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
                           }`}>
-                            {u.platformRole === "super_admin" || u.role === "admin" ? "admin" : "member"}
+                            {u.platformRole === "super_admin" || u.role === "admin" || u.role === "super_admin" || u.isSuperAdmin === true ? "admin" : "member"}
                           </span>
                           <span className="text-xs text-[#52656A] dark:text-[#A5C9CA] min-w-[70px] text-right">
                             {formatDate(u.createdAt)}
@@ -948,7 +1044,11 @@ const SuperAdminDashboard = () => {
                         </tr>
                       ) : (
                         filteredUsers.map((u) => {
-                          const isAdmin = u.platformRole === "super_admin" || u.role === "admin"
+                          const isAdmin =
+                            u.platformRole === "super_admin" ||
+                            u.role === "admin" ||
+                            u.role === "super_admin" ||
+                            u.isSuperAdmin === true
                           const isUserActive = u.isActive !== false && u.status !== "inactive"
 
                           return (
@@ -1131,17 +1231,150 @@ const SuperAdminDashboard = () => {
           )}
 
           {/* ═══════════════════════════════════════════════════════════════
-              TAB 4: SPACES (No Functionality)
+              TAB 4: SPACES (Matching Image 2)
               ═══════════════════════════════════════════════════════════════ */}
           {activeTab === "spaces" && (
-            <div className="max-w-4xl mx-auto py-24 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/30 text-2xl text-[#395B64] dark:text-[#A5C9CA] mb-3">
-                <i className="fa-solid fa-shapes" />
+            <div className="max-w-6xl mx-auto space-y-6">
+              
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                    className="md:hidden mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333]"
+                    aria-label="Open sidebar"
+                  >
+                    <i className="fa-solid fa-bars text-lg" />
+                  </button>
+                  <div>
+                    <h1 className="text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
+                      Spaces
+                    </h1>
+                    <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+                      Create and manage workspace channels
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/80 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs cursor-pointer flex-shrink-0"
+                    title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+                  >
+                    {isDark ? <FiSun className="text-amber-400 text-sm" /> : <FiMoon className="text-[#395B64] text-sm" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateSpaceModal(true)}
+                    className="rounded-lg bg-[#00897b] hover:bg-[#00796b] text-white px-5 py-2.5 text-sm font-semibold transition cursor-pointer shadow-xs flex items-center gap-2"
+                  >
+                    Create Space
+                  </button>
+                </div>
               </div>
-              <h2 className="text-base font-bold text-[#2C3333] dark:text-white">Spaces</h2>
-              <p className="mt-1 text-xs text-[#52656A] dark:text-[#A5C9CA]">
-                No spaces configured.
-              </p>
+
+              {/* Spaces Table (Image 2) */}
+              <div className="rounded-xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] shadow-xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100 dark:border-[#2C3333]">
+                        <th className="py-3.5 px-6 text-[11px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">
+                          SPACE
+                        </th>
+                        <th className="py-3.5 px-6 text-[11px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">
+                          DESCRIPTION
+                        </th>
+                        <th className="py-3.5 px-6 text-[11px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">
+                          MEMBERS
+                        </th>
+                        <th className="py-3.5 px-6 text-[11px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">
+                          CREATED BY
+                        </th>
+                        <th className="py-3.5 px-6 text-[11px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">
+                          CREATED
+                        </th>
+                        <th className="py-3.5 px-6 text-[11px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">
+                          ACTIONS
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100/80 dark:divide-[#2C3333]">
+                      {isSpacesLoading ? (
+                        <tr>
+                          <td colSpan={6} className="py-12 text-center text-sm text-gray-400">
+                            <i className="fa-solid fa-circle-notch fa-spin text-lg mr-2 text-[#00897b]" />
+                            Loading spaces...
+                          </td>
+                        </tr>
+                      ) : spaces.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-12 text-center text-sm text-gray-400">
+                            No spaces found. Click &quot;Create Space&quot; to create one.
+                          </td>
+                        </tr>
+                      ) : (
+                        spaces.map((space) => {
+                          const memberCount = Array.isArray(space.members) ? space.members.length : 0
+                          const creatorName =
+                            space.createdBy?.username || space.createdBy?.email || "Unknown"
+
+                          return (
+                            <tr
+                              key={space._id}
+                              className="hover:bg-gray-50/50 dark:hover:bg-[#252F2F]/40 transition"
+                            >
+                              <td className="py-4 px-6 text-sm font-semibold text-[#00897b] dark:text-[#26a69a] whitespace-nowrap">
+                                #{space.name}
+                              </td>
+                              <td className="py-4 px-6 text-sm text-gray-400 dark:text-gray-500 max-w-xs truncate">
+                                {space.description || "—"}
+                              </td>
+                              <td className="py-4 px-6 text-sm whitespace-nowrap">
+                                <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-2 rounded-md bg-[#e0f2f1] dark:bg-[#004d40]/40 text-[#00796b] dark:text-[#80cbc4] text-xs font-semibold">
+                                  {memberCount}
+                                </span>
+                              </td>
+                              <td className="py-4 px-6 text-sm text-[#2C3333] dark:text-gray-200 whitespace-nowrap">
+                                {creatorName}
+                              </td>
+                              <td className="py-4 px-6 text-sm text-[#52656A] dark:text-gray-400 whitespace-nowrap">
+                                {formatDate(space.createdAt)}
+                              </td>
+                              <td className="py-4 px-6 text-sm whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMembersModalSpace(space)
+                                      setAddMemberEmail("")
+                                      setAddMemberError("")
+                                    }}
+                                    className="rounded-md border border-gray-300 dark:border-gray-600 px-3.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer"
+                                  >
+                                    Members
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteSpaceConfirm(space)}
+                                    className="rounded-md bg-[#ef4444] hover:bg-[#dc2626] px-3.5 py-1 text-xs font-medium text-white transition cursor-pointer"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -1214,6 +1447,175 @@ const SuperAdminDashboard = () => {
             fetchStats()
           }}
         />
+      )}
+
+      {/* ── Create Space Modal ───────────────────────────────────────────── */}
+      {showCreateSpaceModal && (
+        <CreateSpaceModal
+          isOpen={showCreateSpaceModal}
+          onClose={() => setShowCreateSpaceModal(false)}
+          onSpaceCreated={(newSpace) => {
+            setSpaces((prev) => [newSpace, ...prev])
+            fetchAdminSpaces()
+          }}
+          availableUsers={allUsers}
+          currentUserId={user?._id || user?.id}
+        />
+      )}
+
+      {/* ── Space Members Modal (Image 3) ─────────────────────────────────── */}
+      {activeMembersModalSpace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#1E2525] p-6 shadow-2xl border border-gray-100 dark:border-[#2C3333] animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-[#2C3333]">
+              <h3 className="text-base font-semibold text-[#2C3333] dark:text-white">
+                #{activeMembersModalSpace.name} — Members ({activeMembersModalSpace.members?.length || 0})
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMembersModalSpace(null)
+                  setAddMemberEmail("")
+                  setAddMemberError("")
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-white text-lg p-1 transition cursor-pointer"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+
+            {/* Add Member Section */}
+            <div className="pt-4">
+              <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                ADD MEMBER
+              </label>
+              <form onSubmit={handleAddMemberByEmail}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="email"
+                    value={addMemberEmail}
+                    onChange={(e) => {
+                      setAddMemberEmail(e.target.value)
+                      if (addMemberError) setAddMemberError("")
+                    }}
+                    placeholder="name@shnoor.com"
+                    className="flex-1 rounded-lg border border-gray-200 dark:border-[#2C3333] bg-white dark:bg-[#252F2F] px-3.5 py-2.5 text-sm text-[#2C3333] dark:text-white placeholder-gray-400 outline-none focus:border-[#00897b] focus:ring-1 focus:ring-[#00897b] transition"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isAddingMember || !addMemberEmail.trim()}
+                    className="rounded-lg bg-[#00897b] hover:bg-[#00796b] disabled:opacity-50 text-white font-medium text-sm px-5 py-2.5 transition flex items-center justify-center cursor-pointer shadow-xs"
+                  >
+                    {isAddingMember ? (
+                      <i className="fa-solid fa-circle-notch fa-spin text-sm" />
+                    ) : (
+                      "+ Add"
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                  Person must have logged in with their @shnoor.com account at least once.
+                </p>
+                {addMemberError && (
+                  <div className="mt-2.5 text-xs text-rose-500 font-medium flex items-center gap-1.5">
+                    <i className="fa-solid fa-circle-exclamation flex-shrink-0" />
+                    <span>{addMemberError}</span>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            <div className="border-t border-gray-100 dark:border-[#2C3333] my-4" />
+
+            {/* Existing Members List */}
+            <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
+              {(activeMembersModalSpace.members || []).map((member) => {
+                const memberId = member._id || member.id || member
+                const isRemoving = removingMemberId === memberId
+                const isAdminRole =
+                  member.platformRole === "super_admin" ||
+                  member.role === "admin" ||
+                  String(activeMembersModalSpace.createdBy?._id || activeMembersModalSpace.createdBy) === String(memberId)
+
+                return (
+                  <div key={memberId} className="flex items-center justify-between py-1">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold text-sm flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {member.avatar ? (
+                          <img src={member.avatar} alt={member.username || "Avatar"} className="w-full h-full object-cover" />
+                        ) : (
+                          (member.username || member.email || "U").charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#2C3333] dark:text-white truncate">
+                          {member.username || "User"}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {member.email || "No email"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
+                      {isAdminRole ? (
+                        <span className="rounded bg-[#e0f2f1] dark:bg-[#004d40]/40 px-2.5 py-0.5 text-xs font-medium text-[#00796b] dark:text-[#80cbc4]">
+                          admin
+                        </span>
+                      ) : (
+                        <span className="rounded bg-gray-100 dark:bg-gray-800 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">
+                          member
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={isRemoving}
+                        onClick={() => handleRemoveMemberFromSpace(activeMembersModalSpace._id, memberId, member.username)}
+                        className="rounded-md border border-rose-300 dark:border-rose-500/40 px-3 py-1 text-xs font-medium text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isRemoving ? <i className="fa-solid fa-circle-notch fa-spin text-xs" /> : "Remove"}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Space Confirmation Modal ──────────────────────────────── */}
+      {deleteSpaceConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#1A2121] p-6 text-center shadow-xl border border-gray-200 dark:border-[#2C3333]">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/15 text-rose-500 text-xl mb-3">
+              <i className="fa-solid fa-trash-can" />
+            </div>
+            <h3 className="font-semibold text-base text-[#2C3333] dark:text-white">
+              Delete Space?
+            </h3>
+            <p className="mt-2 text-xs text-[#52656A] dark:text-[#A5C9CA] leading-relaxed">
+              Are you sure you want to delete <strong className="text-[#2C3333] dark:text-white">#{deleteSpaceConfirm.name}</strong>? This will permanently delete the space and all of its messages.
+            </p>
+            <div className="mt-5 flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeleteSpaceConfirm(null)}
+                className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-[#2C3333] text-xs font-medium text-[#52656A] dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#242D2D] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSpace}
+                className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium transition cursor-pointer"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

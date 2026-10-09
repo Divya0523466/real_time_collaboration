@@ -127,6 +127,11 @@ const login = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
+    const isSuperAdmin =
+      user.role === "super_admin" ||
+      user.role === "admin" ||
+      user.email?.toLowerCase() === "admin@gmail.com";
+
     return res.json({
       message: "Login successful",
       token,
@@ -135,7 +140,9 @@ const login = async (req, res) => {
         username: user.username,
         email: user.email,
         avatar: user.avatar,
-        role: user.role || "user",
+        role: isSuperAdmin ? "admin" : (user.role || "user"),
+        platformRole: isSuperAdmin ? "super_admin" : "user",
+        isSuperAdmin,
         isActive: user.isActive !== false,
         status: user.status || "active",
       },

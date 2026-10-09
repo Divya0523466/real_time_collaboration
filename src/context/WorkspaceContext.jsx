@@ -164,6 +164,10 @@ export const WorkspaceProvider = ({ children }) => {
           if (data.token) {
             localStorage.setItem("worknestToken", data.token);
           }
+          if (isSuperAdminUser(effectiveUser)) {
+            const curToken = data.token || localStorage.getItem("worknestToken");
+            if (curToken) localStorage.setItem("worknest_admin_token", curToken);
+          }
         } else if (response.status === 401 || response.status === 403) {
           setUser(null);
           setWorkspaces([]);
