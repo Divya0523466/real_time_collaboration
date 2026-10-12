@@ -46,6 +46,7 @@ export const getMe = async (req, res) => {
         isSuperAdmin,
         isActive: user.isActive !== false,
         status: user.status || "active",
+        twoFactorEnabled: Boolean(user.twoFactorEnabled),
       },
       workspaces,
     });

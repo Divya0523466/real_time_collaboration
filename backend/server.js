@@ -76,7 +76,7 @@ io.use((socket, next) => {
     return next(new Error("Authentication required"));
   }
   jwt.verify(token, process.env.JWT_SECRET, (error, decoded) => {
-    if (error || !decoded?.userId) {
+    if (error || !decoded?.userId || decoded?.purpose === "2fa_pending") {
       return next(new Error("Invalid or expired token"));
     }
     socket.userId = decoded.userId.toString();

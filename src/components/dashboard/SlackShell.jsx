@@ -1291,9 +1291,7 @@ const SlackShell = () => {
                   <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
                   <span className="flex-1 text-left">Mentions</span>
                   {unreadMentionsCount > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
-                      {unreadMentionsCount}
-                    </span>
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500 shadow-xs ring-2 ring-blue-500/20" title={`${unreadMentionsCount} unread mentions`} />
                   )}
                 </button>
               </>
@@ -2787,6 +2785,7 @@ const SlackShell = () => {
             <SpaceMessageThread
               space={selectedSpace}
               currentUserId={user?.id || user?._id}
+              currentUser={user}
               isSuperAdmin={isSuperAdmin}
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
               onManageMembers={() => {

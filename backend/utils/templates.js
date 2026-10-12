@@ -14,15 +14,20 @@ export const htmlTemplateOtp = (otp) => {
           We received a request to reset the password for your WorkNest account. Use the verification code below to proceed.
         </p>
         
-        <div style="border: 2px solid #8BBB92; border-radius: 8px; padding: 24px; margin-bottom: 24px; display: inline-block;">
-          <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #12544F;">
-            ${otp}
-          </span>
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 32px auto; text-align: center;">
+          <tr>
+            <td align="center" style="border: 2px solid #8BBB92; border-radius: 12px; padding: 18px 32px; background-color: #F8FAFB; box-shadow: 0 2px 8px rgba(18, 84, 79, 0.08);">
+              <span style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #12544F; font-family: monospace, sans-serif; display: inline-block; margin-right: -8px;">
+                ${otp}
+              </span>
+            </td>
+          </tr>
+        </table>
+        <div style="text-align: center; margin-top: 12px; margin-bottom: 24px;">
+          <p style="font-size: 13px; color: #2A835F; margin: 0; font-weight: 600;">
+            This code is valid for the next 10 minutes.
+          </p>
         </div>
-        
-        <p style="font-size: 14px; color: #2A835F; margin-bottom: 40px; font-weight: 600;">
-          This code is valid for the next 10 minutes.
-        </p>
         
         <hr style="border: none; border-top: 1px solid #8BBB92; opacity: 0.3; margin: 48px 0 24px;" />
         <p style="font-size: 14px; color: #12544F; line-height: 1.5; margin-bottom: 8px; opacity: 0.8;">
@@ -231,6 +236,60 @@ export const removedFromChannel = (workspaceName, channelName) => {
         </div>
         
         <hr style="border: none; border-top: 1px solid #8BBB92; opacity: 0.3; margin: 48px 0 24px;" />
+        <p style="font-size: 12px; color: #12544F; margin-top: 24px; opacity: 0.6;">
+          © ${new Date().getFullYear()} WorkNest. All rights reserved.
+        </p>
+      </div>
+    </div>
+  `;
+};
+
+export const htmlTemplate2FAOtp = (otp, type = "login") => {
+  let title = "Login Verification Code";
+  let message = "A sign-in attempt was detected on your WorkNest account. Use the 6-digit verification code below to complete your login.";
+
+  if (type === "setup") {
+    title = "Two-Factor Authentication Setup";
+    message = "You are enabling Two-Factor Authentication on your WorkNest account. Use the 6-digit verification code below to verify your email.";
+  } else if (type === "disable") {
+    title = "Disable Two-Factor Authentication";
+    message = "You requested to disable Two-Factor Authentication on your WorkNest account. Use the 6-digit verification code below to confirm disabling 2FA.";
+  }
+
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; color: #092328; margin: 0; padding: 40px 20px;">
+      <div style="max-width: 600px; margin: 0 auto;">
+        
+        <div style="text-align: center; margin-bottom: 40px;">
+          <img src="https://res.cloudinary.com/nbmkbcu4/image/upload/v1790058816/worknestlogo.png" alt="WorkNest Logo" style="height: 48px; margin-bottom: 8px;" />
+          <h2 style="margin: 0; color: #092328; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">WorkNest</h2>
+        </div>
+        
+        <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 16px; color: #092328;">${title}</h1>
+        
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+          ${message}
+        </p>
+        
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 32px auto; text-align: center;">
+          <tr>
+            <td align="center" style="border: 2px solid #8BBB92; border-radius: 12px; padding: 18px 36px; background-color: #F8FAFB; box-shadow: 0 2px 8px rgba(18, 84, 79, 0.08);">
+              <span style="font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #12544F; font-family: monospace, sans-serif; display: inline-block; margin-right: -10px;">
+                ${otp}
+              </span>
+            </td>
+          </tr>
+        </table>
+        <div style="text-align: center; margin-top: 12px; margin-bottom: 24px;">
+          <p style="font-size: 13px; color: #2A835F; margin: 0; font-weight: 600;">
+            This code is valid for the next 5 minutes.
+          </p>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #8BBB92; opacity: 0.3; margin: 48px 0 24px;" />
+        <p style="font-size: 14px; color: #12544F; line-height: 1.5; margin-bottom: 8px; opacity: 0.8;">
+          If you did not initiate this request, please secure your account immediately by changing your password.
+        </p>
         <p style="font-size: 12px; color: #12544F; margin-top: 24px; opacity: 0.6;">
           © ${new Date().getFullYear()} WorkNest. All rights reserved.
         </p>

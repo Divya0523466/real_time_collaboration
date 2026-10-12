@@ -499,7 +499,7 @@ const MessageThread = ({
                       }`}
                     >
                       <div className="flex flex-col">
-                        {Boolean(message.content?.trim()) && (
+                        {(Boolean(message.content?.trim()) || Boolean(message.attachments?.length) || Boolean(attachments?.length)) && (
                           <div className="min-w-0 break-words leading-relaxed">
                             <MessageContent
                               content={message.content}

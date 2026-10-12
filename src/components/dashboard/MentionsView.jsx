@@ -35,6 +35,7 @@ const MentionsView = ({
 
   const [loading, setLoading] = useState(false)
   const [dbMentions, setDbMentions] = useState([])
+  const [readMentionIds, setReadMentionIds] = useState(() => new Set())
 
   const loadMentions = useCallback(async () => {
     try {
@@ -86,7 +87,14 @@ const MentionsView = ({
           (n.messageId && (n.messageId === m.messageId || n.messageId?._id === m.messageId)) ||
           n._id === m.notificationId
       )
-      const isRead = matchingNotif ? Boolean(matchingNotif.isRead) : Boolean(m.isRead)
+
+      const msgIdStr = (m.messageId || m.id || m._id)?.toString()
+      const notifIdStr = (m.notificationId || matchingNotif?._id)?.toString()
+      const isLocallyMarkedRead =
+        (msgIdStr && readMentionIds.has(msgIdStr)) ||
+        (notifIdStr && readMentionIds.has(notifIdStr))
+
+      const isRead = isLocallyMarkedRead || (matchingNotif ? Boolean(matchingNotif.isRead) : Boolean(m.isRead))
 
       return {
         id: m.id || m._id,
@@ -112,7 +120,7 @@ const MentionsView = ({
     // Also include real-time notifications if not already captured in dbMentions
     const existingMsgIds = new Set(items.map((i) => i.messageId?.toString()))
     const notifItems = (notifications || [])
-      .filter((n) => n.type === "CHANNEL_MENTION" || n.type === "DM_MENTION")
+      .filter((n) => n.type === "CHANNEL_MENTION" || n.type === "DM_MENTION" || n.type === "SPACE_MENTION")
       .filter((n) => {
         if (workspaceId && n.workspaceId) {
           const wsId = n.workspaceId?._id || n.workspaceId?.id || n.workspaceId
@@ -123,26 +131,38 @@ const MentionsView = ({
       })
       .map((n) => {
         const isChannel = n.type === "CHANNEL_MENTION"
+        const isSpace = n.type === "SPACE_MENTION"
         const cId = n.channelId?._id || n.channelId?.id || n.channelId
+        const sId = n.spaceId?._id || n.spaceId?.id || n.spaceId
         const cName =
           n.channelId?.name ||
           channels?.find((c) => (c.id || c._id)?.toString() === cId?.toString())?.name ||
           "channel"
+        const sName = n.spaceId?.name || "Space"
         const actor = n.actorId
+
+        const mIdStr = (n.messageId || n._id)?.toString()
+        const nIdStr = n._id?.toString()
+        const isLocallyMarkedRead =
+          (mIdStr && readMentionIds.has(mIdStr)) ||
+          (nIdStr && readMentionIds.has(nIdStr))
 
         return {
           id: n._id,
           messageId: n.messageId || n._id,
           isChannel,
+          isSpace,
           channelId: cId,
           channelName: cName,
+          spaceId: sId,
+          spaceName: sName,
           otherUserId: n.metadata?.senderId || actor?._id,
           otherUserName: actor?.username || "Direct Message",
           senderName: actor?.username || "Someone",
           senderAvatar: actor?.avatar || null,
           content: n.message || "Mentioned you in a message",
           mentions: [{ userId: user?.id }],
-          isRead: Boolean(n.isRead),
+          isRead: isLocallyMarkedRead || Boolean(n.isRead),
           notificationId: n._id,
           createdAt: n.createdAt,
         }
@@ -151,34 +171,58 @@ const MentionsView = ({
     return [...items, ...notifItems].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     )
-  }, [dbMentions, notifications, channels, workspaceId, user?.id])
+  }, [dbMentions, notifications, channels, workspaceId, user?.id, readMentionIds])
 
   const handleMarkAsRead = async (item, e) => {
     if (e) e.stopPropagation()
-    if (item.isRead) return
+    const msgId = (item.messageId || item.id)?.toString()
+    const notifId = item.notificationId?.toString()
 
-    // Optimistic local state update
+    setReadMentionIds((prev) => {
+      const next = new Set(prev)
+      if (msgId) next.add(msgId)
+      if (item.id) next.add(item.id.toString())
+      if (notifId) next.add(notifId)
+      return next
+    })
+
+    // Optimistic local state update in dbMentions
     setDbMentions((prev) =>
       prev.map((m) =>
-        (m.messageId === item.messageId || m.id === item.id) ? { ...m, isRead: true } : m
+        ((m.messageId && m.messageId.toString() === msgId) || (m.id && m.id.toString() === msgId) || (m.id && m.id.toString() === item.id?.toString()))
+          ? { ...m, isRead: true }
+          : m
       )
     )
 
-    if (item.notificationId && markNotificationAsRead) {
-      markNotificationAsRead(item.notificationId).catch(() => {})
+    // Mark all matching notifications in WorkspaceContext
+    const matchingNotifs = (notifications || []).filter(
+      (n) =>
+        (n._id && (n._id === notifId || n._id.toString() === item.id?.toString())) ||
+        (n.messageId && (n.messageId.toString() === msgId || n.messageId?._id?.toString() === msgId))
+    )
+    for (const notif of matchingNotifs) {
+      if (!notif.isRead && markNotificationAsRead) {
+        markNotificationAsRead(notif._id).catch(() => {})
+      }
+    }
+    if (notifId && markNotificationAsRead && !matchingNotifs.some((n) => n._id === notifId)) {
+      markNotificationAsRead(notifId).catch(() => {})
     }
 
     try {
-      await markMentionAsReadApi(item.messageId)
+      if (item.messageId) {
+        await markMentionAsReadApi(item.messageId)
+      } else if (item.id) {
+        await markMentionAsReadApi(item.id)
+      }
     } catch (err) {
       console.error("Failed to mark mention as read:", err)
     }
   }
 
   const handleItemClick = (item) => {
-    if (!item.isRead) {
-      handleMarkAsRead(item)
-    }
+    handleMarkAsRead(item)
 
     if (item.isSpace) {
       if (item.spaceId && onNavigateSpace) {
@@ -265,7 +309,7 @@ const MentionsView = ({
                   <div className="flex-shrink-0 w-2.5 flex items-center justify-center">
                     {isUnread ? (
                       <span
-                        className="h-2 w-2 rounded-full bg-[#395B64] dark:bg-[#A5C9CA]"
+                        className="h-2 w-2 rounded-full bg-blue-500 shadow-xs ring-2 ring-blue-500/20"
                         title="Unread"
                       />
                     ) : (

@@ -8,7 +8,9 @@ import WorkspaceMembership from "../models/WorkspaceMembership.js"
 import File from "../models/File.js"
 import Notification from "../models/Notification.js"
 import getChannelAccess from "../utils/channelAccess.js"
-import getSpaceAccess from "../utils/spaceAccess.js"
+import getSpaceAccess, { isUserSuperAdmin } from "../utils/spaceAccess.js"
+import Space from "../models/Space.js"
+import SpaceReadState from "../models/SpaceReadState.js"
 
 const populateLegacyMessageAttachments = async (messages) => {
   if (!messages || messages.length === 0) return messages;
@@ -670,7 +672,7 @@ const getStarredMessages = async (req, res) => {
     for (const msg of spaceMessages) {
       if (!msg.spaceId) continue;
       if (isFileMessageRecord(msg)) continue;
-      if (wsIdStr && msg.spaceId.workspaceId?.toString() !== wsIdStr) {
+      if (wsIdStr && msg.spaceId.workspaceId && msg.spaceId.workspaceId.toString() !== wsIdStr) {
         continue;
       }
 
@@ -723,7 +725,7 @@ const getUserMentions = async (req, res) => {
     // 1. Fetch mention notifications for current user to track read status and message IDs
     const mentionNotifications = await Notification.find({
       recipientId: userObjId,
-      type: { $in: ["CHANNEL_MENTION", "DM_MENTION"] },
+      type: { $in: ["CHANNEL_MENTION", "DM_MENTION", "SPACE_MENTION"] },
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -782,8 +784,11 @@ const getUserMentions = async (req, res) => {
           content: { $regex: `@(${escapedUsername}|all)\\b`, $options: "i" },
         });
       }
-      if (notifMsgIds.length > 0) {
-        channelMentionFilters.push({ _id: { $in: notifMsgIds } });
+      const channelNotifMsgIds = mentionNotifications
+        .filter((n) => n.type === "CHANNEL_MENTION" && n.messageId)
+        .map((n) => n.messageId);
+      if (channelNotifMsgIds.length > 0) {
+        channelMentionFilters.push({ _id: { $in: channelNotifMsgIds } });
       }
 
       channelMessages = await ChannelMessage.find({
@@ -834,6 +839,117 @@ const getUserMentions = async (req, res) => {
         channelId: chan._id,
         channelName: chan.name,
         channelType: chan.type,
+        content: msg.content,
+        mentions: (msg.mentions || []).map((m) => ({
+          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+        })),
+        sender: {
+          id: msg.senderId?._id,
+          username: msg.senderId?.username || "Unknown",
+          avatar: msg.senderId?.avatar,
+        },
+        isRead,
+        notificationId: matchingNotif ? matchingNotif._id : null,
+        createdAt: msg.createdAt,
+      });
+    }
+
+    // 3b. Find space messages mentioning this user in accessible spaces
+    let spaceQuery = {};
+    const isSuper = await isUserSuperAdmin(userId);
+    if (!isSuper) {
+      spaceQuery.members = userObjId;
+    }
+    if (workspaceId && workspaceId !== "undefined" && workspaceId !== "null") {
+      spaceQuery.$or = [
+        { workspaceId },
+        { workspaceId: null },
+        { workspaceId: { $exists: false } },
+      ];
+    }
+    const allSpacesInScope = await Space.find(spaceQuery).lean();
+    const accessibleSpaceMap = new Map();
+    for (const sp of allSpacesInScope) {
+      accessibleSpaceMap.set(sp._id.toString(), sp);
+    }
+    const accessibleSpaceIds = Array.from(accessibleSpaceMap.keys()).map(
+      (id) => new mongoose.Types.ObjectId(id)
+    );
+
+    const spaceReadStates = await SpaceReadState.find({
+      userId,
+      spaceId: { $in: accessibleSpaceIds },
+    }).lean();
+
+    const spaceReadStateMap = new Map();
+    spaceReadStates.forEach((rs) => {
+      spaceReadStateMap.set(rs.spaceId.toString(), rs.lastReadAt);
+    });
+
+    let spaceMessages = [];
+    if (accessibleSpaceIds.length > 0) {
+      const spaceMentionFilters = [
+        { "mentions.userId": { $in: [userId, userObjId] } },
+      ];
+      if (currentUsername) {
+        const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        spaceMentionFilters.push({
+          content: { $regex: `@(${escapedUsername}|all)\\b`, $options: "i" },
+        });
+      }
+      const spaceNotifMsgIds = mentionNotifications
+        .filter((n) => n.type === "SPACE_MENTION" && n.messageId)
+        .map((n) => n.messageId);
+      if (spaceNotifMsgIds.length > 0) {
+        spaceMentionFilters.push({ _id: { $in: spaceNotifMsgIds } });
+      }
+
+      spaceMessages = await ChannelMessage.find({
+        spaceId: { $in: accessibleSpaceIds },
+        senderId: { $ne: userObjId },
+        $or: spaceMentionFilters,
+        isDeleted: false,
+      })
+        .populate("senderId", "username avatar")
+        .populate("spaceId", "name workspaceId")
+        .sort({ createdAt: -1 })
+        .lean();
+    }
+
+    const validSpaceMessages = [];
+    for (const msg of spaceMessages) {
+      const msgIdStr = msg._id.toString();
+      if (seenMessageIds.has(msgIdStr)) continue;
+      seenMessageIds.add(msgIdStr);
+
+      const sp = msg.spaceId;
+      if (!sp || !accessibleSpaceMap.has(sp._id?.toString() || sp.toString())) continue;
+
+      if (
+        workspaceId &&
+        workspaceId !== "undefined" &&
+        workspaceId !== "null" &&
+        sp.workspaceId &&
+        sp.workspaceId.toString() !== workspaceId.toString()
+      ) {
+        continue;
+      }
+
+      const matchingNotif = notifByMessageId.get(msgIdStr);
+      const spaceLastRead = spaceReadStateMap.get(sp._id.toString());
+      const isRead = matchingNotif
+        ? Boolean(matchingNotif.isRead)
+        : spaceLastRead
+        ? new Date(msg.createdAt) <= new Date(spaceLastRead)
+        : false;
+
+      validSpaceMessages.push({
+        id: msg._id,
+        messageId: msg._id,
+        type: "SPACE",
+        spaceId: sp._id,
+        spaceName: sp.name,
+        workspaceId: sp.workspaceId,
         content: msg.content,
         mentions: (msg.mentions || []).map((m) => ({
           userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
@@ -918,7 +1034,9 @@ const getUserMentions = async (req, res) => {
       seenMessageIds.add(notifMsgIdStr);
 
       const isChannel = notif.type === "CHANNEL_MENTION";
+      const isSpace = notif.type === "SPACE_MENTION";
       const chan = notif.channelId;
+      const sp = notif.spaceId;
 
       if (
         workspaceId &&
@@ -931,7 +1049,7 @@ const getUserMentions = async (req, res) => {
       }
 
       // If DM mention notification, ensure recipient was actually the receiver in the DM conversation
-      if (!isChannel) {
+      if (!isChannel && !isSpace) {
         const receiverIdFromMeta = notif.metadata?.receiverId?.toString();
         if (receiverIdFromMeta && receiverIdFromMeta !== userId.toString()) {
           continue;
@@ -946,13 +1064,23 @@ const getUserMentions = async (req, res) => {
         }
       }
 
+      // If space mention notification, ensure current user has access to that space
+      if (isSpace && sp) {
+        const sIdStr = (sp._id || sp).toString();
+        if (!accessibleSpaceMap.has(sIdStr)) {
+          continue;
+        }
+      }
+
       const actor = notif.actorId;
       validChannelMessages.push({
         id: notif._id,
         messageId: notif.messageId || notif._id,
-        type: isChannel ? "CHANNEL" : "DIRECT",
+        type: isSpace ? "SPACE" : isChannel ? "CHANNEL" : "DIRECT",
         channelId: chan?._id || chan,
         channelName: chan?.name || "channel",
+        spaceId: sp?._id || sp,
+        spaceName: (sp && accessibleSpaceMap.get((sp._id || sp).toString())?.name) || "Space",
         otherUserId: notif.metadata?.senderId || actor?._id,
         otherUserName: actor?.username || "Direct Message",
         content: notif.message,
@@ -968,7 +1096,7 @@ const getUserMentions = async (req, res) => {
       });
     }
 
-    const allMentions = [...validChannelMessages, ...validDmMessages].sort(
+    const allMentions = [...validChannelMessages, ...validSpaceMessages, ...validDmMessages].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     );
 
@@ -986,7 +1114,7 @@ const markMentionAsRead = async (req, res) => {
 
     const notifQuery = {
       recipientId: userId,
-      type: { $in: ["CHANNEL_MENTION", "DM_MENTION"] },
+      type: { $in: ["CHANNEL_MENTION", "DM_MENTION", "SPACE_MENTION"] },
     };
     if (mongoose.isValidObjectId(messageId)) {
       notifQuery.$or = [{ messageId: messageId }, { _id: messageId }];
@@ -1010,7 +1138,7 @@ const markAllMentionsAsRead = async (req, res) => {
 
     const filter = {
       recipientId: userId,
-      type: { $in: ["CHANNEL_MENTION", "DM_MENTION"] },
+      type: { $in: ["CHANNEL_MENTION", "DM_MENTION", "SPACE_MENTION"] },
       isRead: false,
     };
     if (workspaceId && workspaceId !== "undefined" && workspaceId !== "null") {

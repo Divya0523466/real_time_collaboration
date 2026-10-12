@@ -226,27 +226,6 @@ const StarredMessagesView = ({
                       </div>
 
                       <div className="flex items-center gap-1">
-                        {/* Forward button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            e.currentTarget.blur()
-                            onForwardMessage && onForwardMessage(msg, {
-                              sourceType: msg.type === "CHANNEL" ? "CHANNEL" : "DIRECT",
-                              sourceName: msg.type === "CHANNEL" ? msg.channelName : msg.otherUserName,
-                              sourceId: (msg.type === "CHANNEL" ? msg.channelId : msg.otherUserId)?.toString() || "",
-                              channelId: msg.channelId,
-                              otherUserId: msg.otherUserId,
-                            })
-                          }}
-                          title="Forward message"
-                          aria-label="Forward message"
-                          className="text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white p-1 flex-shrink-0 transition-colors"
-                        >
-                          <i className="fa-solid fa-share text-xs" />
-                        </button>
-
                         {/* Green Star Button to unstar */}
                         <button
                           type="button"

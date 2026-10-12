@@ -62,7 +62,71 @@ const userSchema = new mongoose.Schema(
     resetOtpLastAttemptDate: {
       type: Date,
       default: null,
-    }
+    },
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    twoFactorOtpHash: {
+      type: String,
+      default: null,
+    },
+    twoFactorOtpExpiry: {
+      type: Date,
+      default: null,
+    },
+    twoFactorAttempts: {
+      type: Number,
+      default: 0,
+    },
+    twoFactorLastSentAt: {
+      type: Date,
+      default: null,
+    },
+    twoFactorSendCount: {
+      type: Number,
+      default: 0,
+    },
+    twoFactorSetupOtpHash: {
+      type: String,
+      default: null,
+    },
+    twoFactorSetupOtpExpiry: {
+      type: Date,
+      default: null,
+    },
+    twoFactorSetupAttempts: {
+      type: Number,
+      default: 0,
+    },
+    twoFactorSetupLastSentAt: {
+      type: Date,
+      default: null,
+    },
+    twoFactorSetupSendCount: {
+      type: Number,
+      default: 0,
+    },
+    twoFactorDisableOtpHash: {
+      type: String,
+      default: null,
+    },
+    twoFactorDisableOtpExpiry: {
+      type: Date,
+      default: null,
+    },
+    twoFactorDisableAttempts: {
+      type: Number,
+      default: 0,
+    },
+    twoFactorDisableLastSentAt: {
+      type: Date,
+      default: null,
+    },
+    twoFactorDisableSendCount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true },
 )

@@ -290,24 +290,37 @@ const SpaceMessageThread = ({
 
   const handleToggleStar = async (message) => {
     try {
-      const msgId = message.id || message._id
-      if (message.isStarred) {
-        await unstarMessageApi(msgId)
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id?.toString() === msgId?.toString() ? { ...m, isStarred: false } : m
-          )
+      const msgId = (message.id || message._id)?.toString()
+      if (!msgId) return
+      const isCurrentlyStarred = Boolean(message.isStarred)
+      const nextStarred = !isCurrentlyStarred
+
+      // Optimistic UI update
+      setMessages((prev) =>
+        prev.map((m) =>
+          ((m.id || m._id)?.toString() === msgId) ? { ...m, isStarred: nextStarred } : m
         )
+      )
+
+      if (isCurrentlyStarred) {
+        await unstarMessageApi(msgId)
+        toast.success("Message unstarred")
       } else {
-        await starMessageApi(msgId)
+        await starMessageApi(msgId, "CHANNEL")
+        toast.success("Message starred")
+      }
+    } catch (err) {
+      console.error("Failed to toggle star:", err)
+      toast.error(err.message || "Failed to update star")
+      // Revert on failure
+      const msgId = (message.id || message._id)?.toString()
+      if (msgId) {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id?.toString() === msgId?.toString() ? { ...m, isStarred: true } : m
+            ((m.id || m._id)?.toString() === msgId) ? { ...m, isStarred: Boolean(message.isStarred) } : m
           )
         )
       }
-    } catch (err) {
-      toast.error(err.message || "Failed to update star")
     }
   }
 
@@ -499,7 +512,7 @@ const SpaceMessageThread = ({
                                 : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
                             }`}
                           >
-                            <i className={`${message.isStarred ? "fa-solid" : "fa-regular"} fa-star text-[10px]`} />
+                            <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
                           </button>
                           <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                             {message.isStarred ? "Unstar" : "Star"}
@@ -607,15 +620,10 @@ const SpaceMessageThread = ({
                             }`
                       }`}
                     >
-                      {!isSender && (
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-xs font-bold text-[#00897b] dark:text-[#A5C9CA]">
-                            {username}
-                          </span>
-                          <span className="text-[10px] text-gray-400 dark:text-[#A5C9CA]/60">
-                            {formatMessageTime(message.createdAt)}
-                          </span>
-                        </div>
+                      {!isSender && username && (
+                        <p className="text-xs font-bold text-[#00897b] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
+                          {username}
+                        </p>
                       )}
 
                       {message.replyToMessage && (
@@ -623,7 +631,15 @@ const SpaceMessageThread = ({
                       )}
 
                       {message.forwardedFrom && (
-                        <ForwardedMessageCard forwardedFrom={message.forwardedFrom} onNavigateSource={onNavigateSource} />
+                        <ForwardedMessageCard
+                          forwardedFrom={message.forwardedFrom}
+                          isSender={isSender}
+                          onNavigateSource={onNavigateSource}
+                          timestamp={formatMessageTime(message.createdAt)}
+                          isEdited={message.isEdited && !isDeleted}
+                          isStarred={message.isStarred && !isDeleted && !isImageOrFile}
+                          onToggleStar={() => handleToggleStar(message)}
+                        />
                       )}
 
                       <MessageContent
@@ -640,10 +656,28 @@ const SpaceMessageThread = ({
                         className="text-sm leading-relaxed break-words"
                       />
 
-                      <div className="flex items-center justify-end gap-1.5 mt-1 text-[10px] opacity-70">
-                        {message.isEdited && <span>(edited)</span>}
-                        {isSender && <span>{formatMessageTime(message.createdAt)}</span>}
-                      </div>
+                      {!message.forwardedFrom && (
+                        <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none">
+                          <span className="whitespace-nowrap">
+                            {formatMessageTime(message.createdAt)}
+                          </span>
+                          {message.isEdited && !isDeleted && (
+                            <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                              (edited)
+                            </span>
+                          )}
+                          {message.isStarred && !isDeleted && !isImageOrFile && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStar(message)}
+                              title="Starred message (click to unstar)"
+                              className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                            >
+                              <i className="fa-solid fa-star text-[9px]" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -665,7 +699,7 @@ const SpaceMessageThread = ({
                                 : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
                             }`}
                           >
-                            <i className={`${message.isStarred ? "fa-solid" : "fa-regular"} fa-star text-[10px]`} />
+                            <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
                           </button>
                           <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                             {message.isStarred ? "Unstar" : "Star"}

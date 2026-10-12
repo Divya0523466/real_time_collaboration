@@ -21,6 +21,9 @@ const authenticateToken = (req, res, next) => {
       if (err) {
         return res.status(403).json({ message: "Invalid or expired token" });
       }
+      if (decoded?.purpose === "2fa_pending") {
+        return res.status(403).json({ message: "Two-factor verification required" });
+      }
       req.userId = decoded.userId;
       req.token = token;
       next();
