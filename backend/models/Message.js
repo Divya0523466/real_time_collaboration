@@ -154,6 +154,11 @@ const messageSchema = new mongoose.Schema(
       default: [],
       index: true,
     },
+    deletedBy: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+      index: true,
+    },
   },
   { timestamps: true },
 )

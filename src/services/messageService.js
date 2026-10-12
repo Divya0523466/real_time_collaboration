@@ -204,3 +204,17 @@ export const forwardMessageApi = async ({ targetType, targetId, content = "", fo
   return data
 }
 
+export const deleteDirectConversationApi = async (otherUserId) => {
+  const response = await fetch(`${API_URL}/messages/direct/${otherUserId}/conversation`, {
+    credentials: "include",
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to delete conversation")
+  }
+  return data
+}
+

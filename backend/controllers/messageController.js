@@ -1,16 +1,16 @@
-import mongoose from "mongoose"
-import Message from "../models/Message.js"
-import User from "../models/User.js"
-import Channel from "../models/Channel.js"
-import ChannelMessage from "../models/ChannelMessage.js"
-import ChannelReadState from "../models/ChannelReadState.js"
-import WorkspaceMembership from "../models/WorkspaceMembership.js"
-import File from "../models/File.js"
-import Notification from "../models/Notification.js"
-import getChannelAccess from "../utils/channelAccess.js"
-import getSpaceAccess, { isUserSuperAdmin } from "../utils/spaceAccess.js"
-import Space from "../models/Space.js"
-import SpaceReadState from "../models/SpaceReadState.js"
+import mongoose from "mongoose";
+import Message from "../models/Message.js";
+import User from "../models/User.js";
+import Channel from "../models/Channel.js";
+import ChannelMessage from "../models/ChannelMessage.js";
+import ChannelReadState from "../models/ChannelReadState.js";
+import WorkspaceMembership from "../models/WorkspaceMembership.js";
+import File from "../models/File.js";
+import Notification from "../models/Notification.js";
+import getChannelAccess from "../utils/channelAccess.js";
+import getSpaceAccess, { isUserSuperAdmin } from "../utils/spaceAccess.js";
+import Space from "../models/Space.js";
+import SpaceReadState from "../models/SpaceReadState.js";
 
 const populateLegacyMessageAttachments = async (messages) => {
   if (!messages || messages.length === 0) return messages;
@@ -21,7 +21,9 @@ const populateLegacyMessageAttachments = async (messages) => {
       (!m.attachments || m.attachments.length === 0) &&
       typeof m.content === "string" &&
       (m.content.includes("res.cloudinary.com") ||
-        /\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt|csv)(\?.*)?$/i.test(m.content))
+        /\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt|csv)(\?.*)?$/i.test(
+          m.content,
+        )),
   );
 
   if (!needsLookup) return messages;
@@ -36,7 +38,9 @@ const populateLegacyMessageAttachments = async (messages) => {
         (!msg.attachments || msg.attachments.length === 0) &&
         typeof msg.content === "string" &&
         (msg.content.includes("res.cloudinary.com") ||
-          /\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt|csv)(\?.*)?$/i.test(msg.content))
+          /\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt|csv)(\?.*)?$/i.test(
+            msg.content,
+          ))
       ) {
         const trimmed = msg.content.trim();
         const matched = allFiles.find((f) => {
@@ -66,10 +70,13 @@ const populateLegacyMessageAttachments = async (messages) => {
             trimmed === matched.previewUrl ||
             (matched.publicId && trimmed.endsWith(matched.publicId));
 
-          const obj = typeof msg.toObject === "function" ? msg.toObject() : { ...msg };
+          const obj =
+            typeof msg.toObject === "function" ? msg.toObject() : { ...msg };
           return {
             ...obj,
-            content: isPureUrl ? "" : msg.content.replace(matched.url, "").trim(),
+            content: isPureUrl
+              ? ""
+              : msg.content.replace(matched.url, "").trim(),
             attachments: [att],
           };
         }
@@ -83,35 +90,44 @@ const populateLegacyMessageAttachments = async (messages) => {
 
 const getDirectMessages = async (req, res) => {
   try {
-    const currentUserId = req.userId
-    const { userId: otherUserId } = req.params
+    const currentUserId = req.userId;
+    const { userId: otherUserId } = req.params;
 
-    const otherUser = await User.findById(otherUserId).select("_id")
+    const otherUser = await User.findById(otherUserId).select("_id");
     if (!otherUser) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "User not found" });
     }
 
     if (currentUserId.toString() === otherUserId.toString()) {
-      return res.status(400).json({ message: "Cannot message yourself" })
+      return res.status(400).json({ message: "Cannot message yourself" });
     }
+
+    const userObjId = mongoose.Types.ObjectId.isValid(currentUserId)
+      ? new mongoose.Types.ObjectId(currentUserId)
+      : currentUserId;
+    const otherUserObjId = mongoose.Types.ObjectId.isValid(otherUserId)
+      ? new mongoose.Types.ObjectId(otherUserId)
+      : otherUserId;
 
     const messages = await Message.find({
       $or: [
-        { senderId: currentUserId, receiverId: otherUserId },
-        { senderId: otherUserId, receiverId: currentUserId },
+        { senderId: userObjId, receiverId: otherUserObjId },
+        { senderId: otherUserObjId, receiverId: userObjId },
       ],
+      deletedBy: { $nin: [userObjId, currentUserId] },
     })
       .populate("senderId", "username avatar")
-      .select("_id senderId receiverId content attachments mentions forwardedFrom createdAt updatedAt isEdited isDeleted isRead starredBy")
-      .sort({ createdAt: 1 })
+      .select(
+        "_id senderId receiverId content attachments mentions forwardedFrom createdAt updatedAt isEdited isDeleted isRead starredBy",
+      )
+      .sort({ createdAt: 1 });
 
     const populatedMessages = await populateLegacyMessageAttachments(messages);
 
-    // Automatically mark unread messages from otherUser as read
     await Message.updateMany(
       { senderId: otherUserId, receiverId: currentUserId, isRead: false },
-      { $set: { isRead: true } }
-    )
+      { $set: { isRead: true } },
+    );
 
     return res.json({
       messages: populatedMessages.map((msg) => ({
@@ -126,13 +142,15 @@ const getDirectMessages = async (req, res) => {
           : undefined,
         receiverId: msg.receiverId,
         content: msg.isDeleted ? null : msg.content,
-        attachments: msg.isDeleted ? [] : (msg.attachments || []),
+        attachments: msg.isDeleted ? [] : msg.attachments || [],
         mentions: msg.isDeleted
           ? []
           : (msg.mentions || []).map((m) => ({
-              userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+              userId: m.userId?._id
+                ? m.userId._id.toString()
+                : m.userId?.toString() || m.toString(),
             })),
-        forwardedFrom: msg.isDeleted ? null : (msg.forwardedFrom || null),
+        forwardedFrom: msg.isDeleted ? null : msg.forwardedFrom || null,
         createdAt: msg.createdAt,
         updatedAt: msg.updatedAt,
         isEdited: msg.isEdited || false,
@@ -140,23 +158,25 @@ const getDirectMessages = async (req, res) => {
         isRead: msg.isRead || false,
         isStarred: Boolean(
           msg.starredBy &&
-          msg.starredBy.some((id) => id.toString() === currentUserId.toString())
+          msg.starredBy.some(
+            (id) => id.toString() === currentUserId.toString(),
+          ),
         ),
       })),
-    })
+    });
   } catch (error) {
     return res
       .status(500)
-      .json({ message: "Server error", error: error.message })
+      .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 const buildReplyToMessage = (parent) => {
-  if (!parent) return null
+  if (!parent) return null;
   return {
     id: parent._id,
     content: parent.isDeleted ? null : parent.content,
-    attachments: parent.isDeleted ? [] : (parent.attachments || []),
+    attachments: parent.isDeleted ? [] : parent.attachments || [],
     isDeleted: parent.isDeleted || false,
     sender: parent.senderId?._id
       ? {
@@ -164,8 +184,8 @@ const buildReplyToMessage = (parent) => {
           username: parent.senderId.username,
         }
       : undefined,
-  }
-}
+  };
+};
 
 const formatChannelMessage = (message, currentUserId = null) => ({
   id: message._id,
@@ -179,45 +199,51 @@ const formatChannelMessage = (message, currentUserId = null) => ({
       }
     : undefined,
   content: message.isDeleted ? null : message.content,
-  attachments: message.isDeleted ? [] : (message.attachments || []).map((att) => ({
-    id: att.id || att._id,
-    fileId: att.fileId || att._id,
-    originalName: att.originalName,
-    url: att.url,
-    previewUrl: att.previewUrl || "",
-    publicId: att.publicId || "",
-    resourceType: att.resourceType || "auto",
-    format: att.format || "",
-    mimeType: att.mimeType || "",
-    size: att.size || 0,
-    extension: att.extension || "",
-  })),
+  attachments: message.isDeleted
+    ? []
+    : (message.attachments || []).map((att) => ({
+        id: att.id || att._id,
+        fileId: att.fileId || att._id,
+        originalName: att.originalName,
+        url: att.url,
+        previewUrl: att.previewUrl || "",
+        publicId: att.publicId || "",
+        resourceType: att.resourceType || "auto",
+        format: att.format || "",
+        mimeType: att.mimeType || "",
+        size: att.size || 0,
+        extension: att.extension || "",
+      })),
   mentions: message.isDeleted
     ? []
     : (message.mentions || []).map((m) => ({
-        userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+        userId: m.userId?._id
+          ? m.userId._id.toString()
+          : m.userId?.toString() || m.toString(),
       })),
   replyTo: message.replyTo?._id || message.replyTo || null,
-  replyToMessage: buildReplyToMessage(message.replyTo?._id ? message.replyTo : null),
-  forwardedFrom: message.isDeleted ? null : (message.forwardedFrom || null),
+  replyToMessage: buildReplyToMessage(
+    message.replyTo?._id ? message.replyTo : null,
+  ),
+  forwardedFrom: message.isDeleted ? null : message.forwardedFrom || null,
   isEdited: message.isEdited || false,
   isDeleted: message.isDeleted || false,
   isStarred: Boolean(
     message.starredBy &&
     currentUserId &&
-    message.starredBy.some((id) => id.toString() === currentUserId.toString())
+    message.starredBy.some((id) => id.toString() === currentUserId.toString()),
   ),
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
-})
+});
 
 const getChannelMessages = async (req, res) => {
   try {
-    const { channelId } = req.params
-    const access = await getChannelAccess(req.userId, channelId)
+    const { channelId } = req.params;
+    const access = await getChannelAccess(req.userId, channelId);
 
     if (!access.channel) {
-      return res.status(403).json({ message: "Access denied to channel" })
+      return res.status(403).json({ message: "Access denied to channel" });
     }
 
     const messages = await ChannelMessage.find({ channelId })
@@ -226,7 +252,7 @@ const getChannelMessages = async (req, res) => {
         path: "replyTo",
         populate: { path: "senderId", select: "username" },
       })
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: 1 });
 
     const populatedMessages = await populateLegacyMessageAttachments(messages);
 
@@ -234,90 +260,104 @@ const getChannelMessages = async (req, res) => {
     await ChannelReadState.findOneAndUpdate(
       { channelId, userId: req.userId },
       { $set: { lastReadAt: new Date() } },
-      { upsert: true }
-    )
+      { upsert: true },
+    );
 
     return res.json({
-      messages: populatedMessages.map((msg) => formatChannelMessage(msg, req.userId)),
-    })
+      messages: populatedMessages.map((msg) =>
+        formatChannelMessage(msg, req.userId),
+      ),
+    });
   } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 const getUnreadMessageCounts = async (req, res) => {
   try {
-    const { workspaceId } = req.query
-    const userId = req.userId
+    const { workspaceId } = req.query;
+    const userId = req.userId;
 
     if (!workspaceId || !mongoose.isValidObjectId(workspaceId)) {
-      return res.status(400).json({ message: "Valid workspaceId query parameter is required" })
+      return res
+        .status(400)
+        .json({ message: "Valid workspaceId query parameter is required" });
     }
 
-    const membership = await WorkspaceMembership.findOne({ userId, workspaceId })
+    const membership = await WorkspaceMembership.findOne({
+      userId,
+      workspaceId,
+    });
     if (!membership) {
-      return res.status(403).json({ message: "Access denied to workspace" })
+      return res.status(403).json({ message: "Access denied to workspace" });
     }
 
     // 1. Channels unread counts
-    let channelFilter = { workspaceId }
+    let channelFilter = { workspaceId };
     if (membership.role === "MEMBER") {
       channelFilter = {
         workspaceId,
-        $or: [
-          { type: "PUBLIC" },
-          { type: "PRIVATE", members: userId },
-        ],
-      }
+        $or: [{ type: "PUBLIC" }, { type: "PRIVATE", members: userId }],
+      };
     }
 
-    const accessibleChannels = await Channel.find(channelFilter).select("_id")
-    const channelIds = accessibleChannels.map((c) => c._id)
+    const accessibleChannels = await Channel.find(channelFilter).select("_id");
+    const channelIds = accessibleChannels.map((c) => c._id);
 
     // Find all read states for user in these channels
     const readStates = await ChannelReadState.find({
       userId,
       channelId: { $in: channelIds },
-    })
+    });
 
-    const readStateMap = new Map()
+    const readStateMap = new Map();
     readStates.forEach((rs) => {
-      readStateMap.set(rs.channelId.toString(), rs.lastReadAt)
-    })
+      readStateMap.set(rs.channelId.toString(), rs.lastReadAt);
+    });
 
-    const channelCounts = {}
+    const channelCounts = {};
     await Promise.all(
       channelIds.map(async (cId) => {
-        const cIdStr = cId.toString()
-        const lastReadAt = readStateMap.get(cIdStr) || membership.createdAt || new Date(0)
+        const cIdStr = cId.toString();
+        const lastReadAt =
+          readStateMap.get(cIdStr) || membership.createdAt || new Date(0);
 
         const count = await ChannelMessage.countDocuments({
           channelId: cId,
           createdAt: { $gt: lastReadAt },
           senderId: { $ne: userId },
           isDeleted: false,
-        })
+        });
         if (count > 0) {
-          channelCounts[cIdStr] = count
+          channelCounts[cIdStr] = count;
         }
-      })
-    )
+      }),
+    );
 
     // 2. Direct Messages unread counts (from members of this workspace)
-    const workspaceMemberships = await WorkspaceMembership.find({ workspaceId }).select("userId")
+    const workspaceMemberships = await WorkspaceMembership.find({
+      workspaceId,
+    }).select("userId");
     const workspaceMemberUserIds = workspaceMemberships
       .map((m) => m.userId)
-      .filter((mUserId) => mUserId && mUserId.toString() !== userId.toString())
+      .filter((mUserId) => mUserId && mUserId.toString() !== userId.toString());
 
-    const dmCounts = {}
+    const dmCounts = {};
     if (workspaceMemberUserIds.length > 0) {
       const dmAgg = await Message.aggregate([
         {
           $match: {
             receiverId: new mongoose.Types.ObjectId(userId),
-            senderId: { $in: workspaceMemberUserIds.map((id) => new mongoose.Types.ObjectId(id)) },
+            senderId: {
+              $in: workspaceMemberUserIds.map(
+                (id) => new mongoose.Types.ObjectId(id),
+              ),
+            },
             isRead: false,
             isDeleted: false,
+            deletedBy: { $ne: new mongoose.Types.ObjectId(userId) },
           },
         },
         {
@@ -326,81 +366,87 @@ const getUnreadMessageCounts = async (req, res) => {
             count: { $sum: 1 },
           },
         },
-      ])
+      ]);
 
       dmAgg.forEach((entry) => {
-        dmCounts[entry._id.toString()] = entry.count
-      })
+        dmCounts[entry._id.toString()] = entry.count;
+      });
     }
 
     return res.json({
       channels: channelCounts,
       dms: dmCounts,
-    })
+    });
   } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 const markChannelAsRead = async (req, res) => {
   try {
-    const { channelId } = req.params
-    const userId = req.userId
+    const { channelId } = req.params;
+    const userId = req.userId;
 
-    const access = await getChannelAccess(userId, channelId)
+    const access = await getChannelAccess(userId, channelId);
     if (!access.channel) {
-      return res.status(403).json({ message: "Access denied to channel" })
+      return res.status(403).json({ message: "Access denied to channel" });
     }
 
-    const now = new Date()
+    const now = new Date();
     await ChannelReadState.findOneAndUpdate(
       { channelId, userId },
       { $set: { lastReadAt: now } },
-      { upsert: true, new: true }
-    )
+      { upsert: true, new: true },
+    );
 
     await Notification.updateMany(
       { recipientId: userId, channelId, isRead: false },
-      { $set: { isRead: true } }
-    )
+      { $set: { isRead: true } },
+    );
 
-    return res.json({ success: true, channelId, lastReadAt: now })
+    return res.json({ success: true, channelId, lastReadAt: now });
   } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 const markChannelAsUnread = async (req, res) => {
   try {
-    const { channelId } = req.params
-    const userId = req.userId
+    const { channelId } = req.params;
+    const userId = req.userId;
 
-    const access = await getChannelAccess(userId, channelId)
+    const access = await getChannelAccess(userId, channelId);
     if (!access.channel) {
-      return res.status(403).json({ message: "Access denied to channel" })
+      return res.status(403).json({ message: "Access denied to channel" });
     }
 
     // Set lastReadAt to past (epoch 0) so all messages are considered unread
-    const past = new Date(0)
+    const past = new Date(0);
     await ChannelReadState.findOneAndUpdate(
       { channelId, userId },
       { $set: { lastReadAt: past } },
-      { upsert: true, new: true }
-    )
+      { upsert: true, new: true },
+    );
 
-    return res.json({ success: true, channelId, lastReadAt: past })
+    return res.json({ success: true, channelId, lastReadAt: past });
   } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 const markDirectMessagesAsRead = async (req, res) => {
   try {
-    const { userId: senderUserId } = req.params
-    const currentUserId = req.userId
+    const { userId: senderUserId } = req.params;
+    const currentUserId = req.userId;
 
     if (!mongoose.isValidObjectId(senderUserId)) {
-      return res.status(400).json({ message: "Invalid user ID" })
+      return res.status(400).json({ message: "Invalid user ID" });
     }
 
     await Message.updateMany(
@@ -411,8 +457,8 @@ const markDirectMessagesAsRead = async (req, res) => {
       },
       {
         $set: { isRead: true },
-      }
-    )
+      },
+    );
 
     await Notification.updateMany(
       {
@@ -421,22 +467,24 @@ const markDirectMessagesAsRead = async (req, res) => {
         type: "DM_MENTION",
         isRead: false,
       },
-      { $set: { isRead: true } }
-    )
+      { $set: { isRead: true } },
+    );
 
-    return res.json({ success: true })
+    return res.json({ success: true });
   } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 const markDirectMessagesAsUnread = async (req, res) => {
   try {
-    const { userId: senderUserId } = req.params
-    const currentUserId = req.userId
+    const { userId: senderUserId } = req.params;
+    const currentUserId = req.userId;
 
     if (!mongoose.isValidObjectId(senderUserId)) {
-      return res.status(400).json({ message: "Invalid user ID" })
+      return res.status(400).json({ message: "Invalid user ID" });
     }
 
     // Find the latest message between senderUserId and currentUserId (or received from senderUserId)
@@ -444,18 +492,20 @@ const markDirectMessagesAsUnread = async (req, res) => {
       senderId: senderUserId,
       receiverId: currentUserId,
       isDeleted: false,
-    }).sort({ createdAt: -1 })
+    }).sort({ createdAt: -1 });
 
     if (latestMessage) {
-      latestMessage.isRead = false
-      await latestMessage.save()
+      latestMessage.isRead = false;
+      await latestMessage.save();
     }
 
-    return res.json({ success: true })
+    return res.json({ success: true });
   } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message })
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 const isFileMessageRecord = (msg) => {
   if (!msg) return false;
@@ -464,7 +514,9 @@ const isFileMessageRecord = (msg) => {
   if (!content) return false;
   return (
     content.includes("res.cloudinary.com") ||
-    /\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt|csv)(\?.*)?$/i.test(content)
+    /\.(jpeg|jpg|gif|png|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt|csv)(\?.*)?$/i.test(
+      content,
+    )
   );
 };
 
@@ -492,9 +544,10 @@ const starMessage = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    
     if (isFileMessageRecord(message)) {
-      return res.status(400).json({ message: "Only text messages can be starred" });
+      return res
+        .status(400)
+        .json({ message: "Only text messages can be starred" });
     }
 
     if (type === "CHANNEL") {
@@ -527,7 +580,9 @@ const starMessage = async (req, res) => {
     return res.json({ success: true, messageId, isStarred: true });
   } catch (error) {
     console.error("Error in starMessage:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -555,7 +610,9 @@ const unstarMessage = async (req, res) => {
     return res.json({ success: true, messageId, isStarred: false });
   } catch (error) {
     console.error("Error in unstarMessage:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -601,7 +658,9 @@ const getStarredMessages = async (req, res) => {
           workspaceId: msg.channelId.workspaceId,
           content: msg.content,
           mentions: (msg.mentions || []).map((m) => ({
-            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+            userId: m.userId?._id
+              ? m.userId._id.toString()
+              : m.userId?.toString() || m.toString(),
           })),
           sender: {
             id: msg.senderId?._id,
@@ -619,6 +678,7 @@ const getStarredMessages = async (req, res) => {
       $and: [
         { $or: [{ starredBy: userId }, { starredBy: userObjId }] },
         { isDeleted: false },
+        { deletedBy: { $nin: [userId, userObjId] } },
         {
           $or: [
             { senderId: { $in: [userId, userObjId] } },
@@ -636,7 +696,9 @@ const getStarredMessages = async (req, res) => {
       .filter((msg) => !isFileMessageRecord(msg))
       .map((msg) => {
         const otherUser =
-          msg.senderId?._id?.toString() === userId.toString() ? msg.receiverId : msg.senderId;
+          msg.senderId?._id?.toString() === userId.toString()
+            ? msg.receiverId
+            : msg.senderId;
         return {
           id: msg._id,
           messageId: msg._id,
@@ -645,7 +707,9 @@ const getStarredMessages = async (req, res) => {
           otherUserName: otherUser?.username || "Direct Message",
           content: msg.content,
           mentions: (msg.mentions || []).map((m) => ({
-            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+            userId: m.userId?._id
+              ? m.userId._id.toString()
+              : m.userId?.toString() || m.toString(),
           })),
           sender: {
             id: msg.senderId?._id,
@@ -672,7 +736,11 @@ const getStarredMessages = async (req, res) => {
     for (const msg of spaceMessages) {
       if (!msg.spaceId) continue;
       if (isFileMessageRecord(msg)) continue;
-      if (wsIdStr && msg.spaceId.workspaceId && msg.spaceId.workspaceId.toString() !== wsIdStr) {
+      if (
+        wsIdStr &&
+        msg.spaceId.workspaceId &&
+        msg.spaceId.workspaceId.toString() !== wsIdStr
+      ) {
         continue;
       }
 
@@ -687,7 +755,9 @@ const getStarredMessages = async (req, res) => {
           workspaceId: msg.spaceId.workspaceId,
           content: msg.content,
           mentions: (msg.mentions || []).map((m) => ({
-            userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+            userId: m.userId?._id
+              ? m.userId._id.toString()
+              : m.userId?.toString() || m.toString(),
           })),
           sender: {
             id: msg.senderId?._id,
@@ -700,14 +770,18 @@ const getStarredMessages = async (req, res) => {
       }
     }
 
-    const allStarred = [...validChannelMessages, ...validSpaceMessages, ...validDmMessages].sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
+    const allStarred = [
+      ...validChannelMessages,
+      ...validSpaceMessages,
+      ...validDmMessages,
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return res.json({ starredMessages: allStarred });
   } catch (error) {
     console.error("Error in getStarredMessages:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -750,7 +824,7 @@ const getUserMentions = async (req, res) => {
         accessibleChannelMap.set(chan._id.toString(), chan);
       } else {
         const isMember = (chan.members || []).some(
-          (m) => (m._id || m)?.toString() === userId.toString()
+          (m) => (m._id || m)?.toString() === userId.toString(),
         );
         if (isMember) {
           accessibleChannelMap.set(chan._id.toString(), chan);
@@ -759,7 +833,7 @@ const getUserMentions = async (req, res) => {
     }
 
     const accessibleChannelIds = Array.from(accessibleChannelMap.keys()).map(
-      (id) => new mongoose.Types.ObjectId(id)
+      (id) => new mongoose.Types.ObjectId(id),
     );
 
     const readStates = await ChannelReadState.find({
@@ -779,7 +853,10 @@ const getUserMentions = async (req, res) => {
         { "mentions.userId": { $in: [userId, userObjId] } },
       ];
       if (currentUsername) {
-        const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const escapedUsername = currentUsername.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&",
+        );
         channelMentionFilters.push({
           content: { $regex: `@(${escapedUsername}|all)\\b`, $options: "i" },
         });
@@ -812,7 +889,11 @@ const getUserMentions = async (req, res) => {
       seenMessageIds.add(msgIdStr);
 
       const chan = msg.channelId;
-      if (!chan || !accessibleChannelMap.has(chan._id?.toString() || chan.toString())) continue;
+      if (
+        !chan ||
+        !accessibleChannelMap.has(chan._id?.toString() || chan.toString())
+      )
+        continue;
 
       if (
         workspaceId &&
@@ -829,8 +910,8 @@ const getUserMentions = async (req, res) => {
       const isRead = matchingNotif
         ? Boolean(matchingNotif.isRead)
         : chanLastRead
-        ? new Date(msg.createdAt) <= new Date(chanLastRead)
-        : false;
+          ? new Date(msg.createdAt) <= new Date(chanLastRead)
+          : false;
 
       validChannelMessages.push({
         id: msg._id,
@@ -841,7 +922,9 @@ const getUserMentions = async (req, res) => {
         channelType: chan.type,
         content: msg.content,
         mentions: (msg.mentions || []).map((m) => ({
-          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+          userId: m.userId?._id
+            ? m.userId._id.toString()
+            : m.userId?.toString() || m.toString(),
         })),
         sender: {
           id: msg.senderId?._id,
@@ -873,7 +956,7 @@ const getUserMentions = async (req, res) => {
       accessibleSpaceMap.set(sp._id.toString(), sp);
     }
     const accessibleSpaceIds = Array.from(accessibleSpaceMap.keys()).map(
-      (id) => new mongoose.Types.ObjectId(id)
+      (id) => new mongoose.Types.ObjectId(id),
     );
 
     const spaceReadStates = await SpaceReadState.find({
@@ -892,7 +975,10 @@ const getUserMentions = async (req, res) => {
         { "mentions.userId": { $in: [userId, userObjId] } },
       ];
       if (currentUsername) {
-        const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const escapedUsername = currentUsername.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&",
+        );
         spaceMentionFilters.push({
           content: { $regex: `@(${escapedUsername}|all)\\b`, $options: "i" },
         });
@@ -923,7 +1009,8 @@ const getUserMentions = async (req, res) => {
       seenMessageIds.add(msgIdStr);
 
       const sp = msg.spaceId;
-      if (!sp || !accessibleSpaceMap.has(sp._id?.toString() || sp.toString())) continue;
+      if (!sp || !accessibleSpaceMap.has(sp._id?.toString() || sp.toString()))
+        continue;
 
       if (
         workspaceId &&
@@ -940,8 +1027,8 @@ const getUserMentions = async (req, res) => {
       const isRead = matchingNotif
         ? Boolean(matchingNotif.isRead)
         : spaceLastRead
-        ? new Date(msg.createdAt) <= new Date(spaceLastRead)
-        : false;
+          ? new Date(msg.createdAt) <= new Date(spaceLastRead)
+          : false;
 
       validSpaceMessages.push({
         id: msg._id,
@@ -952,7 +1039,9 @@ const getUserMentions = async (req, res) => {
         workspaceId: sp.workspaceId,
         content: msg.content,
         mentions: (msg.mentions || []).map((m) => ({
-          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+          userId: m.userId?._id
+            ? m.userId._id.toString()
+            : m.userId?.toString() || m.toString(),
         })),
         sender: {
           id: msg.senderId?._id,
@@ -967,11 +1056,12 @@ const getUserMentions = async (req, res) => {
 
     // 4. DM messages mentioning current user
     // A DM mention only belongs to the current user if the current user is a conversation participant (receiverId)
-    const dmSubFilters = [
-      { "mentions.userId": { $in: [userId, userObjId] } },
-    ];
+    const dmSubFilters = [{ "mentions.userId": { $in: [userId, userObjId] } }];
     if (currentUsername) {
-      const escapedUsername = currentUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedUsername = currentUsername.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
       dmSubFilters.push({
         content: { $regex: `@${escapedUsername}\\b`, $options: "i" },
       });
@@ -987,6 +1077,7 @@ const getUserMentions = async (req, res) => {
     const dmMessages = await Message.find({
       receiverId: userObjId,
       senderId: { $ne: userObjId },
+      deletedBy: { $nin: [userId, userObjId] },
       $or: dmSubFilters,
       isDeleted: false,
     })
@@ -1002,7 +1093,9 @@ const getUserMentions = async (req, res) => {
       seenMessageIds.add(msgIdStr);
 
       const otherUser =
-        msg.senderId?._id?.toString() === userId.toString() ? msg.receiverId : msg.senderId;
+        msg.senderId?._id?.toString() === userId.toString()
+          ? msg.receiverId
+          : msg.senderId;
 
       const matchingNotif = notifByMessageId.get(msgIdStr);
 
@@ -1014,14 +1107,18 @@ const getUserMentions = async (req, res) => {
         otherUserName: otherUser?.username || "Direct Message",
         content: msg.content,
         mentions: (msg.mentions || []).map((m) => ({
-          userId: m.userId?._id ? m.userId._id.toString() : m.userId?.toString() || m.toString(),
+          userId: m.userId?._id
+            ? m.userId._id.toString()
+            : m.userId?.toString() || m.toString(),
         })),
         sender: {
           id: msg.senderId?._id,
           username: msg.senderId?.username || "Unknown",
           avatar: msg.senderId?.avatar,
         },
-        isRead: matchingNotif ? Boolean(matchingNotif.isRead) : Boolean(msg.isRead),
+        isRead: matchingNotif
+          ? Boolean(matchingNotif.isRead)
+          : Boolean(msg.isRead),
         notificationId: matchingNotif ? matchingNotif._id : null,
         createdAt: msg.createdAt,
       });
@@ -1029,7 +1126,9 @@ const getUserMentions = async (req, res) => {
 
     // 5. Fallback: Any mention notifications whose messages weren't queried directly
     for (const notif of mentionNotifications) {
-      const notifMsgIdStr = notif.messageId ? notif.messageId.toString() : notif._id.toString();
+      const notifMsgIdStr = notif.messageId
+        ? notif.messageId.toString()
+        : notif._id.toString();
       if (seenMessageIds.has(notifMsgIdStr)) continue;
       seenMessageIds.add(notifMsgIdStr);
 
@@ -1080,7 +1179,9 @@ const getUserMentions = async (req, res) => {
         channelId: chan?._id || chan,
         channelName: chan?.name || "channel",
         spaceId: sp?._id || sp,
-        spaceName: (sp && accessibleSpaceMap.get((sp._id || sp).toString())?.name) || "Space",
+        spaceName:
+          (sp && accessibleSpaceMap.get((sp._id || sp).toString())?.name) ||
+          "Space",
         otherUserId: notif.metadata?.senderId || actor?._id,
         otherUserName: actor?.username || "Direct Message",
         content: notif.message,
@@ -1096,14 +1197,18 @@ const getUserMentions = async (req, res) => {
       });
     }
 
-    const allMentions = [...validChannelMessages, ...validSpaceMessages, ...validDmMessages].sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
+    const allMentions = [
+      ...validChannelMessages,
+      ...validSpaceMessages,
+      ...validDmMessages,
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return res.json({ mentions: allMentions });
   } catch (error) {
     console.error("Error in getUserMentions:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -1127,7 +1232,9 @@ const markMentionAsRead = async (req, res) => {
     return res.json({ success: true, message: "Mention marked as read" });
   } catch (error) {
     console.error("Error in markMentionAsRead:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -1150,7 +1257,9 @@ const markAllMentionsAsRead = async (req, res) => {
     return res.json({ success: true, message: "All mentions marked as read" });
   } catch (error) {
     console.error("Error in markAllMentionsAsRead:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -1160,36 +1269,51 @@ const forwardMessage = async (req, res) => {
     const { targetType, targetId, content = "", forwardedFrom } = req.body;
 
     if (!targetType || !targetId || !forwardedFrom) {
-      return res.status(400).json({ message: "targetType, targetId, and forwardedFrom are required" });
+      return res.status(400).json({
+        message: "targetType, targetId, and forwardedFrom are required",
+      });
     }
 
     if (!["CHANNEL", "DIRECT"].includes(targetType)) {
-      return res.status(400).json({ message: "Invalid targetType. Must be CHANNEL or DIRECT." });
+      return res
+        .status(400)
+        .json({ message: "Invalid targetType. Must be CHANNEL or DIRECT." });
     }
 
     const io = req.app.get("io");
-    const currentUser = await User.findById(currentUserId).select("username avatar").lean();
+    const currentUser = await User.findById(currentUserId)
+      .select("username avatar")
+      .lean();
     const senderName = currentUser?.username || "Someone";
 
-    const formattedAttachments = (forwardedFrom.originalAttachments || []).map((att) => ({
-      fileId: att.fileId || att.id || att._id,
-      originalName: att.originalName || "Attachment",
-      url: att.url,
-      previewUrl: att.previewUrl || "",
-      publicId: att.publicId || "",
-      resourceType: att.resourceType || "auto",
-      format: att.format || "",
-      mimeType: att.mimeType || "",
-      size: att.size || 0,
-      extension: att.extension || "",
-    }));
+    const formattedAttachments = (forwardedFrom.originalAttachments || []).map(
+      (att) => ({
+        fileId: att.fileId || att.id || att._id,
+        originalName: att.originalName || "Attachment",
+        url: att.url,
+        previewUrl: att.previewUrl || "",
+        publicId: att.publicId || "",
+        resourceType: att.resourceType || "auto",
+        format: att.format || "",
+        mimeType: att.mimeType || "",
+        size: att.size || 0,
+        extension: att.extension || "",
+      }),
+    );
 
     let origSenderName = forwardedFrom.senderName || "";
     let origSenderAvatar = forwardedFrom.senderAvatar || "";
 
-    if (forwardedFrom.senderId && (!origSenderName || origSenderName === "User" || origSenderName === "Unknown")) {
+    if (
+      forwardedFrom.senderId &&
+      (!origSenderName ||
+        origSenderName === "User" ||
+        origSenderName === "Unknown")
+    ) {
       try {
-        const origUser = await User.findById(forwardedFrom.senderId).select("username avatar").lean();
+        const origUser = await User.findById(forwardedFrom.senderId)
+          .select("username avatar")
+          .lean();
         if (origUser) {
           origSenderName = origUser.username || origSenderName;
           origSenderAvatar = origUser.avatar || origSenderAvatar;
@@ -1200,16 +1324,26 @@ const forwardMessage = async (req, res) => {
     }
 
     const formattedForwardedFrom = {
-      originalMessageId: forwardedFrom.originalMessageId ? new mongoose.Types.ObjectId(forwardedFrom.originalMessageId) : null,
-      senderId: forwardedFrom.senderId ? new mongoose.Types.ObjectId(forwardedFrom.senderId) : null,
+      originalMessageId: forwardedFrom.originalMessageId
+        ? new mongoose.Types.ObjectId(forwardedFrom.originalMessageId)
+        : null,
+      senderId: forwardedFrom.senderId
+        ? new mongoose.Types.ObjectId(forwardedFrom.senderId)
+        : null,
       senderName: origSenderName || "User",
       senderAvatar: origSenderAvatar || "",
       originalContent: forwardedFrom.originalContent || "",
       originalAttachments: formattedAttachments,
-      originalCreatedAt: forwardedFrom.originalCreatedAt ? new Date(forwardedFrom.originalCreatedAt) : new Date(),
+      originalCreatedAt: forwardedFrom.originalCreatedAt
+        ? new Date(forwardedFrom.originalCreatedAt)
+        : new Date(),
       sourceType: forwardedFrom.sourceType || "",
       sourceName: forwardedFrom.sourceName || "",
-      sourceId: forwardedFrom.sourceId || forwardedFrom.channelId || forwardedFrom.otherUserId || "",
+      sourceId:
+        forwardedFrom.sourceId ||
+        forwardedFrom.channelId ||
+        forwardedFrom.otherUserId ||
+        "",
     };
 
     const trimmedContent = typeof content === "string" ? content.trim() : "";
@@ -1217,7 +1351,9 @@ const forwardMessage = async (req, res) => {
     if (targetType === "CHANNEL") {
       const access = await getChannelAccess(currentUserId, targetId);
       if (!access.channel) {
-        return res.status(403).json({ message: "Access denied to target channel" });
+        return res
+          .status(403)
+          .json({ message: "Access denied to target channel" });
       }
 
       const savedMessage = await ChannelMessage.create({
@@ -1229,16 +1365,20 @@ const forwardMessage = async (req, res) => {
         forwardedFrom: formattedForwardedFrom,
       });
 
-      const populatedMessage = await ChannelMessage.findById(savedMessage._id)
-        .populate("senderId", "username avatar");
+      const populatedMessage = await ChannelMessage.findById(
+        savedMessage._id,
+      ).populate("senderId", "username avatar");
 
-      const messagePayload = formatChannelMessage(populatedMessage, currentUserId);
+      const messagePayload = formatChannelMessage(
+        populatedMessage,
+        currentUserId,
+      );
 
       // Update sender read state
       ChannelReadState.findOneAndUpdate(
         { channelId: access.channel._id, userId: currentUserId },
         { $set: { lastReadAt: new Date() } },
-        { upsert: true }
+        { upsert: true },
       ).catch(() => {});
 
       if (io) {
@@ -1255,10 +1395,14 @@ const forwardMessage = async (req, res) => {
     } else {
       // DIRECT
       if (currentUserId.toString() === targetId.toString()) {
-        return res.status(400).json({ message: "Cannot forward message to yourself" });
+        return res
+          .status(400)
+          .json({ message: "Cannot forward message to yourself" });
       }
 
-      const targetUser = await User.findById(targetId).select("_id username avatar");
+      const targetUser = await User.findById(targetId).select(
+        "_id username avatar",
+      );
       if (!targetUser) {
         return res.status(404).json({ message: "Target user not found" });
       }
@@ -1286,8 +1430,14 @@ const forwardMessage = async (req, res) => {
       };
 
       if (io) {
-        io.to(`user:${targetId}`).emit("receive-direct-message", messagePayload);
-        io.to(`user:${currentUserId}`).emit("direct-message-sent", messagePayload);
+        io.to(`user:${targetId}`).emit(
+          "receive-direct-message",
+          messagePayload,
+        );
+        io.to(`user:${currentUserId}`).emit(
+          "direct-message-sent",
+          messagePayload,
+        );
       }
 
       return res.status(201).json({
@@ -1299,7 +1449,59 @@ const forwardMessage = async (req, res) => {
     }
   } catch (error) {
     console.error("Error in forwardMessage:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
+  }
+};
+
+const deleteDirectConversation = async (req, res) => {
+  try {
+    const currentUserId = req.userId;
+    const { userId: otherUserId } = req.params;
+
+    if (!mongoose.isValidObjectId(otherUserId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    const userObjId = mongoose.Types.ObjectId.isValid(currentUserId)
+      ? new mongoose.Types.ObjectId(currentUserId)
+      : currentUserId;
+    const otherUserObjId = mongoose.Types.ObjectId.isValid(otherUserId)
+      ? new mongoose.Types.ObjectId(otherUserId)
+      : otherUserId;
+    await Message.updateMany(
+      {
+        $or: [
+          { senderId: userObjId, receiverId: otherUserObjId },
+          { senderId: otherUserObjId, receiverId: userObjId },
+        ],
+      },
+      {
+        $addToSet: { deletedBy: userObjId },
+      },
+    );
+
+    await Message.updateMany(
+      {
+        senderId: otherUserObjId,
+        receiverId: userObjId,
+        isRead: false,
+      },
+      {
+        $set: { isRead: true },
+      },
+    );
+
+    return res.json({
+      success: true,
+      message: "Conversation history deleted for your account",
+    });
+  } catch (error) {
+    console.error("Error in deleteDirectConversation:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -1320,4 +1522,5 @@ export {
   markMentionAsRead,
   markAllMentionsAsRead,
   forwardMessage,
-}
+  deleteDirectConversation,
+};

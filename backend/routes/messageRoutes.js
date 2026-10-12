@@ -15,6 +15,7 @@ import {
   markMentionAsRead,
   markAllMentionsAsRead,
   forwardMessage,
+  deleteDirectConversation,
 } from "../controllers/messageController.js"
 
 const router = express.Router()
@@ -35,6 +36,9 @@ router.post("/channels/:channelId/read", markChannelAsRead)
 router.post("/channels/:channelId/unread", markChannelAsUnread)
 router.post("/direct/:userId/read", markDirectMessagesAsRead)
 router.post("/direct/:userId/unread", markDirectMessagesAsUnread)
+router.delete("/direct/:userId/conversation", deleteDirectConversation)
+router.delete("/direct/:userId", deleteDirectConversation)
+router.delete("/:userId/conversation", deleteDirectConversation)
 router.get("/channels/:channelId", getChannelMessages)
 router.get("/:userId", getDirectMessages)
 

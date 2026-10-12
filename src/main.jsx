@@ -9,7 +9,7 @@ import { ThemeProvider } from './context/ThemeContext'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
-      <ToastContainer/>
+      <ToastContainer limit={3} autoClose={2500} />
       <BrowserRouter>
         <App />
       </BrowserRouter>
