@@ -2201,7 +2201,7 @@ const SlackShell = () => {
                       No channels yet
                     </div>
                   ) : (
-                    channels.map((chan) => {
+                    channels.map((chan, idx) => {
                       const isActive =
                         currentChannel?.id === chan.id &&
                         !selectedDMUser &&
@@ -2213,6 +2213,7 @@ const SlackShell = () => {
                       const isUnread =
                         (unreadChannelCounts[chan.id.toString()] || 0) > 0;
                       const isPinned = pinnedKeys.has(`channel:${chan.id}`);
+                      const openUpward = idx >= 3;
                       return (
                         <div key={chan.id} className="relative group">
                           <div
@@ -2292,7 +2293,9 @@ const SlackShell = () => {
                                 className="fixed inset-0 z-30"
                                 onClick={() => setActiveChannelMenuId(null)}
                               />
-                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
+                              <div
+                                className={`absolute right-2  ${openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5`}
+                              >
                                 <button
                                   type="button"
                                   onClick={(e) =>
@@ -2409,7 +2412,8 @@ const SlackShell = () => {
               {!isDMsCollapsed && (
                 <div className="space-y-0.5 pt-1">
                   {visibleDirectMessageMembers.length > 0 ? (
-                    visibleDirectMessageMembers.map((member) => {
+                    visibleDirectMessageMembers.map((member, idx) => {
+                      const openUpward = idx >= 3;
                       const isSelected = selectedDMUser?.id === member.id;
                       const isMenuOpen = activeDMMenuId === member.id;
                       const isUnread =
@@ -3381,7 +3385,9 @@ const SlackShell = () => {
                               className="fixed inset-0 z-30"
                               onClick={() => setActiveChannelMenuId(null)}
                             />
-                            <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
+                            <div
+                              className={`absolute right-2 ${openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5`}
+                            >
                               {/* Toggle Read / Unread */}
                               <button
                                 type="button"
@@ -3522,12 +3528,13 @@ const SlackShell = () => {
             {!isDMsCollapsed && (
               <div className="space-y-0.5 pt-1">
                 {visibleDirectMessageMembers.length > 0 ? (
-                  visibleDirectMessageMembers.map((member) => {
+                  visibleDirectMessageMembers.map((member, idx) => {
                     const isSelected = selectedDMUser?.id === member.id;
                     const isMenuOpen = activeDMMenuId === member.id;
                     const isUnread =
                       (unreadDMCounts[member.id?.toString()] || 0) > 0;
                     const isPinned = pinnedKeys.has(`dm:${member.id}`);
+                    const openUpward = idx >= 2;
                     return (
                       <div key={member.id} className="relative group">
                         <div
@@ -3621,7 +3628,9 @@ const SlackShell = () => {
                               className="fixed inset-0 z-30"
                               onClick={() => setActiveDMMenuId(null)}
                             />
-                            <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
+                            <div
+                              className={`absolute right-2 ${openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5`}
+                            >
                               {/* Toggle Read / Unread */}
                               <button
                                 type="button"
@@ -4957,7 +4966,11 @@ const SlackShell = () => {
                     Leave {leaveTarget.type === "channel" ? "Channel" : "Space"}
                   </p>
                   <h2 className="text-xl font-bold text-[#2C3333] dark:text-[#E7F6F2]">
-                    Leave {leaveTarget.type === "channel" ? `#${leaveTarget.name}` : `"${leaveTarget.name}"`}?
+                    Leave{" "}
+                    {leaveTarget.type === "channel"
+                      ? `#${leaveTarget.name}`
+                      : `"${leaveTarget.name}"`}
+                    ?
                   </h2>
                 </div>
               </div>
@@ -4973,7 +4986,8 @@ const SlackShell = () => {
 
             <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-3.5 mb-5 text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
               <p className="font-semibold mb-1">
-                Are you sure you want to leave this {leaveTarget.type === "channel" ? "channel" : "space"}?
+                Are you sure you want to leave this{" "}
+                {leaveTarget.type === "channel" ? "channel" : "space"}?
               </p>
               <p>
                 You will no longer receive new messages or notifications from{" "}
