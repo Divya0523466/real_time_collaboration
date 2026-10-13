@@ -29,6 +29,8 @@ const DirectMessaging = ({
   onOpenSidebar,
   onForwardMessage = () => {},
   onNavigateSource = () => {},
+  isBlocked = false,
+  onToggleBlock,
 }) => {
   const { workspaceData, user } = useWorkspace()
   const [selectedUser, setSelectedUser] = useState(externalSelectedUser)
@@ -131,7 +133,9 @@ const DirectMessaging = ({
 
   // Handle errors
   const handleDirectMessageError = (error) => {
-    setError(error.message || "Failed to send message")
+    const msg = error?.message || "Failed to send message"
+    setError(msg)
+    toast.error(msg)
   }
 
   // Handle edit — update the message in place without touching messageIdsRef
@@ -185,6 +189,7 @@ const DirectMessaging = ({
 
   const handleSendMessage = (content, attachments = [], mentions = []) => {
     if (!currentSelectedUser) return
+    setError(null)
     const trimmed = typeof content === "string" ? content.trim() : ""
     if (!trimmed && (!attachments || attachments.length === 0)) {
       return
@@ -259,6 +264,9 @@ const DirectMessaging = ({
       onNavigateSource={onNavigateSource}
       currentUserId={user?.id || user?._id}
       onOpenSidebar={onOpenSidebar}
+      isBlocked={isBlocked}
+      onToggleBlock={onToggleBlock}
+      onClearError={() => setError(null)}
     />
   )
 }

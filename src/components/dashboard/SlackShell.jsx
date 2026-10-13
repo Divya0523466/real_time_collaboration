@@ -43,6 +43,7 @@ import {
   markDirectMessagesAsRead,
   markDirectMessagesAsUnread,
   deleteDirectConversationApi,
+  toggleBlockUserApi,
 } from "../../services/messageService";
 
 export const getWorkspaceInitials = (name) => {
@@ -180,6 +181,20 @@ const SlackShell = () => {
       return new Set();
     }
   });
+  const [blockedUserIds, setBlockedUserIds] = useState(() => {
+    const initial = user?.blockedUsers || [];
+    return new Set(initial.map((id) => (id?._id || id?.id || id).toString()));
+  });
+
+  useEffect(() => {
+    if (user?.blockedUsers) {
+      setBlockedUserIds(
+        new Set(
+          user.blockedUsers.map((id) => (id?._id || id?.id || id).toString()),
+        ),
+      );
+    }
+  }, [user?.blockedUsers]);
   const [isPinnedCollapsed, setIsPinnedCollapsed] = useState(false);
   const [activePinnedMenuKey, setActivePinnedMenuKey] = useState(null);
   const [forwardModalData, setForwardModalData] = useState({
@@ -191,6 +206,10 @@ const SlackShell = () => {
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [leaveTarget, setLeaveTarget] = useState(null);
   const [isLeavingTarget, setIsLeavingTarget] = useState(false);
+  const [blockTarget, setBlockTarget] = useState(null);
+  const [isBlockingUser, setIsBlockingUser] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
 
   const handleOpenForwardModal = (message, sourceContext) => {
     setForwardModalData({
@@ -719,6 +738,54 @@ const SlackShell = () => {
     }
   };
 
+  const handleToggleBlockUser = async (member, e) => {
+    e?.stopPropagation();
+    setActiveDMMenuId(null);
+    setActivePinnedMenuKey(null);
+    const targetUserId = (member?.id || member?._id)?.toString();
+    if (!targetUserId) return;
+    const isCurrentlyBlocked = blockedUserIds.has(targetUserId);
+
+    if (!isCurrentlyBlocked) {
+      setBlockTarget({
+        id: targetUserId,
+        username: member.username || member.name || "this user",
+      });
+      return;
+    }
+
+    try {
+      const res = await toggleBlockUserApi(targetUserId);
+      setBlockedUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(targetUserId);
+        return next;
+      });
+      toast.success(res.message || "User unblocked");
+    } catch (err) {
+      toast.error(err.message || "Failed to update block status");
+    }
+  };
+
+  const handleConfirmBlockUser = async () => {
+    if (!blockTarget?.id) return;
+    setIsBlockingUser(true);
+    try {
+      const res = await toggleBlockUserApi(blockTarget.id);
+      setBlockedUserIds((prev) => {
+        const next = new Set(prev);
+        next.add(blockTarget.id);
+        return next;
+      });
+      toast.success(res.message || "User blocked");
+      setBlockTarget(null);
+    } catch (err) {
+      toast.error(err.message || "Failed to block user");
+    } finally {
+      setIsBlockingUser(false);
+    }
+  };
+
   const handleSelectDM = (member) => {
     const mId = (member.id || member._id)?.toString();
     if (mId) handleUnhideDM(mId);
@@ -1111,11 +1178,23 @@ const SlackShell = () => {
                             <div className="h-px bg-[#395B64]/50 my-1" />
                             <button
                               type="button"
-                              onClick={(e) => handleComingSoon("Block user", e)}
+                              onClick={(e) =>
+                                handleToggleBlockUser(
+                                  item.data || {
+                                    id: item.id,
+                                    username: item.name,
+                                  },
+                                  e,
+                                )
+                              }
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-400 hover:bg-[#395B64] transition"
                             >
-                              <i className="fa-solid fa-ban w-3.5" />
-                              Block user
+                              <i
+                                className={`fa-solid ${blockedUserIds.has(item.id?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
+                              />
+                              {blockedUserIds.has(item.id?.toString())
+                                ? "Unblock user"
+                                : "Block user"}
                             </button>
                             <button
                               type="button"
@@ -1742,20 +1821,12 @@ const SlackShell = () => {
     }
   };
 
-  const handleRemoveMember = async (memberId, memberName) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to remove ${memberName} from this workspace?`,
-      )
-    ) {
-      return;
-    }
-    try {
-      await removeMember(memberId);
-      toast.error(`${memberName} has been removed from the workspace`);
-    } catch (err) {
-      toast.error(err.message || "Failed to remove member");
-    }
+  const handleRemoveMember = (memberId, memberName) => {
+    setMemberToRemove({
+      id: memberId,
+      name: memberName,
+      type: "workspace",
+    });
   };
 
   const filteredMembers = useMemo(() => {
@@ -1800,22 +1871,34 @@ const SlackShell = () => {
     }
   };
 
-  const handleRemoveChannelMember = async (member) => {
-    if (
-      !activeChannel?.id ||
-      !window.confirm(`Remove ${member.username} from this channel?`)
-    )
-      return;
+  const handleRemoveChannelMember = (member) => {
+    if (!activeChannel?.id) return;
+    setMemberToRemove({
+      id: member.id,
+      name: member.username,
+      type: "channel",
+    });
+  };
 
-    setChannelMemberActionLoading(true);
+  const handleConfirmRemoveMember = async () => {
+    if (!memberToRemove) return;
+    setIsRemovingMember(true);
     try {
-      await removeChannelMember(activeChannel.id, member.id);
-      await refreshChannelDetails();
-      toast.error(`${member.username} removed from channel`);
+      if (memberToRemove.type === "workspace") {
+        await removeMember(memberToRemove.id);
+        toast.error(
+          `${memberToRemove.name} has been removed from the workspace`,
+        );
+      } else {
+        await removeChannelMember(activeChannel.id, memberToRemove.id);
+        await refreshChannelDetails();
+        toast.error(`${memberToRemove.name} removed from channel`);
+      }
+      setMemberToRemove(null);
     } catch (err) {
-      toast.error(err.message || "Failed to remove member from channel");
+      toast.error(err.message || "Failed to remove member");
     } finally {
-      setChannelMemberActionLoading(false);
+      setIsRemovingMember(false);
     }
   };
 
@@ -2555,12 +2638,18 @@ const SlackShell = () => {
                                 <button
                                   type="button"
                                   onClick={(e) =>
-                                    handleComingSoon("Block user", e)
+                                    handleToggleBlockUser(member, e)
                                   }
                                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-400 hover:bg-[#395B64] transition"
                                 >
-                                  <i className="fa-solid fa-ban w-3.5" />
-                                  Block user
+                                  <i
+                                    className={`fa-solid ${blockedUserIds.has((member.id || member._id)?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
+                                  />
+                                  {blockedUserIds.has(
+                                    (member.id || member._id)?.toString(),
+                                  )
+                                    ? "Unblock user"
+                                    : "Block user"}
                                 </button>
                                 <button
                                   type="button"
@@ -3294,7 +3383,7 @@ const SlackShell = () => {
                     No channels yet
                   </div>
                 ) : (
-                  channels.map((chan) => {
+                  channels.map((chan, idx) => {
                     const isActive =
                       currentChannel?.id === chan.id &&
                       !selectedDMUser &&
@@ -3306,6 +3395,7 @@ const SlackShell = () => {
                     const isUnread =
                       (unreadChannelCounts[chan.id.toString()] || 0) > 0;
                     const isPinned = pinnedKeys.has(`channel:${chan.id}`);
+                    const openUpward = idx >= 3;
                     return (
                       <div key={chan.id} className="relative group">
                         <div
@@ -3688,12 +3778,18 @@ const SlackShell = () => {
                               <button
                                 type="button"
                                 onClick={(e) =>
-                                  handleComingSoon("Block user", e)
+                                  handleToggleBlockUser(member, e)
                                 }
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-400 hover:bg-[#395B64] transition"
                               >
-                                <i className="fa-solid fa-ban w-3.5" />
-                                Block user
+                                <i
+                                  className={`fa-solid ${blockedUserIds.has((member.id || member._id)?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
+                                />
+                                {blockedUserIds.has(
+                                  (member.id || member._id)?.toString(),
+                                )
+                                  ? "Unblock user"
+                                  : "Block user"}
                               </button>
 
                               {/* Delete */}
@@ -4152,6 +4248,10 @@ const SlackShell = () => {
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
+              isBlocked={blockedUserIds.has(
+                (selectedDMUser?.id || selectedDMUser?._id)?.toString(),
+              )}
+              onToggleBlock={(e) => handleToggleBlockUser(selectedDMUser, e)}
             />
           ) : selectedSpace ? (
             <SpaceMessageThread
@@ -5024,6 +5124,169 @@ const SlackShell = () => {
                   <>
                     <i className="fa-solid fa-arrow-right-from-bracket text-xs" />
                     Leave
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Block User Confirmation Modal */}
+      {blockTarget && (
+        <div
+          className="fixed inset-0 z-50 grid overflow-y-auto bg-[#2C3333]/65 px-4 py-6 backdrop-blur-xs sm:px-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isBlockingUser) {
+              setBlockTarget(null);
+            }
+          }}
+        >
+          <div
+            className="m-auto w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-6 shadow-[0_24px_70px_rgba(44,51,51,0.4)] sm:p-8"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950/50 text-base font-bold">
+                  <i className="fa-solid fa-ban" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-400">
+                    Block User
+                  </p>
+                  <h2 className="text-xl font-bold text-[#2C3333] dark:text-[#E7F6F2]">
+                    Block @{blockTarget.username}?
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isBlockingUser && setBlockTarget(null)}
+                disabled={isBlockingUser}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition disabled:opacity-50"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-3.5 mb-5 text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+              <p className="font-semibold mb-1">
+                Are you sure you want to block this user?
+              </p>
+              <p>
+                You and <strong>@{blockTarget.username}</strong> will no longer be
+                able to send direct messages to each other.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setBlockTarget(null)}
+                disabled={isBlockingUser}
+                className="flex-1 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] py-2.5 text-xs font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBlockUser}
+                disabled={isBlockingUser}
+                className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-700 py-2.5 text-xs font-semibold text-white transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isBlockingUser ? (
+                  <>
+                    <i className="fa-solid fa-circle-notch fa-spin text-xs" />
+                    Blocking...
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-ban text-xs" />
+                    Block user
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Member Confirmation Modal */}
+      {memberToRemove && (
+        <div
+          className="fixed inset-0 z-50 grid overflow-y-auto bg-[#2C3333]/65 px-4 py-6 backdrop-blur-xs sm:px-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isRemovingMember) {
+              setMemberToRemove(null);
+            }
+          }}
+        >
+          <div
+            className="m-auto w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-6 shadow-[0_24px_70px_rgba(44,51,51,0.4)] sm:p-8"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-950/50 text-base font-bold">
+                  <i className="fa-solid fa-user-minus" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-400">
+                    Remove Member
+                  </p>
+                  <h2 className="text-xl font-bold text-[#2C3333] dark:text-[#E7F6F2]">
+                    Remove {memberToRemove.name}?
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isRemovingMember && setMemberToRemove(null)}
+                disabled={isRemovingMember}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition disabled:opacity-50"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/30 p-3.5 mb-5 text-xs text-rose-800 dark:text-rose-200 leading-relaxed">
+              <p className="font-semibold mb-1">
+                Are you sure you want to remove this member?
+              </p>
+              <p>
+                <strong>{memberToRemove.name}</strong> will be removed from this{" "}
+                {memberToRemove.type === "workspace" ? "workspace" : "channel"}.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setMemberToRemove(null)}
+                disabled={isRemovingMember}
+                className="flex-1 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] py-2.5 text-xs font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRemoveMember}
+                disabled={isRemovingMember}
+                className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 py-2.5 text-xs font-semibold text-white transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isRemovingMember ? (
+                  <>
+                    <i className="fa-solid fa-circle-notch fa-spin text-xs" />
+                    Removing...
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-user-minus text-xs" />
+                    Remove
                   </>
                 )}
               </button>

@@ -554,7 +554,7 @@ io.on("connection", async (socket) => {
 
     let receiver;
     try {
-      receiver = await User.findById(receiverId).select("_id username");
+      receiver = await User.findById(receiverId).select("_id username blockedUsers");
     } catch {
       receiver = null;
     }
@@ -569,6 +569,22 @@ io.on("connection", async (socket) => {
     if (socket.userId.toString() === receiverId.toString()) {
       socket.emit("send-direct-message-error", {
         message: "Cannot send message to yourself",
+      });
+      return;
+    }
+
+    const sender = await User.findById(socket.userId).select("blockedUsers");
+    const isSenderBlocking = (sender?.blockedUsers || []).some(
+      (id) => id.toString() === receiverId.toString()
+    );
+    const isReceiverBlocking = (receiver?.blockedUsers || []).some(
+      (id) => id.toString() === socket.userId.toString()
+    );
+    if (isSenderBlocking || isReceiverBlocking) {
+      socket.emit("send-direct-message-error", {
+        message: isSenderBlocking
+          ? "You have blocked this user. Unblock them to send messages."
+          : "This user is not accepting direct messages at this time.",
       });
       return;
     }

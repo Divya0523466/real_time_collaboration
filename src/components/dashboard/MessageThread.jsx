@@ -59,6 +59,9 @@ const MessageThread = ({
   onNavigateSource = () => {},
   currentUserId = null,
   onOpenSidebar = () => {},
+  isBlocked = false,
+  onToggleBlock,
+  onClearError,
 }) => {
   const { isUserOnline, workspaceData, user } = useWorkspace()
   const resolvedCurrentUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
@@ -300,8 +303,21 @@ const MessageThread = ({
       {/* Messages Area */}
       <div ref={messagesContainerRef} className="flex-1 space-y-2 overflow-y-auto p-4">
         {error && (
-          <div className="rounded border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-2 text-sm text-rose-700 dark:text-rose-400">
-            {error}
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-2.5 text-xs sm:text-sm text-amber-800 dark:text-amber-200 shadow-xs">
+            <div className="flex items-center gap-2">
+              <i className="fa-solid fa-circle-exclamation text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>{error}</span>
+            </div>
+            {onClearError && (
+              <button
+                type="button"
+                onClick={onClearError}
+                className="text-amber-700 dark:text-amber-300 hover:opacity-75 transition p-1"
+                title="Dismiss"
+              >
+                <i className="fa-solid fa-xmark text-xs" />
+              </button>
+            )}
           </div>
         )}
 
@@ -617,85 +633,105 @@ const MessageThread = ({
 
       {/* Input Area */}
       <div className="border-t border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121] p-4 transition-colors">
-        {/* Attached file preview chip */}
-        {attachedFile && (
-          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFB] dark:bg-[#242D2D] px-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#D0DCDB] dark:border-[#395B64]/60">
-            <div className="flex items-center gap-2 truncate">
-              <i className="fa-solid fa-paperclip text-[#395B64] dark:text-[#A5C9CA]" />
-              <span className="font-medium truncate">{attachedFile.originalName}</span>
-              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70">({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+        {isBlocked ? (
+          <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-xs sm:text-sm text-amber-700 dark:text-amber-300">
+            <div className="flex items-center gap-2">
+              <i className="fa-solid fa-ban text-amber-500" />
+              <span>You have blocked this user. Unblock them to send messages.</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setAttachedFile(null)}
-              className="text-[#52656A] dark:text-[#A5C9CA] hover:text-rose-500 transition-colors p-1"
-              title="Remove attachment"
-            >
-              <i className="fa-solid fa-xmark text-xs" />
-            </button>
+            {onToggleBlock && (
+              <button
+                type="button"
+                onClick={onToggleBlock}
+                className="rounded-lg bg-amber-500/20 px-3 py-1 font-semibold text-amber-800 dark:text-amber-200 hover:bg-amber-500/30 transition text-xs"
+              >
+                Unblock
+              </button>
+            )}
           </div>
-        )}
+        ) : (
+          <>
+            {/* Attached file preview chip */}
+            {attachedFile && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFB] dark:bg-[#242D2D] px-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#D0DCDB] dark:border-[#395B64]/60">
+                <div className="flex items-center gap-2 truncate">
+                  <i className="fa-solid fa-paperclip text-[#395B64] dark:text-[#A5C9CA]" />
+                  <span className="font-medium truncate">{attachedFile.originalName}</span>
+                  <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70">({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAttachedFile(null)}
+                  className="text-[#52656A] dark:text-[#A5C9CA] hover:text-rose-500 transition-colors p-1"
+                  title="Remove attachment"
+                >
+                  <i className="fa-solid fa-xmark text-xs" />
+                </button>
+              </div>
+            )}
 
-        {/* Upload error banner */}
-        {uploadError && (
-          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-xs text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
-            <div className="flex items-center gap-1.5 truncate">
-              <i className="fa-solid fa-circle-exclamation text-rose-500 shrink-0" />
-              <span className="truncate">{uploadError}</span>
+            {/* Upload error banner */}
+            {uploadError && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-xs text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
+                <div className="flex items-center gap-1.5 truncate">
+                  <i className="fa-solid fa-circle-exclamation text-rose-500 shrink-0" />
+                  <span className="truncate">{uploadError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUploadError(null)}
+                  className="text-rose-500 hover:text-rose-700 p-0.5"
+                >
+                  <i className="fa-solid fa-xmark text-xs" />
+                </button>
+              </div>
+            )}
+
+            <div className="relative flex items-center gap-2">
+              <MentionSuggestions
+                isOpen={mention.isMentionOpen}
+                users={mention.filteredUsers}
+                selectedIndex={mention.selectedIndex}
+                onSelect={mention.selectUser}
+                onHoverIndex={mention.setSelectedIndex}
+              />
+
+              <FileUpload
+                buttonClassName="flex items-center justify-center h-8 w-8 rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition-colors"
+                onUploadSuccess={(file) => {
+                  setAttachedFile(file);
+                  setUploadError(null);
+                }}
+                onUploadError={(err) => setUploadError(err)}
+              />
+
+              <textarea
+                ref={mainTextareaRef}
+                value={inputValue}
+                onChange={mention.handleInputChange}
+                onSelect={mention.handleInputSelect}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message..."
+                className="flex-1 resize-none rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 px-4 py-2 text-[15px] sm:text-base focus:border-[#395B64] focus:outline-none focus:ring-2 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30"
+                rows="2"
+              />
+
+              <EmojiPickerButton
+                onEmojiSelect={handleEmojiSelect}
+              />
+
+              <button
+                type="button"
+                onClick={handleSendClick}
+                disabled={!inputValue.trim() && !attachedFile}
+                className="flex items-center gap-1.5 rounded-lg bg-[#395B64] px-3 sm:px-4 py-2 font-medium text-white transition hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0"
+              >
+                <i className="fa-solid fa-paper-plane text-sm sm:text-xs" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setUploadError(null)}
-              className="text-rose-500 hover:text-rose-700 p-0.5"
-            >
-              <i className="fa-solid fa-xmark text-xs" />
-            </button>
-          </div>
+          </>
         )}
-
-        <div className="relative flex items-center gap-2">
-          <MentionSuggestions
-            isOpen={mention.isMentionOpen}
-            users={mention.filteredUsers}
-            selectedIndex={mention.selectedIndex}
-            onSelect={mention.selectUser}
-            onHoverIndex={mention.setSelectedIndex}
-          />
-
-          <FileUpload
-            buttonClassName="flex items-center justify-center h-8 w-8 rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition-colors"
-            onUploadSuccess={(file) => {
-              setAttachedFile(file);
-              setUploadError(null);
-            }}
-            onUploadError={(err) => setUploadError(err)}
-          />
-
-          <textarea
-            ref={mainTextareaRef}
-            value={inputValue}
-            onChange={mention.handleInputChange}
-            onSelect={mention.handleInputSelect}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            className="flex-1 resize-none rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 px-4 py-2 text-[15px] sm:text-base focus:border-[#395B64] focus:outline-none focus:ring-2 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30"
-            rows="2"
-          />
-
-          <EmojiPickerButton
-            onEmojiSelect={handleEmojiSelect}
-          />
-
-          <button
-            type="button"
-            onClick={handleSendClick}
-            disabled={!inputValue.trim() && !attachedFile}
-            className="flex items-center gap-1.5 rounded-lg bg-[#395B64] px-3 sm:px-4 py-2 font-medium text-white transition hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0"
-          >
-            <i className="fa-solid fa-paper-plane text-sm sm:text-xs" />
-            <span className="hidden sm:inline">Send</span>
-          </button>
-        </div>
       </div>
     </div>
   )

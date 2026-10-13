@@ -1505,6 +1505,50 @@ const deleteDirectConversation = async (req, res) => {
   }
 };
 
+const toggleBlockUser = async (req, res) => {
+  try {
+    const currentUserId = req.userId;
+    const { userId: targetUserId } = req.params;
+
+    if (!mongoose.isValidObjectId(targetUserId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+    if (currentUserId.toString() === targetUserId.toString()) {
+      return res.status(400).json({ message: "Cannot block yourself" });
+    }
+
+    const currentUser = await User.findById(currentUserId);
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isBlocked = (currentUser.blockedUsers || []).some(
+      (id) => id.toString() === targetUserId.toString()
+    );
+
+    if (isBlocked) {
+      currentUser.blockedUsers = currentUser.blockedUsers.filter(
+        (id) => id.toString() !== targetUserId.toString()
+      );
+    } else {
+      currentUser.blockedUsers = currentUser.blockedUsers || [];
+      currentUser.blockedUsers.push(targetUserId);
+    }
+
+    await currentUser.save();
+
+    return res.json({
+      success: true,
+      isBlocked: !isBlocked,
+      blockedUsers: (currentUser.blockedUsers || []).map((id) => id.toString()),
+      message: !isBlocked ? "User blocked successfully" : "User unblocked successfully",
+    });
+  } catch (error) {
+    console.error("Error in toggleBlockUser:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export {
   getDirectMessages,
   getChannelMessages,
@@ -1523,4 +1567,5 @@ export {
   markAllMentionsAsRead,
   forwardMessage,
   deleteDirectConversation,
+  toggleBlockUser,
 };

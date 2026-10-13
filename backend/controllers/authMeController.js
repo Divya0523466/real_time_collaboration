@@ -47,6 +47,7 @@ export const getMe = async (req, res) => {
         isActive: user.isActive !== false,
         status: user.status || "active",
         twoFactorEnabled: Boolean(user.twoFactorEnabled),
+        blockedUsers: (user.blockedUsers || []).map((id) => id.toString()),
       },
       workspaces,
     });

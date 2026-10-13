@@ -218,3 +218,18 @@ export const deleteDirectConversationApi = async (otherUserId) => {
   return data
 }
 
+export const toggleBlockUserApi = async (userId) => {
+  const response = await fetch(`${API_URL}/messages/direct/${userId}/block`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to update block status")
+  }
+  return data
+}
+
+

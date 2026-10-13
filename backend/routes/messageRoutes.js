@@ -16,6 +16,7 @@ import {
   markAllMentionsAsRead,
   forwardMessage,
   deleteDirectConversation,
+  toggleBlockUser,
 } from "../controllers/messageController.js"
 
 const router = express.Router()
@@ -36,6 +37,7 @@ router.post("/channels/:channelId/read", markChannelAsRead)
 router.post("/channels/:channelId/unread", markChannelAsUnread)
 router.post("/direct/:userId/read", markDirectMessagesAsRead)
 router.post("/direct/:userId/unread", markDirectMessagesAsUnread)
+router.post("/direct/:userId/block", toggleBlockUser)
 router.delete("/direct/:userId/conversation", deleteDirectConversation)
 router.delete("/direct/:userId", deleteDirectConversation)
 router.delete("/:userId/conversation", deleteDirectConversation)
