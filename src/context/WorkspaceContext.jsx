@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "react-toastify";
 import { showDesktopNotification } from "../utils/desktopNotification";
 import { isSuperAdminUser, isDeactivatedAccount } from "../utils/adminAuth";
@@ -81,6 +81,23 @@ export const WorkspaceProvider = ({ children }) => {
   const [invitations, setInvitations] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [isMutedGlobal, setIsMutedGlobal] = useState(() => {
+    return localStorage.getItem("worknest_global_mute") === "true";
+  });
+  const isMutedGlobalRef = useRef(isMutedGlobal);
+  isMutedGlobalRef.current = isMutedGlobal;
+
+  const toggleGlobalMute = useCallback(() => {
+    const next = !isMutedGlobalRef.current;
+    isMutedGlobalRef.current = next;
+    setIsMutedGlobal(next);
+    localStorage.setItem("worknest_global_mute", String(next));
+    if (next) {
+      toast.info("Notifications muted globally");
+    } else {
+      toast.success("Notifications unmuted");
+    }
+  }, []);
   const [onlineUsers, setOnlineUsers] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(() => {
@@ -241,12 +258,14 @@ export const WorkspaceProvider = ({ children }) => {
     const handleNotification = (newNotif) => {
       setNotifications((prev) => [newNotif, ...prev]);
       setUnreadNotificationsCount((prev) => prev + 1);
-      toast.info(newNotif.title, {
-        icon: <i className="fa-solid fa-bell text-[#395B64]" />,
-      });
-      showDesktopNotification(newNotif.title, {
-        body: newNotif.message
-      });
+      if (!isMutedGlobalRef.current) {
+        toast.info(newNotif.title, {
+          icon: <i className="fa-solid fa-bell text-[#395B64]" />,
+        });
+        showDesktopNotification(newNotif.title, {
+          body: newNotif.message
+        });
+      }
     };
 
     const handleChannelMemberRemoved = (data) => {
@@ -1037,6 +1056,8 @@ export const WorkspaceProvider = ({ children }) => {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
+    isMutedGlobal,
+    toggleGlobalMute,
   };
 
   return (

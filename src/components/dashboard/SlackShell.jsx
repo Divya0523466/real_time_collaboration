@@ -105,6 +105,8 @@ const SlackShell = () => {
     removeMember,
     notifications,
     unreadNotificationsCount,
+    isMutedGlobal,
+    toggleGlobalMute,
     isUserOnline,
     loading,
     error,
@@ -2192,8 +2194,11 @@ const SlackShell = () => {
                   }}
                   className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
                 >
-                  <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
+                  <i className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`} />
                   <span className="flex-1 text-left">Notifications</span>
+                  {isMutedGlobal && (
+                    <span className="text-[10px] font-semibold text-amber-400/90 px-1">Muted</span>
+                  )}
                   {unreadNotificationsCount > 0 && (
                     <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
                       {unreadNotificationsCount}
@@ -3032,10 +3037,31 @@ const SlackShell = () => {
                     setShowProfileMenu(false);
                     setShowEditProfileModal(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#E7F6F2] hover:bg-[#395B64] transition mb-3 border border-[#395B64]/50 bg-[#2C3333]/60 hover:text-white cursor-pointer"
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#E7F6F2] hover:bg-[#395B64] transition mb-2 border border-[#395B64]/50 bg-[#2C3333]/60 hover:text-white cursor-pointer"
                 >
                   <i className="fa-regular fa-user text-xs text-[#A5C9CA]" />
                   <span>Edit Profile</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleGlobalMute();
+                  }}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-semibold transition mb-3 border cursor-pointer ${
+                    isMutedGlobal
+                      ? "bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
+                      : "bg-[#2C3333]/60 border-[#395B64]/50 text-[#E7F6F2] hover:bg-[#395B64] hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <i className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} text-xs`} />
+                    <span>{isMutedGlobal ? "Notifications Muted" : "Mute Notifications"}</span>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isMutedGlobal ? "bg-amber-500/20 text-amber-300" : "bg-[#395B64] text-[#A5C9CA]"}`}>
+                    {isMutedGlobal ? "ON" : "OFF"}
+                  </span>
                 </button>
 
                 <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[#A5C9CA]">
@@ -3294,8 +3320,11 @@ const SlackShell = () => {
                 onClick={() => setShowActivityPanel(true)}
                 className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
               >
-                <i className="fa-solid fa-bell w-4 text-center text-[#A5C9CA]" />
+                <i className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`} />
                 <span className="flex-1 text-left">Notifications</span>
+                {isMutedGlobal && (
+                  <span className="text-[10px] font-semibold text-amber-400/90 px-1">Muted</span>
+                )}
                 {unreadNotificationsCount > 0 && (
                   <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
                     {unreadNotificationsCount}

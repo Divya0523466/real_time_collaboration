@@ -70,6 +70,8 @@ const NotificationPanel = ({
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
+    isMutedGlobal,
+    toggleGlobalMute,
   } = useWorkspace();
 
   const [filter, setFilter] = useState("ALL");
@@ -193,7 +195,24 @@ const NotificationPanel = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleGlobalMute();
+              }}
+              title={isMutedGlobal ? "Click to unmute notifications" : "Click to mute notifications"}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
+                isMutedGlobal
+                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
+              }`}
+            >
+              <i className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-500 dark:text-amber-300" : "fa-bell"} text-[11px]`} />
+              <span>{isMutedGlobal ? "Muted" : "Mute"}</span>
+            </button>
+
             {unreadNotificationsCount > 0 && (
               <button
                 type="button"
@@ -206,6 +225,26 @@ const NotificationPanel = ({
             )}
           </div>
         </div>
+
+        {/* Global Mute Status Banner */}
+        {isMutedGlobal && (
+          <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-600 dark:text-amber-300">
+            <span className="flex items-center gap-1.5">
+              <i className="fa-solid fa-bell-slash text-xs" />
+              Notifications are muted globally. Popups and sound alerts are silenced.
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleGlobalMute();
+              }}
+              className="font-bold underline hover:text-amber-500 cursor-pointer ml-2"
+            >
+              Unmute
+            </button>
+          </div>
+        )}
 
         {/* Notification list */}
         <div className="flex-1 overflow-y-auto divide-y divide-[#E0E7E6]/70 dark:divide-[#2C3333]">
