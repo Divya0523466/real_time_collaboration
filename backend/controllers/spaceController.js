@@ -371,12 +371,12 @@ export const addSpaceMembers = async (req, res) => {
 
 export const removeSpaceMember = async (req, res) => {
   try {
+    const { spaceId, userId } = req.params
+    const isSelf = req.userId?.toString() === userId?.toString()
     const isSuper = await isUserSuperAdmin(req.userId)
-    if (!isSuper) {
+    if (!isSelf && !isSuper) {
       return res.status(403).json({ message: "Access denied. Only Super Admins can remove members from Spaces." })
     }
-
-    const { spaceId, userId } = req.params
     const space = await Space.findById(spaceId)
     if (!space) {
       return res.status(404).json({ message: "Space not found" })

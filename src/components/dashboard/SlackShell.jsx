@@ -34,6 +34,7 @@ import {
   markSpaceAsReadApi,
   markSpaceAsUnreadApi,
   fetchSpaceUnreadCountsApi,
+  removeSpaceMemberApi,
 } from "../../services/spaceService";
 import {
   fetchUnreadMessageCounts,
@@ -188,6 +189,8 @@ const SlackShell = () => {
   });
   const [dmToDelete, setDmToDelete] = useState(null);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+  const [leaveTarget, setLeaveTarget] = useState(null);
+  const [isLeavingTarget, setIsLeavingTarget] = useState(false);
 
   const handleOpenForwardModal = (message, sourceContext) => {
     setForwardModalData({
@@ -834,34 +837,59 @@ const SlackShell = () => {
     e?.stopPropagation();
     setActiveChannelMenuId(null);
     setActivePinnedMenuKey(null);
-    if (window.confirm(`Are you sure you want to leave #${chan.name}?`)) {
-      leaveChannel(chan.id);
-      toast.info(`Left #${chan.name}`);
-      if (currentChannel?.id === chan.id) {
-        setIsHomeView(true);
-        navigate(`/app/workspace/${workspaceId}`, { replace: true });
-      }
-    }
+    setLeaveTarget({ type: "channel", id: chan.id, name: chan.name });
   };
 
   const handleLeaveSpace = (sp, e) => {
     e?.stopPropagation();
     setActiveSpaceForAction(null);
     setActivePinnedMenuKey(null);
-    if (window.confirm(`Are you sure you want to leave Space "${sp.name}"?`)) {
-      const spId = (sp._id || sp.id).toString();
-      setSpaces((prev) =>
-        prev.filter((s) => (s._id || s.id).toString() !== spId),
-      );
-      toast.info(`Left Space "${sp.name}"`);
-      if (
-        selectedSpace &&
-        (selectedSpace._id || selectedSpace.id).toString() === spId
-      ) {
-        setSelectedSpace(null);
-        setIsHomeView(true);
-        navigate(`/app/workspace/${workspaceId}`, { replace: true });
+    setLeaveTarget({ type: "space", id: sp._id || sp.id, name: sp.name });
+  };
+
+  const handleConfirmLeave = async () => {
+    if (!leaveTarget) return;
+    const { type, id, name } = leaveTarget;
+    setIsLeavingTarget(true);
+    try {
+      if (type === "channel") {
+        const currentMemberId = user?.id || user?._id;
+        if (currentMemberId && workspaceId) {
+          await removeChannelMember(id, currentMemberId);
+        }
+        leaveChannel(id);
+        toast.info(`Left #${name}`);
+        if (workspaceId) {
+          await selectWorkspace(workspaceId);
+        }
+        if (currentChannel?.id === id) {
+          setIsHomeView(true);
+          navigate(`/app/workspace/${workspaceId}`, { replace: true });
+        }
+      } else if (type === "space") {
+        const currentMemberId = user?.id || user?._id;
+        if (currentMemberId) {
+          await removeSpaceMemberApi(id, currentMemberId);
+        }
+        const spId = id.toString();
+        setSpaces((prev) =>
+          prev.filter((s) => (s._id || s.id).toString() !== spId),
+        );
+        toast.info(`Left Space "${name}"`);
+        if (
+          selectedSpace &&
+          (selectedSpace._id || selectedSpace.id).toString() === spId
+        ) {
+          setSelectedSpace(null);
+          setIsHomeView(true);
+          navigate(`/app/workspace/${workspaceId}`, { replace: true });
+        }
       }
+      setLeaveTarget(null);
+    } catch (err) {
+      toast.error(err.message || `Failed to leave ${type}`);
+    } finally {
+      setIsLeavingTarget(false);
     }
   };
 
@@ -4896,6 +4924,92 @@ const SlackShell = () => {
                   <>
                     <i className="fa-solid fa-trash-can text-xs" />
                     Delete for me
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {leaveTarget && (
+        <div
+          className="fixed inset-0 z-50 grid overflow-y-auto bg-[#2C3333]/65 px-4 py-6 backdrop-blur-xs sm:px-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isLeavingTarget) {
+              setLeaveTarget(null);
+            }
+          }}
+        >
+          <div
+            className="m-auto w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-6 shadow-[0_24px_70px_rgba(44,51,51,0.4)] sm:p-8"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950/50 text-base font-bold">
+                  <i className="fa-solid fa-arrow-right-from-bracket" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-400">
+                    Leave {leaveTarget.type === "channel" ? "Channel" : "Space"}
+                  </p>
+                  <h2 className="text-xl font-bold text-[#2C3333] dark:text-[#E7F6F2]">
+                    Leave {leaveTarget.type === "channel" ? `#${leaveTarget.name}` : `"${leaveTarget.name}"`}?
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isLeavingTarget && setLeaveTarget(null)}
+                disabled={isLeavingTarget}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition disabled:opacity-50"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-3.5 mb-5 text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+              <p className="font-semibold mb-1">
+                Are you sure you want to leave this {leaveTarget.type === "channel" ? "channel" : "space"}?
+              </p>
+              <p>
+                You will no longer receive new messages or notifications from{" "}
+                <strong>
+                  {leaveTarget.type === "channel"
+                    ? `#${leaveTarget.name}`
+                    : `"${leaveTarget.name}"`}
+                </strong>
+                .
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setLeaveTarget(null)}
+                disabled={isLeavingTarget}
+                className="flex-1 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] py-2.5 text-xs font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLeave}
+                disabled={isLeavingTarget}
+                className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 py-2.5 text-xs font-semibold text-white transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isLeavingTarget ? (
+                  <>
+                    <i className="fa-solid fa-circle-notch fa-spin text-xs" />
+                    Leaving...
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-arrow-right-from-bracket text-xs" />
+                    Leave
                   </>
                 )}
               </button>

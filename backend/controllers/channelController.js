@@ -335,7 +335,8 @@ const removeChannelMember = async (req, res) => {
     const userId = req.userId
 
     const requesterMembership = await WorkspaceMembership.findOne({ userId, workspaceId })
-    if (!requesterMembership || !["OWNER", "ADMIN"].includes(requesterMembership.role)) {
+    const isSelf = userId?.toString() === memberId?.toString()
+    if (!isSelf && (!requesterMembership || !["OWNER", "ADMIN"].includes(requesterMembership.role))) {
       return res.status(403).json({ message: "You do not have permission to manage channel members" })
     }
 
