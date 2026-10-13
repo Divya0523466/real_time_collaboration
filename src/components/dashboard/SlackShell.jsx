@@ -107,6 +107,8 @@ const SlackShell = () => {
     unreadNotificationsCount,
     isMutedGlobal,
     toggleGlobalMute,
+    toggleMuteConversation,
+    isConversationMuted,
     isUserOnline,
     loading,
     error,
@@ -1073,6 +1075,12 @@ const SlackShell = () => {
                         className="fa-solid fa-thumbtack text-[9px] text-amber-400/70 shrink-0"
                         title="Pinned"
                       />
+                      {isConversationMuted(item.type, item.id) && (
+                        <i
+                          className="fa-solid fa-bell-slash text-[9px] text-[#A5C9CA]/60 shrink-0"
+                          title="Notifications muted"
+                        />
+                      )}
 
                       {isUnread && (
                         <span
@@ -1158,13 +1166,23 @@ const SlackShell = () => {
 
                         <button
                           type="button"
-                          onClick={(e) =>
-                            handleComingSoon("Mute notifications", e)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePinnedMenuKey(null);
+                            toggleMuteConversation(item.type, item.id);
+                          }}
                           className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                         >
-                          <i className="fa-solid fa-bell-slash text-[#A5C9CA] w-3.5" />
-                          Mute notifications
+                          <i
+                            className={`fa-solid ${
+                              isConversationMuted(item.type, item.id)
+                                ? "fa-bell text-amber-400"
+                                : "fa-bell-slash text-[#A5C9CA]"
+                            } w-3.5`}
+                          />
+                          {isConversationMuted(item.type, item.id)
+                            ? "Unmute notifications"
+                            : "Mute notifications"}
                         </button>
 
                         {item.type === "dm" && (
@@ -2333,6 +2351,12 @@ const SlackShell = () => {
                               <span className="min-w-0 flex-1 truncate">
                                 {chan.name}
                               </span>
+                              {isConversationMuted("channel", chan.id) && (
+                                <i
+                                  className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                  title="Notifications muted"
+                                />
+                              )}
                               {isUnread && (
                                 <span
                                   className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
@@ -2410,13 +2434,23 @@ const SlackShell = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={(e) =>
-                                    handleComingSoon("Mute notifications", e)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveChannelMenuId(null);
+                                    toggleMuteConversation("channel", chan.id);
+                                  }}
                                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                                 >
-                                  <i className="fa-solid fa-bell-slash text-[#A5C9CA] w-3.5" />
-                                  Mute notifications
+                                  <i
+                                    className={`fa-solid ${
+                                      isConversationMuted("channel", chan.id)
+                                        ? "fa-bell text-amber-400"
+                                        : "fa-bell-slash text-[#A5C9CA]"
+                                    } w-3.5`}
+                                  />
+                                  {isConversationMuted("channel", chan.id)
+                                    ? "Unmute notifications"
+                                    : "Mute notifications"}
                                 </button>
                                 <button
                                   type="button"
@@ -2550,6 +2584,12 @@ const SlackShell = () => {
                             <span className="min-w-0 flex-1 truncate">
                               {member.username}
                             </span>
+                            {isConversationMuted("dm", member.id) && (
+                              <i
+                                className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                title="Notifications muted"
+                              />
+                            )}
                             {isUnread && (
                               <span
                                 className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
@@ -2631,13 +2671,23 @@ const SlackShell = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={(e) =>
-                                    handleComingSoon("Mute notifications", e)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDMMenuId(null);
+                                    toggleMuteConversation("dm", member.id);
+                                  }}
                                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                                 >
-                                  <i className="fa-solid fa-bell-slash text-[#A5C9CA] w-3.5" />
-                                  Mute notifications
+                                  <i
+                                    className={`fa-solid ${
+                                      isConversationMuted("dm", member.id)
+                                        ? "fa-bell text-amber-400"
+                                        : "fa-bell-slash text-[#A5C9CA]"
+                                    } w-3.5`}
+                                  />
+                                  {isConversationMuted("dm", member.id)
+                                    ? "Unmute notifications"
+                                    : "Mute notifications"}
                                 </button>
                                 <div className="h-px bg-[#395B64]/50 my-1" />
                                 <button
@@ -2777,6 +2827,12 @@ const SlackShell = () => {
                                   {memberCount === 1 ? "member" : "members"}
                                 </div>
                               </div>
+                              {isConversationMuted("space", spId) && (
+                                <i
+                                  className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                  title="Notifications muted"
+                                />
+                              )}
                               {isUnread && (
                                 <span
                                   className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
@@ -2854,13 +2910,23 @@ const SlackShell = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={(e) =>
-                                    handleComingSoon("Mute notifications", e)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveSpaceForAction(null);
+                                    toggleMuteConversation("space", spId);
+                                  }}
                                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                                 >
-                                  <i className="fa-solid fa-bell-slash text-[#A5C9CA] w-3.5" />
-                                  Mute notifications
+                                  <i
+                                    className={`fa-solid ${
+                                      isConversationMuted("space", spId)
+                                        ? "fa-bell text-amber-400"
+                                        : "fa-bell-slash text-[#A5C9CA]"
+                                    } w-3.5`}
+                                  />
+                                  {isConversationMuted("space", spId)
+                                    ? "Unmute notifications"
+                                    : "Mute notifications"}
                                 </button>
                                 <button
                                   type="button"
@@ -3456,6 +3522,12 @@ const SlackShell = () => {
                             <span className="min-w-0 flex-1 truncate">
                               {chan.name}
                             </span>
+                            {isConversationMuted("channel", chan.id) && (
+                              <i
+                                className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                title="Notifications muted"
+                              />
+                            )}
                             {isUnread && (
                               <span
                                 className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
@@ -3541,13 +3613,23 @@ const SlackShell = () => {
                               {/* Mute */}
                               <button
                                 type="button"
-                                onClick={(e) =>
-                                  handleComingSoon("Mute notifications", e)
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveChannelMenuId(null);
+                                  toggleMuteConversation("channel", chan.id);
+                                }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                               >
-                                <i className="fa-solid fa-bell-slash text-[#A5C9CA] w-3.5" />
-                                Mute notifications
+                                <i
+                                  className={`fa-solid ${
+                                    isConversationMuted("channel", chan.id)
+                                      ? "fa-bell text-amber-400"
+                                      : "fa-bell-slash text-[#A5C9CA]"
+                                  } w-3.5`}
+                                />
+                                {isConversationMuted("channel", chan.id)
+                                  ? "Unmute notifications"
+                                  : "Mute notifications"}
                               </button>
 
                               {/* Copy link */}
@@ -3700,6 +3782,12 @@ const SlackShell = () => {
                           <span className="min-w-0 flex-1 truncate">
                             {member.username}
                           </span>
+                          {isConversationMuted("dm", member.id) && (
+                            <i
+                              className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                              title="Notifications muted"
+                            />
+                          )}
                           {isUnread && (
                             <span
                               className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
@@ -3792,13 +3880,23 @@ const SlackShell = () => {
                               {/* Mute */}
                               <button
                                 type="button"
-                                onClick={(e) =>
-                                  handleComingSoon("Mute notifications", e)
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveDMMenuId(null);
+                                  toggleMuteConversation("dm", member.id);
+                                }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                               >
-                                <i className="fa-solid fa-bell-slash text-[#A5C9CA] w-3.5" />
-                                Mute notifications
+                                <i
+                                  className={`fa-solid ${
+                                    isConversationMuted("dm", member.id)
+                                      ? "fa-bell text-amber-400"
+                                      : "fa-bell-slash text-[#A5C9CA]"
+                                  } w-3.5`}
+                                />
+                                {isConversationMuted("dm", member.id)
+                                  ? "Unmute notifications"
+                                  : "Mute notifications"}
                               </button>
 
                               <div className="h-px bg-[#395B64]/50 my-1" />
@@ -3934,6 +4032,12 @@ const SlackShell = () => {
                                 {memberCount === 1 ? "member" : "members"}
                               </div>
                             </div>
+                            {isConversationMuted("space", spId) && (
+                              <i
+                                className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                title="Notifications muted"
+                              />
+                            )}
                             {isUnread && (
                               <span
                                 className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
@@ -4009,13 +4113,23 @@ const SlackShell = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={(e) =>
-                                  handleComingSoon("Mute notifications", e)
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveSpaceForAction(null);
+                                  toggleMuteConversation("space", spId);
+                                }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
                               >
-                                <i className="fa-solid fa-bell-slash text-[#A5C9CA] w-3.5" />
-                                Mute notifications
+                                <i
+                                  className={`fa-solid ${
+                                    isConversationMuted("space", spId)
+                                      ? "fa-bell text-amber-400"
+                                      : "fa-bell-slash text-[#A5C9CA]"
+                                  } w-3.5`}
+                                />
+                                {isConversationMuted("space", spId)
+                                  ? "Unmute notifications"
+                                  : "Mute notifications"}
                               </button>
                               <button
                                 type="button"

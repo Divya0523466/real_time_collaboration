@@ -98,6 +98,44 @@ export const WorkspaceProvider = ({ children }) => {
       toast.success("Notifications unmuted");
     }
   }, []);
+
+  const [mutedConversations, setMutedConversations] = useState(() => {
+    try {
+      const stored = localStorage.getItem("worknest_muted_conversations");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const mutedConversationsRef = useRef(mutedConversations);
+  mutedConversationsRef.current = mutedConversations;
+
+  const toggleMuteConversation = useCallback((type, id) => {
+    if (!type || !id) return;
+    const key = `${type}:${id}`;
+    const next = new Set(mutedConversationsRef.current);
+    const isMuted = next.has(key);
+    if (isMuted) {
+      next.delete(key);
+      toast.info("Conversation unmuted");
+    } else {
+      next.add(key);
+      toast.success("Conversation muted");
+    }
+    mutedConversationsRef.current = next;
+    setMutedConversations(next);
+    try {
+      localStorage.setItem("worknest_muted_conversations", JSON.stringify(Array.from(next)));
+    } catch (err) {}
+  }, []);
+
+  const isConversationMuted = useCallback(
+    (type, id) => {
+      if (!type || !id) return false;
+      return mutedConversations.has(`${type}:${id}`);
+    },
+    [mutedConversations]
+  );
   const [onlineUsers, setOnlineUsers] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(() => {
@@ -258,14 +296,29 @@ export const WorkspaceProvider = ({ children }) => {
     const handleNotification = (newNotif) => {
       setNotifications((prev) => [newNotif, ...prev]);
       setUnreadNotificationsCount((prev) => prev + 1);
-      if (!isMutedGlobalRef.current) {
-        toast.info(newNotif.title, {
-          icon: <i className="fa-solid fa-bell text-[#395B64]" />,
-        });
-        showDesktopNotification(newNotif.title, {
-          body: newNotif.message
-        });
+
+      if (isMutedGlobalRef.current) return;
+
+      const cId = (newNotif.channelId?._id || newNotif.channelId)?.toString();
+      const sId = (newNotif.spaceId?._id || newNotif.spaceId)?.toString();
+      const dmSenderId = (newNotif.actorId?._id || newNotif.actorId || newNotif.metadata?.senderId)?.toString();
+
+      if (cId && mutedConversationsRef.current.has(`channel:${cId}`)) return;
+      if (sId && mutedConversationsRef.current.has(`space:${sId}`)) return;
+      if (
+        (newNotif.type === "DM_NEW_MESSAGE" || newNotif.type === "DM_MENTION") &&
+        dmSenderId &&
+        mutedConversationsRef.current.has(`dm:${dmSenderId}`)
+      ) {
+        return;
       }
+
+      toast.info(newNotif.title, {
+        icon: <i className="fa-solid fa-bell text-[#395B64]" />,
+      });
+      showDesktopNotification(newNotif.title, {
+        body: newNotif.message,
+      });
     };
 
     const handleChannelMemberRemoved = (data) => {
@@ -1058,6 +1111,9 @@ export const WorkspaceProvider = ({ children }) => {
     deleteNotification,
     isMutedGlobal,
     toggleGlobalMute,
+    mutedConversations,
+    toggleMuteConversation,
+    isConversationMuted,
   };
 
   return (
