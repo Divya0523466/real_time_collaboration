@@ -20,9 +20,12 @@ import workspaceRoutes from "./routes/workspaceRoutes.js";
 import channelRoutes from "./routes/channelRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import spaceRoutes from "./routes/spaceRoutes.js";
+import groupRoutes from "./routes/groupRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import Group from "./models/Group.js";
+import { formatGroupMessage } from "./controllers/groupController.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
 import { validateChannelMentions, validateDirectMentions, validateSpaceMentions } from "./utils/mentionValidation.js";
 import getSpaceAccess from "./utils/spaceAccess.js";
@@ -63,6 +66,7 @@ app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/workspaces", channelRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/spaces", spaceRoutes);
+app.use("/api/groups", groupRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
@@ -166,6 +170,31 @@ io.on("connection", async (socket) => {
     if (room) {
       socket.leave(room);
       activeSpaceRooms.delete(room);
+    }
+  });
+
+  socket.on("join-group", async ({ groupId } = {}) => {
+    try {
+      if (!groupId || !mongoose.isValidObjectId(groupId)) {
+        socket.emit("join-group-error", { message: "Invalid group ID" });
+        return;
+      }
+      const group = await Group.findById(groupId);
+      if (!group || !group.members.some((m) => m.toString() === socket.userId)) {
+        socket.emit("join-group-error", { message: "Access denied to group" });
+        return;
+      }
+      const room = `group:${groupId}`;
+      socket.join(room);
+      socket.emit("group-joined", { groupId });
+    } catch {
+      socket.emit("join-group-error", { message: "Unable to join group" });
+    }
+  });
+
+  socket.on("leave-group", ({ groupId } = {}) => {
+    if (groupId) {
+      socket.leave(`group:${groupId}`);
     }
   });
 
@@ -526,6 +555,43 @@ io.on("connection", async (socket) => {
       })();
     } catch {
       socket.emit("send-space-message-error", { message: "Failed to send space message" });
+    }
+  });
+
+  socket.on("send-group-message", async ({ groupId, content, attachments = [] } = {}) => {
+    const trimmedContent = typeof content === "string" ? content.trim() : "";
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    if (!groupId || (!trimmedContent && !hasAttachments)) {
+      socket.emit("send-group-message-error", { message: "Group and message content or attachment required" });
+      return;
+    }
+
+    try {
+      const group = await Group.findById(groupId);
+      if (!group || !group.members.some((m) => m.toString() === socket.userId)) {
+        socket.emit("send-group-message-error", { message: "Access denied to group" });
+        return;
+      }
+
+      const room = `group:${groupId}`;
+      socket.join(room);
+
+      const savedMessage = await ChannelMessage.create({
+        groupId: group._id,
+        senderId: socket.userId,
+        content: trimmedContent,
+        attachments: attachments || [],
+      });
+
+      const populated = await ChannelMessage.findById(savedMessage._id).populate(
+        "senderId",
+        "username avatar email displayName"
+      );
+
+      const formatted = formatGroupMessage(populated);
+      io.to(room).emit("receive-group-message", formatted);
+    } catch {
+      socket.emit("send-group-message-error", { message: "Failed to send group message" });
     }
   });
 

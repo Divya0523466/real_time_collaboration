@@ -92,7 +92,7 @@ const forwardedFromSchema = new mongoose.Schema(
     },
     sourceType: {
       type: String,
-      enum: ["CHANNEL", "DIRECT", "SPACE", ""],
+      enum: ["CHANNEL", "DIRECT", "SPACE", "GROUP", ""],
       default: "",
     },
     sourceName: {
@@ -113,13 +113,19 @@ const channelMessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Channel",
       required: function () {
-        return !this.spaceId
+        return !this.spaceId && !this.groupId
       },
       index: true,
     },
     spaceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Space",
+      default: null,
+      index: true,
+    },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
       default: null,
       index: true,
     },
