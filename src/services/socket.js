@@ -214,6 +214,27 @@ export const offSpaceMessageDeleted = (callback) => {
   socket.off("space-message-deleted", callback)
 }
 
+// ── Groups Socket Helpers ──────────────────────────────────────────
+export const joinGroup = (groupId) => {
+  socket.emit("join-group", { groupId })
+}
+
+export const leaveGroup = (groupId) => {
+  socket.emit("leave-group", { groupId })
+}
+
+export const sendGroupMessageSocket = (groupId, content, attachments = []) => {
+  socket.emit("send-group-message", { groupId, content, attachments })
+}
+
+export const onGroupMessageReceived = (callback) => {
+  socket.on("receive-group-message", callback)
+}
+
+export const offGroupMessageReceived = (callback) => {
+  socket.off("receive-group-message", callback)
+}
+
 export default socket
 
 

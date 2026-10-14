@@ -28,6 +28,9 @@ import EditSpaceModal from "./EditSpaceModal";
 import SpaceMembersModal from "./SpaceMembersModal";
 import DeleteSpaceModal from "./DeleteSpaceModal";
 import SpaceMessageThread from "./SpaceMessageThread";
+import CreateGroupModal from "./CreateGroupModal";
+import GroupMessageThread from "./GroupMessageThread";
+import { fetchGroupsApi } from "../../services/groupService";
 import {
   fetchSpaces,
   fetchSpace,
@@ -147,6 +150,12 @@ const SlackShell = () => {
     useState(false);
   const [showDeleteSpaceModal, setShowDeleteSpaceModal] = useState(false);
   const [activeSpaceForAction, setActiveSpaceForAction] = useState(null);
+
+  // ── Group states ──────────────────────────────────────────────────
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [isGroupsCollapsed, setIsGroupsCollapsed] = useState(false);
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
 
   const [showDetailsPane, setShowDetailsPane] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
@@ -511,8 +520,23 @@ const SlackShell = () => {
     );
   }, [unreadSpaceCounts]);
 
+  const handleSelectGroup = (grp) => {
+    setSelectedGroup(grp);
+    setSelectedSpace(null);
+    setSelectedDMUser(null);
+    setIsHomeView(false);
+    setIsStarredView(false);
+    setIsMentionsView(false);
+    setShowDetailsPane(false);
+    setActiveChannelMenuId(null);
+    setActiveDMMenuId(null);
+    setActivePinnedMenuKey(null);
+    setIsMobileSidebarOpen(false);
+  };
+
   const handleSelectSpace = (sp) => {
     setSelectedSpace(sp);
+    setSelectedGroup(null);
     setIsHomeView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
@@ -563,6 +587,7 @@ const SlackShell = () => {
     setIsMentionsView(false);
     setSelectedDMUser(null);
     setSelectedSpace(null);
+    setSelectedGroup(null);
     setUnreadChannelCounts((counts) => {
       const nextCounts = { ...counts };
       delete nextCounts[chan.id.toString()];
@@ -798,6 +823,7 @@ const SlackShell = () => {
     setIsMentionsView(false);
     setSelectedDMUser(member);
     setSelectedSpace(null);
+    setSelectedGroup(null);
     setShowDetailsPane(false);
     setUnreadDMCounts((counts) => {
       const nextCounts = { ...counts };
@@ -990,13 +1016,15 @@ const SlackShell = () => {
                     !isStarredView &&
                     !isMentionsView &&
                     !isHomeView &&
-                    !selectedSpace
+                    !selectedSpace &&
+                    !selectedGroup
                   : item.type === "dm"
                     ? selectedDMUser?.id === item.id &&
                       !isStarredView &&
                       !isMentionsView &&
                       !isHomeView &&
-                      !selectedSpace
+                      !selectedSpace &&
+                      !selectedGroup
                     : selectedSpace &&
                       (selectedSpace._id || selectedSpace.id)?.toString() ===
                         item.id?.toString();
@@ -1623,6 +1651,51 @@ const SlackShell = () => {
     };
   }, [workspaceId]);
 
+  // Load groups for the workspace
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+
+    fetchGroupsApi(workspaceId)
+      .then((res) => {
+        if (!cancelled) {
+          const list = Array.isArray(res) ? res : res?.groups || [];
+          setGroups(list);
+        }
+      })
+      .catch((err) => console.warn("Failed to load groups:", err.message));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
+
+  // Group real-time socket events
+  useEffect(() => {
+    const handleGroupCreated = (data) => {
+      const grp = data?.group || data;
+      if (!grp || (!grp._id && !grp.id)) return;
+      const grpWsId = (grp.workspaceId?._id || grp.workspaceId)?.toString();
+      if (workspaceId && grpWsId && grpWsId !== workspaceId.toString()) return;
+
+      setGroups((prev) => {
+        const idStr = (grp._id || grp.id).toString();
+        const exists = prev.some((g) => (g._id || g.id).toString() === idStr);
+        if (exists) {
+          return prev.map((g) =>
+            (g._id || g.id).toString() === idStr ? grp : g,
+          );
+        }
+        return [grp, ...prev];
+      });
+    };
+
+    socket.on("group-created", handleGroupCreated);
+    return () => {
+      socket.off("group-created", handleGroupCreated);
+    };
+  }, [workspaceId]);
+
   // URL spaceId sync
   useEffect(() => {
     if (!spaceId) {
@@ -2187,6 +2260,7 @@ const SlackShell = () => {
                     setIsMentionsView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
+                    setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                     navigate(`/app/workspace/${workspaceId}`);
                   }}
@@ -2195,7 +2269,8 @@ const SlackShell = () => {
                     !isStarredView &&
                     !isMentionsView &&
                     !selectedDMUser &&
-                    !selectedSpace
+                    !selectedSpace &&
+                    !selectedGroup
                       ? "bg-[#395B64] text-white font-semibold shadow-xs"
                       : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
                   }`}
@@ -2232,6 +2307,7 @@ const SlackShell = () => {
                     setIsMentionsView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
+                    setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                   }}
                   className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
@@ -2252,6 +2328,7 @@ const SlackShell = () => {
                     setIsStarredView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
+                    setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                   }}
                   className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
@@ -2314,7 +2391,8 @@ const SlackShell = () => {
                         !isStarredView &&
                         !isMentionsView &&
                         !isHomeView &&
-                        !selectedSpace;
+                        !selectedSpace &&
+                        !selectedGroup;
                       const isMenuOpen = activeChannelMenuId === chan.id;
                       const isUnread =
                         (unreadChannelCounts[chan.id.toString()] || 0) > 0;
@@ -2997,6 +3075,98 @@ const SlackShell = () => {
                 </div>
               )}
             </div>
+
+            {/* Groups */}
+            <div>
+              <SidebarSectionHeader
+                title="Groups"
+                isCollapsed={isGroupsCollapsed}
+                onToggle={() => setIsGroupsCollapsed((prev) => !prev)}
+                icon={
+                  <i className="fa-solid fa-users text-[11px] text-[#A5C9CA]/80 group-hover:text-white" />
+                }
+                count={0}
+                actionButton={
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCreateGroupModal(true);
+                      setIsMobileSidebarOpen(false);
+                    }}
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition cursor-pointer"
+                    title="Create group"
+                  >
+                    <i className="fa-solid fa-plus pointer-events-none" />
+                  </button>
+                }
+              />
+
+              {!isGroupsCollapsed && (
+                <div className="space-y-0.5 pt-1">
+                  {groups.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span>No Groups yet</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCreateGroupModal(true);
+                            setIsMobileSidebarOpen(false);
+                          }}
+                          className="text-[11px] font-semibold text-[#E7F6F2] hover:text-white underline underline-offset-2"
+                        >
+                          Create a Group
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    groups.map((grp) => {
+                      const grpId = (grp._id || grp.id)?.toString();
+                      const isActive =
+                        selectedGroup &&
+                        (selectedGroup._id || selectedGroup.id)?.toString() ===
+                          grpId;
+                      const memberCount = grp.members?.length || 0;
+
+                      return (
+                        <div key={grpId} className="relative group">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleSelectGroup(grp)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleSelectGroup(grp);
+                              }
+                            }}
+                            className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                              isActive
+                                ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                                : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                            }`}
+                          >
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <i className="fa-solid fa-user-group text-xs w-3.5 text-center flex-shrink-0 text-[#A5C9CA]" />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm leading-tight">
+                                  {grp.name}
+                                </div>
+                                <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
+                                  {memberCount}{" "}
+                                  {memberCount === 1 ? "member" : "members"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -3364,6 +3534,7 @@ const SlackShell = () => {
                   setIsMentionsView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
+                  setSelectedGroup(null);
                   setIsMobileSidebarOpen(false);
                   navigate(`/app/workspace/${workspaceId}`);
                 }}
@@ -3372,7 +3543,8 @@ const SlackShell = () => {
                   !isStarredView &&
                   !isMentionsView &&
                   !selectedDMUser &&
-                  !selectedSpace
+                  !selectedSpace &&
+                  !selectedGroup
                     ? "bg-[#395B64] text-white font-semibold shadow-xs"
                     : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
                 }`}
@@ -3406,6 +3578,7 @@ const SlackShell = () => {
                   setIsMentionsView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
+                  setSelectedGroup(null);
                   setIsMobileSidebarOpen(false);
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
@@ -3426,6 +3599,7 @@ const SlackShell = () => {
                   setIsStarredView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
+                  setSelectedGroup(null);
                   setIsMobileSidebarOpen(false);
                 }}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
@@ -3485,7 +3659,8 @@ const SlackShell = () => {
                       !isStarredView &&
                       !isMentionsView &&
                       !isHomeView &&
-                      !selectedSpace;
+                      !selectedSpace &&
+                      !selectedGroup;
                     const isMenuOpen = activeChannelMenuId === chan.id;
                     const isUnread =
                       (unreadChannelCounts[chan.id.toString()] || 0) > 0;
@@ -4200,6 +4375,98 @@ const SlackShell = () => {
               </div>
             )}
           </div>
+
+          {/* Groups */}
+          <div>
+            <SidebarSectionHeader
+              title="Groups"
+              isCollapsed={isGroupsCollapsed}
+              onToggle={() => setIsGroupsCollapsed((prev) => !prev)}
+              icon={
+                <i className="fa-solid fa-users text-[11px] text-[#A5C9CA]/80 group-hover:text-white" />
+              }
+              count={0}
+              actionButton={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowCreateGroupModal(true);
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition cursor-pointer"
+                  title="Create group"
+                >
+                  <i className="fa-solid fa-plus pointer-events-none" />
+                </button>
+              }
+            />
+
+            {!isGroupsCollapsed && (
+              <div className="space-y-0.5 pt-1">
+                {groups.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span>No Groups yet</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateGroupModal(true);
+                          setIsMobileSidebarOpen(false);
+                        }}
+                        className="text-[11px] font-semibold text-[#E7F6F2] hover:text-white underline underline-offset-2"
+                      >
+                        Create a Group
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  groups.map((grp) => {
+                    const grpId = (grp._id || grp.id)?.toString();
+                    const isActive =
+                      selectedGroup &&
+                      (selectedGroup._id || selectedGroup.id)?.toString() ===
+                        grpId;
+                    const memberCount = grp.members?.length || 0;
+
+                    return (
+                      <div key={grpId} className="relative group">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleSelectGroup(grp)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleSelectGroup(grp);
+                            }
+                          }}
+                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                            isActive
+                              ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                              : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                          }`}
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <i className="fa-solid fa-user-group text-xs w-3.5 text-center flex-shrink-0 text-[#A5C9CA]" />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm leading-tight">
+                                {grp.name}
+                              </div>
+                              <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
+                                {memberCount}{" "}
+                                {memberCount === 1 ? "member" : "members"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -4208,7 +4475,8 @@ const SlackShell = () => {
           !isStarredView &&
           !isMentionsView &&
           !isHomeView &&
-          !selectedSpace && (
+          !selectedSpace &&
+          !selectedGroup && (
             <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-3 sm:px-6 shadow-xs select-none transition-colors gap-2">
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 {/* Hamburger — mobile only */}
@@ -4418,6 +4686,13 @@ const SlackShell = () => {
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
             />
+          ) : selectedGroup ? (
+            <GroupMessageThread
+              group={selectedGroup}
+              currentUserId={user?.id || user?._id}
+              currentUser={user}
+              onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+            />
           ) : (
             <ChannelMessageThread
               channel={activeChannel || currentChannel}
@@ -4433,7 +4708,8 @@ const SlackShell = () => {
             !isStarredView &&
             !isMentionsView &&
             !isHomeView &&
-            !selectedSpace && (
+            !selectedSpace &&
+            !selectedGroup && (
               <div
                 className="absolute inset-0 z-10 bg-black/50 sm:hidden"
                 onClick={() => setShowDetailsPane(false)}
@@ -4445,7 +4721,8 @@ const SlackShell = () => {
             !isStarredView &&
             !isMentionsView &&
             !isHomeView &&
-            !selectedSpace && (
+            !selectedSpace &&
+            !selectedGroup && (
               <aside className="absolute inset-y-0 right-0 w-[85%] sm:relative sm:w-72 md:w-80 border-l border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex flex-col h-full overflow-y-auto z-20 shadow-lg transition-colors sm:inset-auto sm:shadow-none">
                 <div className="flex items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] px-5 py-4">
                   <h3 className="text-base font-bold text-[#2C3333] dark:text-white">
@@ -4731,6 +5008,28 @@ const SlackShell = () => {
               ),
             ]);
             handleSelectSpace(newSpace);
+          }}
+        />
+      )}
+
+      {/* Group Modals */}
+      {showCreateGroupModal && (
+        <CreateGroupModal
+          isOpen={showCreateGroupModal}
+          workspaceId={workspaceId}
+          workspaceMembers={workspaceMembers}
+          currentUserId={user?.id || user?._id}
+          onClose={() => setShowCreateGroupModal(false)}
+          onGroupCreated={(newGroup) => {
+            setGroups((prev) => [
+              newGroup,
+              ...prev.filter(
+                (g) =>
+                  (g._id || g.id)?.toString() !==
+                  (newGroup._id || newGroup.id)?.toString(),
+              ),
+            ]);
+            handleSelectGroup(newGroup);
           }}
         />
       )}
