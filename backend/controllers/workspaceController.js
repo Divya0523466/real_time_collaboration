@@ -93,22 +93,26 @@ const getWorkspace = async (req, res) => {
     const membership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
-    });
+    })
+      .select("role")
+      .lean();
 
     if (!membership) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const workspace = await Workspace.findById(workspaceId);
+    const workspace = await Workspace.findById(workspaceId)
+      .select("name description createdAt")
+      .lean();
 
     if (!workspace) {
       return res.status(404).json({ message: "Workspace not found" });
     }
 
-    const members = await WorkspaceMembership.find({ workspaceId }).populate(
-      "userId",
-      "username email avatar",
-    );
+    const members = await WorkspaceMembership.find({ workspaceId })
+      .populate("userId", "username email avatar")
+      .select("userId role")
+      .lean();
 
     return res.json({
       workspace: {

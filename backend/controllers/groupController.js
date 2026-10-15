@@ -97,7 +97,8 @@ export const getWorkspaceGroups = async (req, res) => {
       .populate("createdBy", "username avatar email displayName")
       .populate("members", "username avatar email displayName")
       .populate("admins", "username avatar email displayName")
-      .sort({ updatedAt: -1 });
+      .sort({ updatedAt: -1 })
+      .lean();
 
     return res.json({ success: true, groups });
   } catch (error) {
@@ -121,7 +122,8 @@ export const getGroup = async (req, res) => {
     const group = await Group.findById(groupId)
       .populate("createdBy", "username avatar email displayName")
       .populate("members", "username avatar email displayName")
-      .populate("admins", "username avatar email displayName");
+      .populate("admins", "username avatar email displayName")
+      .lean();
 
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
@@ -157,7 +159,7 @@ export const getGroupMessages = async (req, res) => {
       return res.status(400).json({ message: "Invalid group ID" });
     }
 
-    const group = await Group.findById(groupId);
+    const group = await Group.findById(groupId).select("members").lean();
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
@@ -178,7 +180,8 @@ export const getGroupMessages = async (req, res) => {
       isDeleted: { $ne: true },
     })
       .populate("senderId", "username avatar email displayName")
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: 1 })
+      .lean();
 
     const formatted = messages.map((m) => formatGroupMessage(m));
     return res.json({ success: true, messages: formatted });

@@ -138,7 +138,8 @@ const getDirectMessages = async (req, res) => {
       .select(
         "_id senderId receiverId content attachments mentions forwardedFrom createdAt updatedAt isEdited isDeleted isRead starredBy",
       )
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: 1 })
+      .lean();
 
     const populatedMessages = await populateLegacyMessageAttachments(messages);
 
@@ -270,7 +271,8 @@ const getChannelMessages = async (req, res) => {
         path: "replyTo",
         populate: { path: "senderId", select: "username" },
       })
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: 1 })
+      .lean();
 
     const populatedMessages = await populateLegacyMessageAttachments(messages);
 

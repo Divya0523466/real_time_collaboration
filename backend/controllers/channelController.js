@@ -178,7 +178,7 @@ const getWorkspaceChannels = async (req, res) => {
     const { workspaceId } = req.params
     const userId = req.userId
 
-    const membership = await WorkspaceMembership.findOne({ userId, workspaceId })
+    const membership = await WorkspaceMembership.findOne({ userId, workspaceId }).lean()
 
     if (!membership) {
       return res.status(403).json({ message: "Access denied" })
@@ -195,7 +195,7 @@ const getWorkspaceChannels = async (req, res) => {
       }
     }
 
-    const channels = await Channel.find(filter).select("_id name description type createdBy")
+    const channels = await Channel.find(filter).select("_id name description type createdBy").lean()
 
     return res.json({
       channels: channels.map((c) => ({

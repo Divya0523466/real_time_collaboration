@@ -177,6 +177,8 @@ channelMessageSchema.index({ channelId: 1, createdAt: 1 });
 channelMessageSchema.index({ spaceId: 1, createdAt: 1 });
 channelMessageSchema.index({ groupId: 1, createdAt: 1 });
 channelMessageSchema.index({ channelId: 1, isDeleted: 1, createdAt: 1 });
+channelMessageSchema.index({ spaceId: 1, isDeleted: 1, createdAt: 1 });
+channelMessageSchema.index({ groupId: 1, isDeleted: 1, createdAt: 1 });
 
 const ChannelMessage = mongoose.model("ChannelMessage", channelMessageSchema)
 

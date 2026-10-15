@@ -164,6 +164,7 @@ export const getSpace = async (req, res) => {
     const populated = await Space.findById(space._id)
       .populate("createdBy", "_id username email avatar")
       .populate("members", "_id username email avatar role status isActive")
+      .lean()
 
     return res.json({ space: populated, isSuperAdmin: isSuper })
   } catch (error) {
@@ -444,6 +445,7 @@ export const getSpaceMessages = async (req, res) => {
         populate: { path: "senderId", select: "username" },
       })
       .sort({ createdAt: 1 })
+      .lean()
 
     // Update read state automatically
     await SpaceReadState.findOneAndUpdate(
@@ -514,13 +516,13 @@ export const getSpaceUnreadCounts = async (req, res) => {
       filter.$or = [{ workspaceId }, { workspaceId: null }, { workspaceId: { $exists: false } }]
     }
 
-    const accessibleSpaces = await Space.find(filter).select("_id")
+    const accessibleSpaces = await Space.find(filter).select("_id").lean()
     const spaceIds = accessibleSpaces.map((s) => s._id)
 
     const readStates = await SpaceReadState.find({
       userId,
       spaceId: { $in: spaceIds },
-    })
+    }).lean()
 
     const readStateMap = new Map()
     readStates.forEach((rs) => {
@@ -528,20 +530,37 @@ export const getSpaceUnreadCounts = async (req, res) => {
     })
 
     const spaceCounts = {}
-    for (const sId of spaceIds) {
-      const sIdStr = sId.toString()
-      const lastRead = readStateMap.get(sIdStr) || new Date(0)
-
-      const unreadCount = await ChannelMessage.countDocuments({
-        spaceId: sId,
-        senderId: { $ne: userId },
-        createdAt: { $gt: lastRead },
-        isDeleted: false,
+    if (spaceIds.length > 0) {
+      const spaceConditions = spaceIds.map((sId) => {
+        const sIdStr = sId.toString()
+        const lastRead = readStateMap.get(sIdStr) || new Date(0)
+        return {
+          spaceId: new mongoose.Types.ObjectId(sId),
+          createdAt: { $gt: lastRead },
+        }
       })
 
-      if (unreadCount > 0) {
-        spaceCounts[sIdStr] = unreadCount
-      }
+      const spaceAgg = await ChannelMessage.aggregate([
+        {
+          $match: {
+            $or: spaceConditions,
+            senderId: { $ne: new mongoose.Types.ObjectId(userId) },
+            isDeleted: false,
+          },
+        },
+        {
+          $group: {
+            _id: "$spaceId",
+            count: { $sum: 1 },
+          },
+        },
+      ])
+
+      spaceAgg.forEach((entry) => {
+        if (entry.count > 0) {
+          spaceCounts[entry._id.toString()] = entry.count
+        }
+      })
     }
 
     return res.json({ spaces: spaceCounts })

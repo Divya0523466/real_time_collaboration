@@ -54,9 +54,9 @@ const inviteMembers = async (req, res) => {
         `You've been invited to join ${workspace?.name || "a workspace"} on WorkNest`,
         htmlTemplate
       );
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ email }).select("_id").lean();
       if (existingUser) {
-        const alreadyMember = await WorkspaceMembership.findOne({ workspaceId, userId: existingUser._id });
+        const alreadyMember = await WorkspaceMembership.findOne({ workspaceId, userId: existingUser._id }).select("_id").lean();
         if (alreadyMember) {
           // If they are already a member, skip creating an invitation
           continue;
