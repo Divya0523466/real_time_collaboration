@@ -15,7 +15,7 @@ import SpaceReadState from "../models/SpaceReadState.js";
 const populateLegacyMessageAttachments = async (messages) => {
   if (!messages || messages.length === 0) return messages;
 
-  const needsLookup = messages.some(
+  const candidateMessages = messages.filter(
     (m) =>
       !m.isDeleted &&
       (!m.attachments || m.attachments.length === 0) &&
@@ -26,11 +26,29 @@ const populateLegacyMessageAttachments = async (messages) => {
         )),
   );
 
-  if (!needsLookup) return messages;
+  if (candidateMessages.length === 0) return messages;
 
   try {
-    const allFiles = await File.find().sort({ createdAt: -1 }).lean();
-    if (allFiles.length === 0) return messages;
+    // extracting urls from messages
+    const urlCandidates = new Set();
+    for (const msg of candidateMessages) {
+      const trimmed = msg.content.trim();
+      urlCandidates.add(trimmed);
+      const extractedUrls = trimmed.match(/https?:\/\/[^\s]+/g);
+      if (extractedUrls) {
+        extractedUrls.forEach((u) => urlCandidates.add(u));
+      }
+    }
+
+    const urlList = Array.from(urlCandidates).filter(Boolean);
+    if (urlList.length === 0) return messages;
+
+    //metadata of files with matching url or preview url
+    const matchedFiles = await File.find({
+      $or: [{ url: { $in: urlList } }, { previewUrl: { $in: urlList } }],
+    }).lean();
+
+    if (matchedFiles.length === 0) return messages;
 
     return messages.map((msg) => {
       if (
@@ -43,7 +61,7 @@ const populateLegacyMessageAttachments = async (messages) => {
           ))
       ) {
         const trimmed = msg.content.trim();
-        const matched = allFiles.find((f) => {
+        const matched = matchedFiles.find((f) => {
           if (f.url && trimmed.includes(f.url)) return true;
           if (f.previewUrl && trimmed.includes(f.previewUrl)) return true;
           if (f.publicId && trimmed.includes(f.publicId)) return true;
@@ -1523,12 +1541,12 @@ const toggleBlockUser = async (req, res) => {
     }
 
     const isBlocked = (currentUser.blockedUsers || []).some(
-      (id) => id.toString() === targetUserId.toString()
+      (id) => id.toString() === targetUserId.toString(),
     );
 
     if (isBlocked) {
       currentUser.blockedUsers = currentUser.blockedUsers.filter(
-        (id) => id.toString() !== targetUserId.toString()
+        (id) => id.toString() !== targetUserId.toString(),
       );
     } else {
       currentUser.blockedUsers = currentUser.blockedUsers || [];
@@ -1541,11 +1559,15 @@ const toggleBlockUser = async (req, res) => {
       success: true,
       isBlocked: !isBlocked,
       blockedUsers: (currentUser.blockedUsers || []).map((id) => id.toString()),
-      message: !isBlocked ? "User blocked successfully" : "User unblocked successfully",
+      message: !isBlocked
+        ? "User blocked successfully"
+        : "User unblocked successfully",
     });
   } catch (error) {
     console.error("Error in toggleBlockUser:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 

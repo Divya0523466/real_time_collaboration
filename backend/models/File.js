@@ -51,6 +51,9 @@ const fileSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+fileSchema.index({ url: 1 });
+fileSchema.index({ previewUrl: 1 });
+
 const File = mongoose.model("File", fileSchema);
 
 export default File;
