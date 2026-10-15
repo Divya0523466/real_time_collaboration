@@ -24,6 +24,7 @@ const workspaceMembershipSchema = new mongoose.Schema(
 )
 
 workspaceMembershipSchema.index({ userId: 1, workspaceId: 1 }, { unique: true })
+workspaceMembershipSchema.index({ workspaceId: 1, userId: 1 });
 
 const WorkspaceMembership = mongoose.model("WorkspaceMembership", workspaceMembershipSchema)
 

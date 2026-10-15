@@ -39,6 +39,9 @@ const channelSchema = new mongoose.Schema(
   { timestamps: true },
 )
 
+channelSchema.index({ workspaceId: 1, type: 1 });
+channelSchema.index({ workspaceId: 1, name: 1 });
+
 const Channel = mongoose.model("Channel", channelSchema)
 
 export default Channel
