@@ -37,6 +37,7 @@ const inviteSchema = new mongoose.Schema(
 )
 
 inviteSchema.index({ workspaceId: 1, email: 1 }, { unique: true })
+inviteSchema.index({ email: 1, status: 1, createdAt: -1 });
 
 const Invitation = mongoose.model("Invitation", inviteSchema)
 

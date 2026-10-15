@@ -336,23 +336,39 @@ const getUnreadMessageCounts = async (req, res) => {
     });
 
     const channelCounts = {};
-    await Promise.all(
-      channelIds.map(async (cId) => {
+    if (channelIds.length > 0) {
+      const channelConditions = channelIds.map((cId) => {
         const cIdStr = cId.toString();
         const lastReadAt =
           readStateMap.get(cIdStr) || membership.createdAt || new Date(0);
-
-        const count = await ChannelMessage.countDocuments({
-          channelId: cId,
+        return {
+          channelId: new mongoose.Types.ObjectId(cId),
           createdAt: { $gt: lastReadAt },
-          senderId: { $ne: userId },
-          isDeleted: false,
-        });
-        if (count > 0) {
-          channelCounts[cIdStr] = count;
+        };
+      });
+
+      const channelAgg = await ChannelMessage.aggregate([
+        {
+          $match: {
+            $or: channelConditions,
+            senderId: { $ne: new mongoose.Types.ObjectId(userId) },
+            isDeleted: false,
+          },
+        },
+        {
+          $group: {
+            _id: "$channelId",
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      channelAgg.forEach((entry) => {
+        if (entry.count > 0) {
+          channelCounts[entry._id.toString()] = entry.count;
         }
-      }),
-    );
+      });
+    }
 
     // 2. Direct Messages unread counts (from members of this workspace)
     const workspaceMemberships = await WorkspaceMembership.find({

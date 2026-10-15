@@ -39,6 +39,8 @@ const groupSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+groupSchema.index({ workspaceId: 1, members: 1, updatedAt: -1 });
+
 const Group = mongoose.model("Group", groupSchema);
 
 export default Group;
