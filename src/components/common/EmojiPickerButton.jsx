@@ -1,39 +1,47 @@
-import { useState, useRef, useEffect } from "react"
-import EmojiPicker, { Theme } from "emoji-picker-react"
-import { useTheme } from "../../context/ThemeContext"
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { Theme } from "emoji-picker-react";
+import { useTheme } from "../../context/ThemeContext";
+
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 
 const EmojiPickerButton = ({
   onEmojiSelect,
   buttonClassName = "",
   positionClass = "bottom-full mb-2 right-0",
 }) => {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef(null)
-  const { isDark } = useTheme()
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setIsOpen(false)
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
+        setIsOpen(false);
       }
-    }
+    };
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside)
+      document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [isOpen])
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
 
   const handleEmojiClick = (emojiData) => {
     if (emojiData?.emoji) {
-      onEmojiSelect(emojiData.emoji)
+      onEmojiSelect(emojiData.emoji);
     }
-  }
+  };
 
   return (
-    <div className="relative inline-flex items-center flex-shrink-0" ref={containerRef}>
+    <div
+      className="relative inline-flex items-center flex-shrink-0"
+      ref={containerRef}
+    >
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -48,20 +56,30 @@ const EmojiPickerButton = ({
       </button>
 
       {isOpen && (
-        <div className={`absolute ${positionClass} z-50 shadow-2xl rounded-2xl overflow-hidden border border-[#D0DCDB] dark:border-[#395B64]/60`}>
-          <EmojiPicker
-            onEmojiClick={handleEmojiClick}
-            theme={isDark ? Theme.DARK : Theme.LIGHT}
-            autoFocusSearch={false}
-            width={340}
-            height={400}
-            emojiSize={28}
-            previewConfig={{ showPreview: false }}
-          />
+        <div
+          className={`absolute ${positionClass} z-50 shadow-2xl rounded-2xl overflow-hidden border border-[#D0DCDB] dark:border-[#395B64]/60`}
+        >
+          <Suspense
+            fallback={
+              <div className="w-[340px] h-[400px] flex items-center justify-center bg-white dark:bg-[#121717] text-xs text-[#52656A] dark:text-[#A5C9CA]">
+                Loading emojis...
+              </div>
+            }
+          >
+            <EmojiPicker
+              onEmojiClick={handleEmojiClick}
+              theme={isDark ? Theme.DARK : Theme.LIGHT}
+              autoFocusSearch={false}
+              width={340}
+              height={400}
+              emojiSize={28}
+              previewConfig={{ showPreview: false }}
+            />
+          </Suspense>
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default EmojiPickerButton
+export default EmojiPickerButton;

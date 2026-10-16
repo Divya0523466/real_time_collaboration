@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { toast } from "react-toastify";
 import { showDesktopNotification } from "../utils/desktopNotification";
 import { isSuperAdminUser, isDeactivatedAccount } from "../utils/adminAuth";
@@ -70,13 +77,22 @@ export const WorkspaceProvider = ({ children }) => {
       return null;
     }
     if (stored && isSuperAdminUser(stored)) {
-      return { ...stored, platformRole: "super_admin", role: "admin", isSuperAdmin: true };
+      return {
+        ...stored,
+        platformRole: "super_admin",
+        role: "admin",
+        isSuperAdmin: true,
+      };
     }
     return stored;
   });
-  const [workspaces, setWorkspaces] = useState(() => readStoredValue("worknestWorkspaces", []));
+  const [workspaces, setWorkspaces] = useState(() =>
+    readStoredValue("worknestWorkspaces", []),
+  );
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
-  const [workspaceData, setWorkspaceData] = useState(() => readStoredValue("worknestWorkspaceData", null));
+  const [workspaceData, setWorkspaceData] = useState(() =>
+    readStoredValue("worknestWorkspaceData", null),
+  );
   const [channels, setChannels] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -125,7 +141,10 @@ export const WorkspaceProvider = ({ children }) => {
     mutedConversationsRef.current = next;
     setMutedConversations(next);
     try {
-      localStorage.setItem("worknest_muted_conversations", JSON.stringify(Array.from(next)));
+      localStorage.setItem(
+        "worknest_muted_conversations",
+        JSON.stringify(Array.from(next)),
+      );
     } catch (err) {}
   }, []);
 
@@ -134,17 +153,28 @@ export const WorkspaceProvider = ({ children }) => {
       if (!type || !id) return false;
       return mutedConversations.has(`${type}:${id}`);
     },
-    [mutedConversations]
+    [mutedConversations],
   );
   const [onlineUsers, setOnlineUsers] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(() => {
     try {
-      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const urlParams =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : null;
       if (urlParams?.get("token")) return true;
-      const token = typeof localStorage !== "undefined" ? localStorage.getItem("worknestToken") : null;
-      const storedUser = typeof localStorage !== "undefined" ? localStorage.getItem("worknestUser") : null;
-      return Boolean(token && token !== "null" && token !== "undefined" && !storedUser);
+      const token =
+        typeof localStorage !== "undefined"
+          ? localStorage.getItem("worknestToken")
+          : null;
+      const storedUser =
+        typeof localStorage !== "undefined"
+          ? localStorage.getItem("worknestUser")
+          : null;
+      return Boolean(
+        token && token !== "null" && token !== "undefined" && !storedUser,
+      );
     } catch {
       return false;
     }
@@ -159,8 +189,14 @@ export const WorkspaceProvider = ({ children }) => {
         if (urlToken) {
           localStorage.setItem("worknestToken", urlToken);
           urlParams.delete("token");
-          const newSearch = urlParams.toString() ? `?${urlParams.toString()}` : "";
-          window.history.replaceState({}, document.title, window.location.pathname + newSearch);
+          const newSearch = urlParams.toString()
+            ? `?${urlParams.toString()}`
+            : "";
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname + newSearch,
+          );
         }
 
         const token = localStorage.getItem("worknestToken");
@@ -177,20 +213,30 @@ export const WorkspaceProvider = ({ children }) => {
         }
 
         const headers = getAuthHeaders();
-        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/me`, {
-          credentials: "include",
-          headers,
-        });
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/me`,
+          {
+            credentials: "include",
+            headers,
+          },
+        );
 
         if (response.ok) {
           const data = await response.json();
-          let isDeact = data.user?.isActive === false || data.user?.status === "inactive";
+          let isDeact =
+            data.user?.isActive === false || data.user?.status === "inactive";
           try {
             const stored = localStorage.getItem("worknest_deactivated_users");
             const deactList = stored ? JSON.parse(stored) : [];
-            const deactSet = new Set(deactList.map((x) => String(x).toLowerCase().trim()));
-            const uid = String(data.user?.id || data.user?._id || "").toLowerCase().trim();
-            const uemail = String(data.user?.email || "").toLowerCase().trim();
+            const deactSet = new Set(
+              deactList.map((x) => String(x).toLowerCase().trim()),
+            );
+            const uid = String(data.user?.id || data.user?._id || "")
+              .toLowerCase()
+              .trim();
+            const uemail = String(data.user?.email || "")
+              .toLowerCase()
+              .trim();
             if (deactSet.has(uid) || deactSet.has(uemail)) {
               isDeact = true;
             }
@@ -210,18 +256,28 @@ export const WorkspaceProvider = ({ children }) => {
             return;
           }
           const effectiveUser = isSuperAdminUser(data.user)
-            ? { ...data.user, platformRole: "super_admin", role: "admin", isSuperAdmin: true }
+            ? {
+                ...data.user,
+                platformRole: "super_admin",
+                role: "admin",
+                isSuperAdmin: true,
+              }
             : data.user;
           setUser(effectiveUser);
           setWorkspaces(data.workspaces || []);
           localStorage.setItem("worknestUser", JSON.stringify(effectiveUser));
-          localStorage.setItem("worknestWorkspaces", JSON.stringify(data.workspaces || []));
+          localStorage.setItem(
+            "worknestWorkspaces",
+            JSON.stringify(data.workspaces || []),
+          );
           if (data.token) {
             localStorage.setItem("worknestToken", data.token);
           }
           if (isSuperAdminUser(effectiveUser)) {
-            const curToken = data.token || localStorage.getItem("worknestToken");
-            if (curToken) localStorage.setItem("worknest_admin_token", curToken);
+            const curToken =
+              data.token || localStorage.getItem("worknestToken");
+            if (curToken)
+              localStorage.setItem("worknest_admin_token", curToken);
           }
         } else if (response.status === 401 || response.status === 403) {
           setUser(null);
@@ -260,11 +316,12 @@ export const WorkspaceProvider = ({ children }) => {
     try {
       const res = await apiMarkAsRead(id);
       setNotifications((prev) =>
-        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+        prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)),
       );
-      setUnreadNotificationsCount((prev) => (res.unreadCount !== undefined ? res.unreadCount : Math.max(0, prev - 1)));
-    } catch (err) {
-    }
+      setUnreadNotificationsCount((prev) =>
+        res.unreadCount !== undefined ? res.unreadCount : Math.max(0, prev - 1),
+      );
+    } catch (err) {}
   }, []);
 
   const markAllNotificationsAsRead = useCallback(async () => {
@@ -272,8 +329,7 @@ export const WorkspaceProvider = ({ children }) => {
       await apiMarkAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadNotificationsCount(0);
-    } catch (err) {
-    }
+    } catch (err) {}
   }, []);
 
   const deleteNotification = useCallback(async (id) => {
@@ -283,12 +339,12 @@ export const WorkspaceProvider = ({ children }) => {
       if (res.unreadCount !== undefined) {
         setUnreadNotificationsCount(res.unreadCount);
       }
-    } catch (err) {
-    }
+    } catch (err) {}
   }, []);
+  const userId = user?.id || user?._id || null;
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       socket.disconnect();
       return undefined;
     }
@@ -301,12 +357,17 @@ export const WorkspaceProvider = ({ children }) => {
 
       const cId = (newNotif.channelId?._id || newNotif.channelId)?.toString();
       const sId = (newNotif.spaceId?._id || newNotif.spaceId)?.toString();
-      const dmSenderId = (newNotif.actorId?._id || newNotif.actorId || newNotif.metadata?.senderId)?.toString();
+      const dmSenderId = (
+        newNotif.actorId?._id ||
+        newNotif.actorId ||
+        newNotif.metadata?.senderId
+      )?.toString();
 
       if (cId && mutedConversationsRef.current.has(`channel:${cId}`)) return;
       if (sId && mutedConversationsRef.current.has(`space:${sId}`)) return;
       if (
-        (newNotif.type === "DM_NEW_MESSAGE" || newNotif.type === "DM_MENTION") &&
+        (newNotif.type === "DM_NEW_MESSAGE" ||
+          newNotif.type === "DM_MENTION") &&
         dmSenderId &&
         mutedConversationsRef.current.has(`dm:${dmSenderId}`)
       ) {
@@ -325,7 +386,9 @@ export const WorkspaceProvider = ({ children }) => {
       if (!data?.channelId) return;
       if (data.type === "PRIVATE") {
         setChannels((prev) =>
-          prev.filter((c) => (c.id || c._id)?.toString() !== data.channelId.toString())
+          prev.filter(
+            (c) => (c.id || c._id)?.toString() !== data.channelId.toString(),
+          ),
         );
       }
     };
@@ -334,7 +397,9 @@ export const WorkspaceProvider = ({ children }) => {
       if (!data?.channel) return;
       setChannels((prev) => {
         const exists = prev.some(
-          (c) => (c.id || c._id)?.toString() === (data.channel.id || data.channel._id)?.toString()
+          (c) =>
+            (c.id || c._id)?.toString() ===
+            (data.channel.id || data.channel._id)?.toString(),
         );
         if (exists) return prev;
         return [...prev, data.channel];
@@ -342,7 +407,9 @@ export const WorkspaceProvider = ({ children }) => {
     };
 
     const handleOnlineUsers = (userIds) => {
-      setOnlineUsers(new Set(Array.isArray(userIds) ? userIds.map(String) : []));
+      setOnlineUsers(
+        new Set(Array.isArray(userIds) ? userIds.map(String) : []),
+      );
     };
 
     const handleUserOnline = ({ userId }) => {
@@ -388,7 +455,7 @@ export const WorkspaceProvider = ({ children }) => {
       offUserOffline(handleUserOffline);
       socket.disconnect();
     };
-  }, [user, fetchNotifications]);
+  }, [userId, fetchNotifications]);
 
   const clearAuth = useCallback(() => {
     localStorage.removeItem("worknestToken");
@@ -407,23 +474,34 @@ export const WorkspaceProvider = ({ children }) => {
     setError(null);
   }, []);
 
-  const initializeFromAuth = useCallback((userData, userWorkspaces, token = null) => {
-    if (token) {
-      localStorage.setItem("worknestToken", token);
-    }
-    const effectiveUser = isSuperAdminUser(userData)
-      ? { ...userData, platformRole: "super_admin", role: "admin", isSuperAdmin: true }
-      : userData;
-    localStorage.setItem("worknestUser", JSON.stringify(effectiveUser));
-    localStorage.setItem("worknestWorkspaces", JSON.stringify(userWorkspaces || []));
-    setUser(effectiveUser);
-    setWorkspaces(Array.isArray(userWorkspaces) ? userWorkspaces : []);
-    setSelectedWorkspace(null);
-    setWorkspaceData(null);
-    setChannels([]);
-    setInvitations([]);
-    setError(null);
-  }, []);
+  const initializeFromAuth = useCallback(
+    (userData, userWorkspaces, token = null) => {
+      if (token) {
+        localStorage.setItem("worknestToken", token);
+      }
+      const effectiveUser = isSuperAdminUser(userData)
+        ? {
+            ...userData,
+            platformRole: "super_admin",
+            role: "admin",
+            isSuperAdmin: true,
+          }
+        : userData;
+      localStorage.setItem("worknestUser", JSON.stringify(effectiveUser));
+      localStorage.setItem(
+        "worknestWorkspaces",
+        JSON.stringify(userWorkspaces || []),
+      );
+      setUser(effectiveUser);
+      setWorkspaces(Array.isArray(userWorkspaces) ? userWorkspaces : []);
+      setSelectedWorkspace(null);
+      setWorkspaceData(null);
+      setChannels([]);
+      setInvitations([]);
+      setError(null);
+    },
+    [],
+  );
 
   const fetchPendingInvitations = useCallback(async () => {
     if (!user?.email) {
@@ -443,7 +521,9 @@ export const WorkspaceProvider = ({ children }) => {
       }
 
       const data = await response.json();
-      const nextInvitations = Array.isArray(data.invitations) ? data.invitations : [];
+      const nextInvitations = Array.isArray(data.invitations)
+        ? data.invitations
+        : [];
       setInvitations(nextInvitations);
       return nextInvitations;
     } catch (err) {
@@ -493,7 +573,11 @@ export const WorkspaceProvider = ({ children }) => {
 
       // Keep existing data if it already matches the requested workspace, otherwise reset
       setWorkspaceData((prev) => {
-        if (prev && (prev.id?.toString() === workspaceId?.toString() || prev._id?.toString() === workspaceId?.toString())) {
+        if (
+          prev &&
+          (prev.id?.toString() === workspaceId?.toString() ||
+            prev._id?.toString() === workspaceId?.toString())
+        ) {
           return prev;
         }
         return null;
@@ -522,7 +606,10 @@ export const WorkspaceProvider = ({ children }) => {
         const normalizedWorkspace = normalizeWorkspaceData(data, workspaceId);
         setWorkspaceData(normalizedWorkspace);
         try {
-          localStorage.setItem("worknestWorkspaceData", JSON.stringify(normalizedWorkspace));
+          localStorage.setItem(
+            "worknestWorkspaceData",
+            JSON.stringify(normalizedWorkspace),
+          );
         } catch {}
 
         if (channelsResponse.ok) {
@@ -558,7 +645,9 @@ export const WorkspaceProvider = ({ children }) => {
         );
         if (response.ok) {
           const data = await response.json();
-          const nextChannels = Array.isArray(data.channels) ? data.channels : [];
+          const nextChannels = Array.isArray(data.channels)
+            ? data.channels
+            : [];
           setChannels(nextChannels);
           return nextChannels;
         }
@@ -750,7 +839,7 @@ export const WorkspaceProvider = ({ children }) => {
             body: JSON.stringify({ memberId }),
           },
         );
- 
+
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
           throw new Error(payload.message || "Failed to add member to channel");
@@ -953,52 +1042,68 @@ export const WorkspaceProvider = ({ children }) => {
     [selectedWorkspace, API_URL],
   );
 
-  const acceptInvitation = useCallback(async (invitationId) => {
-    try {
-      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/accept`, {
-        credentials: "include",
-        method: "POST",
-        headers: getAuthHeaders({
-          "Content-Type": "application/json",
-        }),
-      });
+  const acceptInvitation = useCallback(
+    async (invitationId) => {
+      try {
+        const response = await fetch(
+          `${API_URL}/workspaces/invitations/${invitationId}/accept`,
+          {
+            credentials: "include",
+            method: "POST",
+            headers: getAuthHeaders({
+              "Content-Type": "application/json",
+            }),
+          },
+        );
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || "Failed to accept invitation");
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.message || "Failed to accept invitation");
+        }
+
+        setInvitations((prev) =>
+          prev.filter((invitation) => invitation.id !== invitationId),
+        );
+        await fetchUserWorkspaces();
+        return true;
+      } catch (err) {
+        setError(err.message);
+        throw err;
       }
+    },
+    [API_URL, fetchUserWorkspaces],
+  );
 
-      setInvitations((prev) => prev.filter((invitation) => invitation.id !== invitationId));
-      await fetchUserWorkspaces();
-      return true;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [API_URL, fetchUserWorkspaces]);
+  const declineInvitation = useCallback(
+    async (invitationId) => {
+      try {
+        const response = await fetch(
+          `${API_URL}/workspaces/invitations/${invitationId}/decline`,
+          {
+            credentials: "include",
+            method: "POST",
+            headers: getAuthHeaders({
+              "Content-Type": "application/json",
+            }),
+          },
+        );
 
-  const declineInvitation = useCallback(async (invitationId) => {
-    try {
-      const response = await fetch(`${API_URL}/workspaces/invitations/${invitationId}/decline`, {
-        credentials: "include",
-        method: "POST",
-        headers: getAuthHeaders({
-          "Content-Type": "application/json",
-        }),
-      });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.message || "Failed to decline invitation");
+        }
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || "Failed to decline invitation");
+        setInvitations((prev) =>
+          prev.filter((invitation) => invitation.id !== invitationId),
+        );
+        return true;
+      } catch (err) {
+        setError(err.message);
+        throw err;
       }
-
-      setInvitations((prev) => prev.filter((invitation) => invitation.id !== invitationId));
-      return true;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [API_URL]);
+    },
+    [API_URL],
+  );
 
   const updateUserProfile = useCallback(
     async ({ username, avatar }) => {
@@ -1066,7 +1171,7 @@ export const WorkspaceProvider = ({ children }) => {
 
   const isUserOnline = useCallback(
     (userId) => Boolean(userId && onlineUsers.has(userId.toString())),
-    [onlineUsers]
+    [onlineUsers],
   );
 
   const value = {
