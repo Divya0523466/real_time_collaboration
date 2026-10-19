@@ -20,10 +20,10 @@ import { requestNotificationPermission } from "./utils/desktopNotification";
 const GlobalDashboard = lazy(
   () => import("./components/dashboard/GlobalDashboard"),
 );
-const SlackShell = lazy(() => import("./components/slack/SlackShell"));
-const ForgotPassword = lazy(() => import("./components/auth/ForgotPassword"));
-const OTP = lazy(() => import("./components/auth/OTP"));
-const SetPassword = lazy(() => import("./components/auth/SetPassword"));
+const SlackShell = lazy(() => import("./components/dashboard/SlackShell"));
+const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
+const OTP = lazy(() => import("./components/OTP"));
+const SetPassword = lazy(() => import("./components/SetPassword"));
 const SuperAdminDashboard = lazy(
   () => import("./components/admin/SuperAdminDashboard"),
 );
