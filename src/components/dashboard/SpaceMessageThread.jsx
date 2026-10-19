@@ -28,6 +28,7 @@ import EmojiPickerButton from "../common/EmojiPickerButton"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
 import TypingIndicator from "../common/TypingIndicator"
 import useTypingIndicator from "../../hooks/useTypingIndicator"
+import StatusSelector from "../common/StatusSelector"
 
 const AVATAR_COLORS = [
   "#00897b",
@@ -389,6 +390,7 @@ const SpaceMessageThread = ({
 
         {/* Space Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          <StatusSelector align="right" />
           <button
             type="button"
             onClick={handleManageMembers}

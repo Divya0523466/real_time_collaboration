@@ -19,6 +19,8 @@ import EmojiPickerButton from "../common/EmojiPickerButton"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
 import TypingIndicator from "../common/TypingIndicator"
 import useTypingIndicator from "../../hooks/useTypingIndicator"
+import StatusBadge from "../common/StatusBadge"
+import StatusSelector from "../common/StatusSelector"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
@@ -65,7 +67,7 @@ const MessageThread = ({
   onToggleBlock,
   onClearError,
 }) => {
-  const { isUserOnline, workspaceData, user } = useWorkspace()
+  const { isUserOnline, workspaceData, user, getUserPresenceStatus } = useWorkspace()
   const resolvedCurrentUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
   const { toggleTheme, isDark } = useTheme()
   const [inputValue, setInputValue] = useState("")
@@ -272,11 +274,10 @@ const MessageThread = ({
                 activeSelectedUser.username?.charAt(0)?.toUpperCase() || "U"
               )}
             </span>
-            <span
-              className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white dark:ring-[#1A2121] ${
-                isUserOnline(activeSelectedUser.id) ? "bg-emerald-500" : "bg-gray-300"
-              }`}
-              title={isUserOnline(activeSelectedUser.id) ? "Online" : "Offline"}
+            <StatusBadge
+              status={getUserPresenceStatus(activeSelectedUser.id)}
+              size="md"
+              className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#1A2121]"
             />
           </div>
           <div>
@@ -286,36 +287,40 @@ const MessageThread = ({
               </h3>
               <span
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
-                  isUserOnline(selectedUser.id)
+                  getUserPresenceStatus(selectedUser.id) === "active"
                     ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50"
+                    : getUserPresenceStatus(selectedUser.id) === "away"
+                    ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50"
                     : "bg-gray-100 dark:bg-[#2C3333] text-gray-500 dark:text-[#A5C9CA] border border-gray-200 dark:border-gray-700"
                 }`}
               >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    isUserOnline(selectedUser.id) ? "bg-emerald-500" : "bg-gray-400"
-                  }`}
+                <StatusBadge
+                  status={getUserPresenceStatus(selectedUser.id)}
+                  size="xs"
                 />
-                {isUserOnline(selectedUser.id) ? "Online" : "Offline"}
+                <span className="capitalize">{getUserPresenceStatus(selectedUser.id)}</span>
               </span>
             </div>
             <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80">{selectedUser.email || ""}</p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
-          title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-          aria-label="Toggle theme"
-        >
-          {isDark ? (
-            <FiSun className="text-sm text-amber-400" />
-          ) : (
-            <FiMoon className="text-sm text-[#395B64]" />
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <StatusSelector align="right" />
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
+            title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+            aria-label="Toggle theme"
+          >
+            {isDark ? (
+              <FiSun className="text-sm text-amber-400" />
+            ) : (
+              <FiMoon className="text-sm text-[#395B64]" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Messages Area */}

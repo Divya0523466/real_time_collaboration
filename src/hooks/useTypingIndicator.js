@@ -94,7 +94,15 @@ export const useTypingIndicator = ({ type, targetId, currentUserId }) => {
     if (!type || !targetIdStr) return;
 
     const handleUserTyping = (data) => {
-      if (data?.type !== type || data?.targetId?.toString() !== targetIdStr) {
+      if (!data || data.type !== type) return;
+
+      const matchesConversation =
+        type === "dm"
+          ? data.userId?.toString() === targetIdStr ||
+            data.targetId?.toString() === targetIdStr
+          : data.targetId?.toString() === targetIdStr;
+
+      if (!matchesConversation) {
         return;
       }
 
@@ -130,7 +138,15 @@ export const useTypingIndicator = ({ type, targetId, currentUserId }) => {
     };
 
     const handleUserStopTyping = (data) => {
-      if (data?.type !== type || data?.targetId?.toString() !== targetIdStr) {
+      if (!data || data.type !== type) return;
+
+      const matchesConversation =
+        type === "dm"
+          ? data.userId?.toString() === targetIdStr ||
+            data.targetId?.toString() === targetIdStr
+          : data.targetId?.toString() === targetIdStr;
+
+      if (!matchesConversation) {
         return;
       }
 

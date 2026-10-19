@@ -97,23 +97,56 @@ const getOnlineUserIds = async () => {
   return [...new Set(sockets.map((s) => s.userId).filter(Boolean))];
 };
 
+//gets a map of userId to their availablity status
+const getOnlineUserStatuses = async () => {
+  const sockets = await io.fetchSockets();
+  const statusMap = {};
+  for (const s of sockets) {
+    if (s.userId) {
+      statusMap[s.userId] = s.presenceStatus || "active";
+    }
+  }
+  return statusMap;
+};
+
 io.on("connection", async (socket) => {
   //user room is created to handle multiple devices or tabs user online status
   const userRoom = `user:${socket.userId}`;
   const existingSockets = await io.in(userRoom).fetchSockets();
   const isFirstConnection = existingSockets.length === 0; // avoids multiple user-online emits
 
+  // Cache user profile and presenceStatus on the socket instance
+  try {
+    const dbUser = await User.findById(socket.userId)
+      .select("username displayName avatar presenceStatus")
+      .lean();
+    socket.presenceStatus = dbUser?.presenceStatus || "active";
+    socket.userProfile = {
+      username: dbUser?.displayName || dbUser?.username || "Someone",
+      avatar: dbUser?.avatar || "",
+    };
+  } catch {
+    socket.presenceStatus = "active";
+    socket.userProfile = { username: "Someone", avatar: "" };
+  }
+
   socket.join(userRoom);
   const activeChannelRooms = new Set();
   const activeSpaceRooms = new Set();
 
-  // Send current list of online users to newly connected client
+  // Send current list of online users and their statuses
   const onlineUsersList = await getOnlineUserIds();
+  const onlineStatuses = await getOnlineUserStatuses();
   socket.emit("get-online-users", onlineUsersList);
+  socket.emit("get-online-statuses", onlineStatuses);
 
-  // Broadcast to all clients that this user is now online if first active connection
+  // Broadcast to all clients that this user is now online and their presence status
   if (isFirstConnection) {
     io.emit("user-online", { userId: socket.userId });
+    io.emit("user-status-changed", {
+      userId: socket.userId,
+      status: socket.presenceStatus,
+    });
   }
 
   socket.emit("connection-success", {
@@ -122,7 +155,9 @@ io.on("connection", async (socket) => {
 
   socket.on("request-online-users", async () => {
     const users = await getOnlineUserIds();
+    const statuses = await getOnlineUserStatuses();
     socket.emit("get-online-users", users);
+    socket.emit("get-online-statuses", statuses);
   });
 
   socket.on("join-channel", async ({ channelId } = {}) => {
@@ -1563,6 +1598,24 @@ io.on("connection", async (socket) => {
     }
   });
 
+  socket.on("change-status", async ({ status } = {}) => {
+    if (!status || !["active", "away", "offline"].includes(status)) return;
+
+    socket.presenceStatus = status;
+
+    // Update all active socket instances for this user
+    const userSockets = await io.in(`user:${socket.userId}`).fetchSockets();
+    for (const s of userSockets) {
+      s.presenceStatus = status;
+    }
+
+    await User.findByIdAndUpdate(socket.userId, {
+      presenceStatus: status,
+    }).catch(() => {});
+
+    io.emit("user-status-changed", { userId: socket.userId, status });
+  });
+
   socket.on("disconnect", async () => {
     // To disconnnect from the sockets
     const remainingSockets = await io
@@ -1570,6 +1623,10 @@ io.on("connection", async (socket) => {
       .fetchSockets();
     if (remainingSockets.length === 0) {
       io.emit("user-offline", { userId: socket.userId });
+      io.emit("user-status-changed", {
+        userId: socket.userId,
+        status: "offline",
+      });
     }
   });
 });

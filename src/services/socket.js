@@ -1,21 +1,18 @@
-import { io } from "socket.io-client"
+import { io } from "socket.io-client";
 
-const API_URL = import.meta.env.VITE_API_URL || ""
-const SOCKET_URL = API_URL.replace(/\/api\/?$/, "")
+const API_URL = import.meta.env.VITE_API_URL || "";
+const SOCKET_URL = API_URL.replace(/\/api\/?$/, "");
 
 const socket = io(SOCKET_URL, {
   withCredentials: true,
   autoConnect: false,
-})
+});
 
-socket.on("connect", () => {
-})
+socket.on("connect", () => {});
 
-socket.on("connect_error", (error) => {
-})
+socket.on("connect_error", (error) => {});
 
-socket.on("disconnect", (reason) => {
-})
+socket.on("disconnect", (reason) => {});
 
 export const connectSocket = () => {
   const token = localStorage.getItem("worknestToken");
@@ -30,236 +27,311 @@ export const connectSocket = () => {
   }
 };
 
+export const sendDirectMessage = (
+  receiverId,
+  content,
+  attachments = [],
+  mentions = [],
+  workspaceId = null,
+) => {
+  socket.emit("send-direct-message", {
+    receiverId,
+    content,
+    attachments,
+    mentions,
+    workspaceId,
+  });
+};
 
-export const sendDirectMessage = (receiverId, content, attachments = [], mentions = [], workspaceId = null) => {
-  socket.emit("send-direct-message", { receiverId, content, attachments, mentions, workspaceId })
-}
-
-export const editDirectMessage = (messageId, content, mentions = undefined, workspaceId = null) => {
-  socket.emit("edit-direct-message", { messageId, content, mentions, workspaceId })
-}
+export const editDirectMessage = (
+  messageId,
+  content,
+  mentions = undefined,
+  workspaceId = null,
+) => {
+  socket.emit("edit-direct-message", {
+    messageId,
+    content,
+    mentions,
+    workspaceId,
+  });
+};
 
 export const deleteDirectMessage = (messageId) => {
-  socket.emit("delete-direct-message", { messageId })
-}
+  socket.emit("delete-direct-message", { messageId });
+};
 
 export const onDirectMessageReceived = (callback) => {
-  socket.on("receive-direct-message", callback)
-}
+  socket.on("receive-direct-message", callback);
+};
 
 export const onDirectMessageSent = (callback) => {
-  socket.on("direct-message-sent", callback)
-}
+  socket.on("direct-message-sent", callback);
+};
 
 export const onDirectMessageError = (callback) => {
-  socket.on("send-direct-message-error", callback)
-}
+  socket.on("send-direct-message-error", callback);
+};
 
 export const onDirectMessageEdited = (callback) => {
-  socket.on("direct-message-edited", callback)
-}
+  socket.on("direct-message-edited", callback);
+};
 
 export const onDirectMessageDeleted = (callback) => {
-  socket.on("direct-message-deleted", callback)
-}
+  socket.on("direct-message-deleted", callback);
+};
 
 export const offDirectMessageReceived = (callback) => {
-  socket.off("receive-direct-message", callback)
-}
+  socket.off("receive-direct-message", callback);
+};
 
 export const offDirectMessageSent = (callback) => {
-  socket.off("direct-message-sent", callback)
-}
+  socket.off("direct-message-sent", callback);
+};
 
 export const offDirectMessageError = (callback) => {
-  socket.off("send-direct-message-error", callback)
-}
+  socket.off("send-direct-message-error", callback);
+};
 
 export const offDirectMessageEdited = (callback) => {
-  socket.off("direct-message-edited", callback)
-}
+  socket.off("direct-message-edited", callback);
+};
 
 export const offDirectMessageDeleted = (callback) => {
-  socket.off("direct-message-deleted", callback)
-}
+  socket.off("direct-message-deleted", callback);
+};
 
 export const onDirectMessageEditError = (callback) => {
-  socket.on("edit-direct-message-error", callback)
-}
+  socket.on("edit-direct-message-error", callback);
+};
 
 export const offDirectMessageEditError = (callback) => {
-  socket.off("edit-direct-message-error", callback)
-}
+  socket.off("edit-direct-message-error", callback);
+};
 
 export const onDirectMessageDeleteError = (callback) => {
-  socket.on("delete-direct-message-error", callback)
-}
+  socket.on("delete-direct-message-error", callback);
+};
 
 export const offDirectMessageDeleteError = (callback) => {
-  socket.off("delete-direct-message-error", callback)
-}
+  socket.off("delete-direct-message-error", callback);
+};
 
 export const joinChannel = (channelId) => {
-  socket.emit("join-channel", { channelId })
-}
+  socket.emit("join-channel", { channelId });
+};
 
 export const leaveChannel = (channelId) => {
-  socket.emit("leave-channel", { channelId })
-}
+  socket.emit("leave-channel", { channelId });
+};
 
-export const sendChannelMessage = (channelId, content, replyTo = null, attachments = [], mentions = []) => {
-  socket.emit("send-channel-message", { channelId, content, replyTo, attachments, mentions })
-}
+export const sendChannelMessage = (
+  channelId,
+  content,
+  replyTo = null,
+  attachments = [],
+  mentions = [],
+) => {
+  socket.emit("send-channel-message", {
+    channelId,
+    content,
+    replyTo,
+    attachments,
+    mentions,
+  });
+};
 
-export const editChannelMessage = (messageId, content, mentions = undefined) => {
-  socket.emit("edit-channel-message", { messageId, content, mentions })
-}
+export const editChannelMessage = (
+  messageId,
+  content,
+  mentions = undefined,
+) => {
+  socket.emit("edit-channel-message", { messageId, content, mentions });
+};
 
 export const deleteChannelMessage = (messageId) => {
-  socket.emit("delete-channel-message", { messageId })
-}
+  socket.emit("delete-channel-message", { messageId });
+};
 
 export const onChannelMessageEdited = (callback) => {
-  socket.on("channel-message-edited", callback)
-}
+  socket.on("channel-message-edited", callback);
+};
 
 export const onChannelMessageDeleted = (callback) => {
-  socket.on("channel-message-deleted", callback)
-}
+  socket.on("channel-message-deleted", callback);
+};
 
 export const offChannelMessageEdited = (callback) => {
-  socket.off("channel-message-edited", callback)
-}
+  socket.off("channel-message-edited", callback);
+};
 
 export const offChannelMessageDeleted = (callback) => {
-  socket.off("channel-message-deleted", callback)
-}
-
+  socket.off("channel-message-deleted", callback);
+};
 
 export const onNotificationReceived = (callback) => {
-  socket.on("receive-notification", callback)
-}
+  socket.on("receive-notification", callback);
+};
 
 export const offNotificationReceived = (callback) => {
-  socket.off("receive-notification", callback)
-}
-
+  socket.off("receive-notification", callback);
+};
 
 export const onOnlineUsers = (callback) => {
-  socket.on("get-online-users", callback)
-}
+  socket.on("get-online-users", callback);
+};
 
 export const offOnlineUsers = (callback) => {
-  socket.off("get-online-users", callback)
-}
+  socket.off("get-online-users", callback);
+};
 
 export const onUserOnline = (callback) => {
-  socket.on("user-online", callback)
-}
+  socket.on("user-online", callback);
+};
 
 export const offUserOnline = (callback) => {
-  socket.off("user-online", callback)
-}
+  socket.off("user-online", callback);
+};
 
 export const onUserOffline = (callback) => {
-  socket.on("user-offline", callback)
-}
+  socket.on("user-offline", callback);
+};
 
 export const offUserOffline = (callback) => {
-  socket.off("user-offline", callback)
-}
+  socket.off("user-offline", callback);
+};
 
 export const requestOnlineUsers = () => {
-  socket.emit("request-online-users")
-}
+  socket.emit("request-online-users");
+};
 
-export const forwardMessageSocket = (targetType, targetId, content = "", forwardedFrom = null) => {
-  socket.emit("forward-message", { targetType, targetId, content, forwardedFrom })
-}
+export const forwardMessageSocket = (
+  targetType,
+  targetId,
+  content = "",
+  forwardedFrom = null,
+) => {
+  socket.emit("forward-message", {
+    targetType,
+    targetId,
+    content,
+    forwardedFrom,
+  });
+};
 
 // ── Spaces Socket Helpers ──────────────────────────────────────────
 export const joinSpace = (spaceId) => {
-  socket.emit("join-space", { spaceId })
-}
+  socket.emit("join-space", { spaceId });
+};
 
 export const leaveSpace = (spaceId) => {
-  socket.emit("leave-space", { spaceId })
-}
+  socket.emit("leave-space", { spaceId });
+};
 
-export const sendSpaceMessage = (spaceId, content, replyTo = null, attachments = [], mentions = []) => {
-  socket.emit("send-space-message", { spaceId, content, replyTo, attachments, mentions })
-}
+export const sendSpaceMessage = (
+  spaceId,
+  content,
+  replyTo = null,
+  attachments = [],
+  mentions = [],
+) => {
+  socket.emit("send-space-message", {
+    spaceId,
+    content,
+    replyTo,
+    attachments,
+    mentions,
+  });
+};
 
 export const editSpaceMessage = (messageId, content, mentions = undefined) => {
-  socket.emit("edit-space-message", { messageId, content, mentions })
-}
+  socket.emit("edit-space-message", { messageId, content, mentions });
+};
 
 export const deleteSpaceMessage = (messageId) => {
-  socket.emit("delete-space-message", { messageId })
-}
+  socket.emit("delete-space-message", { messageId });
+};
 
 export const onSpaceMessageEdited = (callback) => {
-  socket.on("space-message-edited", callback)
-}
+  socket.on("space-message-edited", callback);
+};
 
 export const offSpaceMessageEdited = (callback) => {
-  socket.off("space-message-edited", callback)
-}
+  socket.off("space-message-edited", callback);
+};
 
 export const onSpaceMessageDeleted = (callback) => {
-  socket.on("space-message-deleted", callback)
-}
+  socket.on("space-message-deleted", callback);
+};
 
 export const offSpaceMessageDeleted = (callback) => {
-  socket.off("space-message-deleted", callback)
-}
+  socket.off("space-message-deleted", callback);
+};
 
 // ── Groups Socket Helpers ──────────────────────────────────────────
 export const joinGroup = (groupId) => {
-  socket.emit("join-group", { groupId })
-}
+  socket.emit("join-group", { groupId });
+};
 
 export const leaveGroup = (groupId) => {
-  socket.emit("leave-group", { groupId })
-}
+  socket.emit("leave-group", { groupId });
+};
 
 export const sendGroupMessageSocket = (groupId, content, attachments = []) => {
-  socket.emit("send-group-message", { groupId, content, attachments })
-}
+  socket.emit("send-group-message", { groupId, content, attachments });
+};
 
 export const onGroupMessageReceived = (callback) => {
-  socket.on("receive-group-message", callback)
-}
+  socket.on("receive-group-message", callback);
+};
 
 export const offGroupMessageReceived = (callback) => {
-  socket.off("receive-group-message", callback)
-}
+  socket.off("receive-group-message", callback);
+};
 
 // ── Typing Indicator Helpers ─────────────────────────────────────────
 export const sendTypingStart = (type, targetId) => {
-  socket.emit("typing:start", { type, targetId })
-}
+  socket.emit("typing:start", { type, targetId });
+};
 
 export const sendTypingStop = (type, targetId) => {
-  socket.emit("typing:stop", { type, targetId })
-}
+  socket.emit("typing:stop", { type, targetId });
+};
 
 export const onUserTyping = (callback) => {
-  socket.on("user-typing", callback)
-}
+  socket.on("user-typing", callback);
+};
 
 export const offUserTyping = (callback) => {
-  socket.off("user-typing", callback)
-}
+  socket.off("user-typing", callback);
+};
 
 export const onUserStopTyping = (callback) => {
-  socket.on("user-stop-typing", callback)
-}
+  socket.on("user-stop-typing", callback);
+};
 
 export const offUserStopTyping = (callback) => {
-  socket.off("user-stop-typing", callback)
-}
+  socket.off("user-stop-typing", callback);
+};
 
-export default socket
+export const emitChangeStatus = (status) => {
+  socket.emit("change-status", { status });
+};
 
+export const onUserStatusChanged = (callback) => {
+  socket.on("user-status-changed", callback);
+};
 
+export const offUserStatusChanged = (callback) => {
+  socket.off("user-status-changed", callback);
+};
+
+export const onOnlineStatuses = (callback) => {
+  socket.on("get-online-statuses", callback);
+};
+
+export const offOnlineStatuses = (callback) => {
+  socket.off("get-online-statuses", callback);
+};
+
+export default socket;

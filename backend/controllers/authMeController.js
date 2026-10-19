@@ -46,6 +46,7 @@ export const getMe = async (req, res) => {
         isSuperAdmin,
         isActive: user.isActive !== false,
         status: user.status || "active",
+        presenceStatus: user.presenceStatus || "active",
         twoFactorEnabled: Boolean(user.twoFactorEnabled),
         blockedUsers: (user.blockedUsers || []).map((id) => id.toString()),
       },

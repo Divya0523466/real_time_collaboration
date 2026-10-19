@@ -30,6 +30,8 @@ import DeleteSpaceModal from "./DeleteSpaceModal";
 import SpaceMessageThread from "./SpaceMessageThread";
 import CreateGroupModal from "./CreateGroupModal";
 import GroupMessageThread from "./GroupMessageThread";
+import StatusBadge from "../common/StatusBadge";
+import StatusSelector from "../common/StatusSelector";
 import { fetchGroupsApi } from "../../services/groupService";
 import {
   fetchSpaces,
@@ -113,6 +115,7 @@ const SlackShell = () => {
     toggleMuteConversation,
     isConversationMuted,
     isUserOnline,
+    getUserPresenceStatus,
     loading,
     error,
   } = useWorkspace();
@@ -2112,7 +2115,11 @@ const SlackShell = () => {
               title="Your Profile"
             >
               {user?.username?.charAt(0)?.toUpperCase() || "U"}
-              <span className="absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-[#2C3333]" />
+              <StatusBadge
+                status={user?.presenceStatus || "active"}
+                size="xs"
+                className="absolute bottom-0.5 right-0.5 ring-1 ring-[#2C3333]"
+              />
             </button>
 
             {/* Profile Menu Popover (Mobile Icon Rail) */}
@@ -2131,9 +2138,10 @@ const SlackShell = () => {
                       <div className="truncate text-sm font-bold text-white">
                         {user?.username || "User"}
                       </div>
-                      <div className="truncate text-xs text-[#A5C9CA]">
+                      <div className="truncate text-xs text-[#A5C9CA] mb-1.5">
                         {user?.email || ""}
                       </div>
+                      <StatusSelector />
                     </div>
                   </div>
 
@@ -2227,7 +2235,14 @@ const SlackShell = () => {
               />
             </button>
           </div>
-          {/* New chat + Shortcuts for mobile */}
+
+          <div className="flex items-center justify-between border-b border-[#2C3333] px-3.5 py-2 bg-[#1A2121]/90">
+            <span className="text-[11px] font-semibold text-[#A5C9CA] tracking-wide uppercase">
+              Status
+            </span>
+            <StatusSelector align="right" />
+          </div>
+
           <div className="px-3 pt-3 pb-1">
             <button
               type="button"
@@ -2287,10 +2302,14 @@ const SlackShell = () => {
                   }}
                   className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
                 >
-                  <i className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`} />
+                  <i
+                    className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`}
+                  />
                   <span className="flex-1 text-left">Notifications</span>
                   {isMutedGlobal && (
-                    <span className="text-[10px] font-semibold text-amber-400/90 px-1">Muted</span>
+                    <span className="text-[10px] font-semibold text-amber-400/90 px-1">
+                      Muted
+                    </span>
                   )}
                   {unreadNotificationsCount > 0 && (
                     <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
@@ -2652,11 +2671,10 @@ const SlackShell = () => {
                                   "U"
                                 )}
                               </span>
-                              <span
-                                className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-500"}`}
-                                title={
-                                  isUserOnline(member.id) ? "Online" : "Offline"
-                                }
+                              <StatusBadge
+                                status={getUserPresenceStatus(member.id)}
+                                size="xs"
+                                className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
                               />
                             </span>
                             <span className="min-w-0 flex-1 truncate">
@@ -3234,7 +3252,11 @@ const SlackShell = () => {
             ) : (
               user?.username?.charAt(0)?.toUpperCase() || "U"
             )}
-            <span className="absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-[#2C3333]" />
+            <StatusBadge
+              status={user?.presenceStatus || "active"}
+              size="xs"
+              className="absolute bottom-0.5 right-0.5 ring-1 ring-[#2C3333]"
+            />
           </button>
 
           {/* Profile Menu Popover */}
@@ -3261,9 +3283,10 @@ const SlackShell = () => {
                     <div className="truncate text-sm font-bold text-white">
                       {user?.username || "User"}
                     </div>
-                    <div className="truncate text-xs text-[#A5C9CA]">
+                    <div className="truncate text-xs text-[#A5C9CA] mb-1.5">
                       {user?.email || ""}
                     </div>
+                    <StatusSelector />
                   </div>
                 </div>
 
@@ -3292,10 +3315,18 @@ const SlackShell = () => {
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <i className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} text-xs`} />
-                    <span>{isMutedGlobal ? "Notifications Muted" : "Mute Notifications"}</span>
+                    <i
+                      className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} text-xs`}
+                    />
+                    <span>
+                      {isMutedGlobal
+                        ? "Notifications Muted"
+                        : "Mute Notifications"}
+                    </span>
                   </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isMutedGlobal ? "bg-amber-500/20 text-amber-300" : "bg-[#395B64] text-[#A5C9CA]"}`}>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isMutedGlobal ? "bg-amber-500/20 text-amber-300" : "bg-[#395B64] text-[#A5C9CA]"}`}
+                  >
                     {isMutedGlobal ? "ON" : "OFF"}
                   </span>
                 </button>
@@ -3501,7 +3532,14 @@ const SlackShell = () => {
             </>
           )}
         </div>
-        {/* New chat button + collapsible Shortcuts */}
+
+        <div className="flex items-center justify-between border-b border-[#2C3333] px-3.5 py-2 bg-[#1A2121]/90">
+          <span className="text-[11px] font-semibold text-[#A5C9CA] tracking-wide uppercase">
+            Status
+          </span>
+          <StatusSelector align="right" />
+        </div>
+
         <div className="px-3 pt-3 pb-1">
           <button
             type="button"
@@ -3558,10 +3596,14 @@ const SlackShell = () => {
                 onClick={() => setShowActivityPanel(true)}
                 className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
               >
-                <i className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`} />
+                <i
+                  className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`}
+                />
                 <span className="flex-1 text-left">Notifications</span>
                 {isMutedGlobal && (
-                  <span className="text-[10px] font-semibold text-amber-400/90 px-1">Muted</span>
+                  <span className="text-[10px] font-semibold text-amber-400/90 px-1">
+                    Muted
+                  </span>
                 )}
                 {unreadNotificationsCount > 0 && (
                   <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
@@ -3943,15 +3985,10 @@ const SlackShell = () => {
                                 member.username?.charAt(0)?.toUpperCase() || "U"
                               )}
                             </span>
-                            <span
-                              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${
-                                isUserOnline(member.id)
-                                  ? "bg-emerald-500"
-                                  : "bg-gray-500"
-                              }`}
-                              title={
-                                isUserOnline(member.id) ? "Online" : "Offline"
-                              }
+                            <StatusBadge
+                              status={getUserPresenceStatus(member.id)}
+                              size="xs"
+                              className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
                             />
                           </span>
                           <span className="min-w-0 flex-1 truncate">
@@ -4522,6 +4559,7 @@ const SlackShell = () => {
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+                <StatusSelector align="right" />
                 <button
                   type="button"
                   onClick={() => setShowMembersPanel(true)}
@@ -4857,13 +4895,10 @@ const SlackShell = () => {
                             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#395B64] text-[10px] font-bold text-white">
                               {m.username?.charAt(0)?.toUpperCase() || "U"}
                             </div>
-                            <span
-                              className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-1 ring-white ${
-                                isUserOnline(m.id)
-                                  ? "bg-emerald-500"
-                                  : "bg-gray-300"
-                              }`}
-                              title={isUserOnline(m.id) ? "Online" : "Offline"}
+                            <StatusBadge
+                              status={getUserPresenceStatus(m.id)}
+                              size="xs"
+                              className="absolute bottom-0 right-0 ring-1 ring-white dark:ring-[#242D2D]"
                             />
                           </div>
                           <span className="truncate text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] flex-1">
@@ -5193,13 +5228,10 @@ const SlackShell = () => {
                           member.username?.charAt(0)?.toUpperCase() || "U"
                         )}
                       </div>
-                      <span
-                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white dark:ring-[#242D2D] ${
-                          isUserOnline(member.id)
-                            ? "bg-emerald-500"
-                            : "bg-gray-300"
-                        }`}
-                        title={isUserOnline(member.id) ? "Online" : "Offline"}
+                      <StatusBadge
+                        status={getUserPresenceStatus(member.id)}
+                        size="sm"
+                        className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#242D2D]"
                       />
                     </div>
 
@@ -5360,12 +5392,10 @@ const SlackShell = () => {
                             member.username?.charAt(0)?.toUpperCase() || "U"
                           )}
                         </span>
-                        <span
-                          className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[#1E2525] ${
-                            isUserOnline(member.id)
-                              ? "bg-emerald-500"
-                              : "bg-gray-500"
-                          }`}
+                        <StatusBadge
+                          status={getUserPresenceStatus(member.id)}
+                          size="xs"
+                          className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
                         />
                       </span>
                       <div className="min-w-0 flex-1">
@@ -5376,8 +5406,9 @@ const SlackShell = () => {
                           {member.email}
                         </div>
                       </div>
-                      <span
-                        className={`h-2 w-2 rounded-full flex-shrink-0 ${isUserOnline(member.id) ? "bg-emerald-500" : "bg-gray-600"}`}
+                      <StatusBadge
+                        status={getUserPresenceStatus(member.id)}
+                        size="xs"
                       />
                     </button>
                   ))}
@@ -5618,8 +5649,8 @@ const SlackShell = () => {
                 Are you sure you want to block this user?
               </p>
               <p>
-                You and <strong>@{blockTarget.username}</strong> will no longer be
-                able to send direct messages to each other.
+                You and <strong>@{blockTarget.username}</strong> will no longer
+                be able to send direct messages to each other.
               </p>
             </div>
 

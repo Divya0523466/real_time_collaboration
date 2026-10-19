@@ -908,7 +908,7 @@ const ChannelMessageThread = ({
     socket.on("send-channel-message-error", handleSocketError);
     onChannelMessageEdited(handleEdited);
     onChannelMessageDeleted(handleDeleted);
-    joinChannel(channel.id);
+    joinChannel(channel?.id || channel?._id);
 
     return () => {
       cancelled = true;

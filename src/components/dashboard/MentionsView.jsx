@@ -7,6 +7,7 @@ import {
   markMentionAsReadApi,
 } from "../../services/messageService"
 import { onNotificationReceived, offNotificationReceived } from "../../services/socket"
+import StatusSelector from "../common/StatusSelector"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
@@ -266,6 +267,10 @@ const MentionsView = ({
               Mentions
             </h1>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <StatusSelector align="right" />
         </div>
       </header>
 

@@ -7,6 +7,7 @@ import { fetchStarredMessagesApi, unstarMessageApi } from "../../services/messag
 import { formatMessageDate, formatMessageTime } from "../../utils/dateUtils"
 import { isImageOrFileMessage } from "../../utils/fileUtils"
 import { toast } from "react-toastify"
+import StatusSelector from "../common/StatusSelector"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
@@ -121,19 +122,22 @@ const StarredMessagesView = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
-          title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-          aria-label="Toggle theme"
-        >
-          {isDark ? (
-            <FiSun className="text-sm text-amber-400" />
-          ) : (
-            <FiMoon className="text-sm text-[#395B64]" />
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <StatusSelector align="right" />
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
+            title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+            aria-label="Toggle theme"
+          >
+            {isDark ? (
+              <FiSun className="text-sm text-amber-400" />
+            ) : (
+              <FiMoon className="text-sm text-[#395B64]" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Main Content Area */}

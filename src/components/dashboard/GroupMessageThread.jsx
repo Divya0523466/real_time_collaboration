@@ -16,6 +16,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
 import TypingIndicator from "../common/TypingIndicator";
 import useTypingIndicator from "../../hooks/useTypingIndicator";
+import StatusSelector from "../common/StatusSelector";
 
 const formatMessageTime = (dateInput) => {
   if (!dateInput) return "";
@@ -170,6 +171,7 @@ const GroupMessageThread = ({
 
         {/* Header Right Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          <StatusSelector align="right" />
           <button
             type="button"
             onClick={() => setShowInfoModal(true)}

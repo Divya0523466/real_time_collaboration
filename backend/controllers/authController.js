@@ -934,6 +934,32 @@ const disable2FA = async (req, res) => {
   }
 };
 
+const updatePresenceStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!["active", "away", "offline"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status. Allowed values: active, away, offline" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.userId,
+      { $set: { presenceStatus: status } },
+      { new: true }
+    ).select("presenceStatus username email");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      message: "Status updated successfully",
+      presenceStatus: updatedUser.presenceStatus,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update status", error: error.message });
+  }
+};
+
 export {
   register,
   login,
@@ -948,4 +974,5 @@ export {
   verifyOTP,
   resetPassword,
   updateProfile,
+  updatePresenceStatus,
 };

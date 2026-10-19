@@ -18,6 +18,11 @@ import socket, {
   onUserOffline,
   offUserOffline,
   requestOnlineUsers,
+  emitChangeStatus,
+  onUserStatusChanged,
+  offUserStatusChanged,
+  onOnlineStatuses,
+  offOnlineStatuses,
 } from "../services/socket";
 import {
   fetchNotifications as apiFetchNotifications,
@@ -156,6 +161,7 @@ export const WorkspaceProvider = ({ children }) => {
     [mutedConversations],
   );
   const [onlineUsers, setOnlineUsers] = useState(() => new Set());
+  const [userStatuses, setUserStatuses] = useState({});
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(() => {
     try {
@@ -428,6 +434,21 @@ export const WorkspaceProvider = ({ children }) => {
         next.delete(userId.toString());
         return next;
       });
+      setUserStatuses((prev) => ({ ...prev, [userId.toString()]: "offline" }));
+    };
+
+    const handleOnlineStatuses = (statuses) => {
+      if (statuses && typeof statuses === "object") {
+        setUserStatuses((prev) => ({ ...prev, ...statuses }));
+      }
+    };
+
+    const handleUserStatusChanged = ({ userId, status }) => {
+      if (!userId || !status) return;
+      setUserStatuses((prev) => ({ ...prev, [userId.toString()]: status }));
+      if (userId.toString() === (user?._id || user?.id)?.toString()) {
+        setUser((prev) => (prev ? { ...prev, presenceStatus: status } : prev));
+      }
     };
 
     const handleSocketConnect = () => {
@@ -441,6 +462,8 @@ export const WorkspaceProvider = ({ children }) => {
     onOnlineUsers(handleOnlineUsers);
     onUserOnline(handleUserOnline);
     onUserOffline(handleUserOffline);
+    onOnlineStatuses(handleOnlineStatuses);
+    onUserStatusChanged(handleUserStatusChanged);
     connectSocket();
 
     fetchNotifications().catch(() => {});
@@ -453,6 +476,8 @@ export const WorkspaceProvider = ({ children }) => {
       offOnlineUsers(handleOnlineUsers);
       offUserOnline(handleUserOnline);
       offUserOffline(handleUserOffline);
+      offOnlineStatuses(handleOnlineStatuses);
+      offUserStatusChanged(handleUserStatusChanged);
       socket.disconnect();
     };
   }, [userId, fetchNotifications]);
@@ -1170,8 +1195,67 @@ export const WorkspaceProvider = ({ children }) => {
   );
 
   const isUserOnline = useCallback(
-    (userId) => Boolean(userId && onlineUsers.has(userId.toString())),
-    [onlineUsers],
+    (userId) => {
+      if (!userId) return false;
+      const sId = (userId?._id || userId?.id || userId)?.toString();
+      if (!sId || !onlineUsers.has(sId)) return false;
+      if (sId === (user?._id || user?.id)?.toString()) {
+        return user?.presenceStatus !== "offline";
+      }
+      return userStatuses[sId] !== "offline";
+    },
+    [onlineUsers, userStatuses, user],
+  );
+
+  const getUserPresenceStatus = useCallback(
+    (targetUserId) => {
+      if (!targetUserId) return "offline";
+      const sId = (
+        targetUserId?._id ||
+        targetUserId?.id ||
+        targetUserId
+      )?.toString();
+      if (!sId) return "offline";
+      if (sId === (user?._id || user?.id)?.toString()) {
+        return user?.presenceStatus || "active";
+      }
+
+      if (!onlineUsers.has(sId)) {
+        return "offline";
+      }
+
+      return userStatuses[sId] || "active";
+    },
+    [onlineUsers, userStatuses, user],
+  );
+
+  const updateUserPresenceStatus = useCallback(
+    async (newStatus) => {
+      if (!["active", "away", "offline"].includes(newStatus)) return;
+
+      setUser((prev) => {
+        if (!prev) return prev;
+        const updated = { ...prev, presenceStatus: newStatus };
+        try {
+          localStorage.setItem("worknestUser", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      emitChangeStatus(newStatus);
+
+      try {
+        await fetch(`${API_URL}/auth/status`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ status: newStatus }),
+        });
+      } catch (err) {
+        console.error("Failed to update status on server:", err);
+      }
+    },
+    [API_URL],
   );
 
   const value = {
@@ -1188,6 +1272,9 @@ export const WorkspaceProvider = ({ children }) => {
     error,
     onlineUsers,
     isUserOnline,
+    userStatuses,
+    getUserPresenceStatus,
+    updateUserPresenceStatus,
     initializeFromAuth,
     clearAuth,
     fetchPendingInvitations,
