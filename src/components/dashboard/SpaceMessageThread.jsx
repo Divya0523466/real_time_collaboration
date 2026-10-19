@@ -26,6 +26,8 @@ import { useMentionInput } from "../../hooks/useMentionInput"
 import AttachmentRenderer from "../common/AttachmentRenderer"
 import EmojiPickerButton from "../common/EmojiPickerButton"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
+import TypingIndicator from "../common/TypingIndicator"
+import useTypingIndicator from "../../hooks/useTypingIndicator"
 
 const AVATAR_COLORS = [
   "#00897b",
@@ -134,6 +136,13 @@ const SpaceMessageThread = ({
     channelMembers: spaceMembers,
   })
 
+  const sId = (space?.id || space?._id)?.toString()
+  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
+    type: "space",
+    targetId: sId,
+    currentUserId: activeUserId,
+  })
+
   const textareaRef = useRef(null)
   const messagesEndRef = useRef(null)
 
@@ -239,6 +248,7 @@ const SpaceMessageThread = ({
     const content = mention.value.trim()
     if (!content && attachedFiles.length === 0) return
 
+    handleStopTypingNow()
     const mentionIds = mention.getMentionedUserIds()
 
     if (editingMessage) {
@@ -274,7 +284,9 @@ const SpaceMessageThread = ({
   const handleEmojiSelect = (emoji) => {
     const el = textareaRef.current
     if (!el) {
-      mention.setValue((mention.value || "") + emoji)
+      const updated = (mention.value || "") + emoji
+      mention.setValue(updated)
+      handleKeystroke(updated)
       return
     }
     const start = el.selectionStart ?? mention.value.length
@@ -282,6 +294,7 @@ const SpaceMessageThread = ({
     const text = mention.value || ""
     const updated = text.substring(0, start) + emoji + text.substring(end)
     mention.handleChange(updated, start + emoji.length)
+    handleKeystroke(updated)
     setTimeout(() => {
       el.focus()
       el.setSelectionRange(start + emoji.length, start + emoji.length)
@@ -845,6 +858,8 @@ const SpaceMessageThread = ({
 
       {/* ── Message Composer ─────────────────────────────────────────── */}
       <div className="relative border-t border-gray-200 dark:border-[#2C3333] p-3 sm:p-4 bg-white dark:bg-[#1A2121]">
+        <TypingIndicator typingText={typingText} isAnyoneTyping={isAnyoneTyping} className="mb-2 px-1" />
+
         <MentionSuggestions
           isOpen={mention.isOpen}
           users={mention.filteredUsers}
@@ -865,8 +880,12 @@ const SpaceMessageThread = ({
             ref={textareaRef}
             rows={1}
             value={mention.value}
-            onChange={(e) => mention.handleChange(e.target.value, e.target.selectionStart)}
+            onChange={(e) => {
+              mention.handleChange(e.target.value, e.target.selectionStart)
+              handleKeystroke(e.target.value)
+            }}
             onKeyDown={handleKeyDown}
+            onBlur={handleStopTypingNow}
             placeholder={`Message #${space?.name || "Space"}...`}
             className="flex-1 max-h-32 resize-none bg-transparent py-1 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#A5C9CA]/50 outline-none"
           />

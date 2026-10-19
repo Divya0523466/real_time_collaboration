@@ -235,6 +235,31 @@ export const offGroupMessageReceived = (callback) => {
   socket.off("receive-group-message", callback)
 }
 
+// ── Typing Indicator Helpers ─────────────────────────────────────────
+export const sendTypingStart = (type, targetId) => {
+  socket.emit("typing:start", { type, targetId })
+}
+
+export const sendTypingStop = (type, targetId) => {
+  socket.emit("typing:stop", { type, targetId })
+}
+
+export const onUserTyping = (callback) => {
+  socket.on("user-typing", callback)
+}
+
+export const offUserTyping = (callback) => {
+  socket.off("user-typing", callback)
+}
+
+export const onUserStopTyping = (callback) => {
+  socket.on("user-stop-typing", callback)
+}
+
+export const offUserStopTyping = (callback) => {
+  socket.off("user-stop-typing", callback)
+}
+
 export default socket
 
 

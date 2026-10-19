@@ -14,6 +14,8 @@ import socket, {
 import GroupInfoModal from "./GroupInfoModal";
 import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
+import TypingIndicator from "../common/TypingIndicator";
+import useTypingIndicator from "../../hooks/useTypingIndicator";
 
 const formatMessageTime = (dateInput) => {
   if (!dateInput) return "";
@@ -36,6 +38,13 @@ const GroupMessageThread = ({
   const messagesEndRef = useRef(null);
 
   const groupId = (group?._id || group?.id)?.toString();
+  const activeUserId = (currentUserId || currentUser?._id || currentUser?.id)?.toString();
+
+  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
+    type: "group",
+    targetId: groupId,
+    currentUserId: activeUserId,
+  });
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -96,6 +105,7 @@ const GroupMessageThread = ({
 
     try {
       setSending(true);
+      handleStopTypingNow();
       setInputText("");
 
       // Try sending via Socket first for instant real-time delivery
@@ -278,6 +288,7 @@ const GroupMessageThread = ({
 
       {/* ── Message Input Bar ───────────────────────────────── */}
       <div className="p-3 border-t border-gray-200 dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex-shrink-0">
+        <TypingIndicator typingText={typingText} isAnyoneTyping={isAnyoneTyping} className="mb-2 px-1" />
         <form
           onSubmit={handleSendMessage}
           className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#2C3333] px-3 py-1.5 focus-within:border-teal-500 dark:focus-within:border-teal-400 transition"
@@ -285,7 +296,11 @@ const GroupMessageThread = ({
           <input
             type="text"
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={(e) => {
+              setInputText(e.target.value);
+              handleKeystroke(e.target.value);
+            }}
+            onBlur={handleStopTypingNow}
             placeholder={`Message ${group?.name || "group"}...`}
             className="flex-1 bg-transparent py-1 text-xs text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#A5C9CA]/50 focus:outline-hidden"
           />

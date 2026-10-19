@@ -17,6 +17,8 @@ import {
 } from "../../utils/fileUtils"
 import EmojiPickerButton from "../common/EmojiPickerButton"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
+import TypingIndicator from "../common/TypingIndicator"
+import useTypingIndicator from "../../hooks/useTypingIndicator"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
@@ -120,6 +122,18 @@ const MessageThread = ({
     includeAll: false,
   })
 
+  const targetUserId = (activeSelectedUser?.id || activeSelectedUser?._id || selectedUser?.id || selectedUser?._id)?.toString()
+  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
+    type: "dm",
+    targetId: targetUserId,
+    currentUserId: resolvedCurrentUserId,
+  })
+
+  const handleInputChange = (e) => {
+    mention.handleInputChange(e)
+    handleKeystroke(e.target.value)
+  }
+
   // Auto-scroll to bottom only when new messages arrive or when switching conversation,
   // not when starring, unstarring, editing, or deleting existing messages.
   useEffect(() => {
@@ -162,6 +176,7 @@ const MessageThread = ({
     const text = inputValue.trim()
     if (!text && !attachedFile) return
 
+    handleStopTypingNow()
     const attachments = attachedFile ? [attachedFile] : []
     const mentions = mention.getMentionedUserIds(inputValue)
     onSendMessage(text, attachments, mentions)
@@ -182,7 +197,9 @@ const MessageThread = ({
   const handleEmojiSelect = (emoji) => {
     const el = mainTextareaRef.current
     if (!el) {
-      setInputValue((prev) => (prev || "") + emoji)
+      const updated = (inputValue || "") + emoji
+      setInputValue(updated)
+      handleKeystroke(updated)
       return
     }
     const start = el.selectionStart ?? inputValue.length
@@ -190,6 +207,7 @@ const MessageThread = ({
     const text = inputValue || ""
     const updated = text.substring(0, start) + emoji + text.substring(end)
     setInputValue(updated)
+    handleKeystroke(updated)
     setTimeout(() => {
       el.focus()
       el.setSelectionRange(start + emoji.length, start + emoji.length)
@@ -633,6 +651,7 @@ const MessageThread = ({
 
       {/* Input Area */}
       <div className="border-t border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121] p-4 transition-colors">
+        <TypingIndicator typingText={typingText} isAnyoneTyping={isAnyoneTyping} className="mb-2 px-1" />
         {isBlocked ? (
           <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-xs sm:text-sm text-amber-700 dark:text-amber-300">
             <div className="flex items-center gap-2">
@@ -708,9 +727,10 @@ const MessageThread = ({
               <textarea
                 ref={mainTextareaRef}
                 value={inputValue}
-                onChange={mention.handleInputChange}
+                onChange={handleInputChange}
                 onSelect={mention.handleInputSelect}
                 onKeyDown={handleKeyDown}
+                onBlur={handleStopTypingNow}
                 placeholder="Type a message..."
                 className="flex-1 resize-none rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 px-4 py-2 text-[15px] sm:text-base focus:border-[#395B64] focus:outline-none focus:ring-2 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30"
                 rows="2"

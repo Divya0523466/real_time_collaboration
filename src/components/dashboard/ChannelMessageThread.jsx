@@ -34,6 +34,8 @@ import { extractMentionIdsFromText } from "../../utils/mentionUtils";
 import AttachmentRenderer from "../common/AttachmentRenderer";
 import EmojiPickerButton from "../common/EmojiPickerButton";
 import ForwardedMessageCard from "../common/ForwardedMessageCard";
+import TypingIndicator from "../common/TypingIndicator";
+import useTypingIndicator from "../../hooks/useTypingIndicator";
 
 const AVATAR_COLORS = [
   "#395B64",
@@ -761,6 +763,12 @@ const ChannelMessageThread = ({
   });
   const composerTextareaRef = useRef(null);
 
+  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
+    type: "channel",
+    targetId: channel?.id || channel?._id,
+    currentUserId: resolvedCurrentUserId,
+  });
+
   const [expandedThreads, setExpandedThreads] = useState(new Set());
 
   const [editingState, setEditingState] = useState(null);
@@ -957,6 +965,7 @@ const ChannelMessageThread = ({
       return;
     }
 
+    handleStopTypingNow();
     const attachments = attachedFile ? [attachedFile] : [];
     const mentionIds = mention.getMentionedUserIds();
 
@@ -976,7 +985,9 @@ const ChannelMessageThread = ({
   const handleEmojiSelect = (emoji) => {
     const el = composerTextareaRef.current;
     if (!el) {
-      mention.setValue((mention.value || "") + emoji);
+      const updated = (mention.value || "") + emoji;
+      mention.setValue(updated);
+      handleKeystroke(updated);
       return;
     }
     const start = el.selectionStart ?? mention.value.length;
@@ -984,6 +995,7 @@ const ChannelMessageThread = ({
     const text = mention.value || "";
     const updated = text.substring(0, start) + emoji + text.substring(end);
     mention.handleChange(updated, start + emoji.length);
+    handleKeystroke(updated);
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(start + emoji.length, start + emoji.length);
@@ -1285,6 +1297,8 @@ const ChannelMessageThread = ({
 
       {/* ── Main message composer ──────────────────────────────────────────── */}
       <div className="border-t border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-4 py-3 transition-colors">
+        <TypingIndicator typingText={typingText} isAnyoneTyping={isAnyoneTyping} className="mb-2 px-1" />
+
         {/* Hint when a reply composer is open */}
         {replyingToId && (
           <div className="flex items-center gap-2 mb-2 text-[11px] text-[#52656A] dark:text-[#A5C9CA]">
@@ -1340,10 +1354,12 @@ const ChannelMessageThread = ({
           <textarea
             ref={composerTextareaRef}
             value={mention.value}
-            onChange={(e) =>
-              mention.handleChange(e.target.value, e.target.selectionStart)
-            }
+            onChange={(e) => {
+              mention.handleChange(e.target.value, e.target.selectionStart);
+              handleKeystroke(e.target.value);
+            }}
             onKeyDown={handleKeyDown}
+            onBlur={handleStopTypingNow}
             onClick={(e) => mention.handleCursorChange(e.target.selectionStart)}
             onKeyUp={(e) => mention.handleCursorChange(e.target.selectionStart)}
             placeholder={`Message #${channel.name}`}
