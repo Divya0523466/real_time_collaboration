@@ -1598,6 +1598,105 @@ io.on("connection", async (socket) => {
     }
   });
 
+  socket.on("message:react", async ({ messageId, conversationType, conversationId, emoji } = {}) => {
+    if (!messageId || !emoji) return;
+
+    try {
+      const u = await User.findById(socket.userId).select("username displayName").lean();
+      const username = u?.displayName || u?.username || "Someone";
+
+      let message = null;
+      let isDirect = false;
+
+      if (conversationType === "DIRECT" || conversationType === "dm") {
+        message = await Message.findById(messageId);
+        isDirect = true;
+      } else {
+        message = await ChannelMessage.findById(messageId);
+        if (!message) {
+          message = await Message.findById(messageId);
+          if (message) isDirect = true;
+        }
+      }
+
+      if (!message || message.isDeleted) return;
+
+      message.reactions = message.reactions || [];
+      const emojiStr = emoji.trim();
+
+      // Check if user previously reacted with any emoji on this message
+      let previousEmoji = null;
+      for (const group of message.reactions) {
+        const idx = group.users.findIndex(
+          (u) => (u.userId?._id || u.userId).toString() === socket.userId.toString()
+        );
+        if (idx !== -1) {
+          previousEmoji = group.emoji;
+          group.users.splice(idx, 1);
+          break;
+        }
+      }
+
+      let hasReacted = false;
+      // If user clicked the same emoji they already had, it's a toggle off
+      if (previousEmoji === emojiStr) {
+        hasReacted = false;
+      } else {
+        // User clicked a new emoji or replaced previous emoji
+        let targetGroup = message.reactions.find((r) => r.emoji === emojiStr);
+        if (targetGroup) {
+          targetGroup.users.push({ userId: socket.userId, username });
+        } else {
+          message.reactions.push({
+            emoji: emojiStr,
+            users: [{ userId: socket.userId, username }],
+          });
+        }
+        hasReacted = true;
+      }
+
+      // Clean up empty reaction groups
+      message.reactions = message.reactions.filter((r) => r.users && r.users.length > 0);
+
+      await message.save();
+
+      const payload = {
+        messageId: message._id.toString(),
+        reactions: message.reactions,
+        userId: socket.userId,
+        emoji: emojiStr,
+        hasReacted,
+      };
+
+      if (isDirect) {
+        io.to(`user:${message.senderId}`).to(`user:${message.receiverId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "dm",
+        });
+      } else if (message.channelId) {
+        io.to(`channel:${message.channelId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "channel",
+          channelId: message.channelId.toString(),
+        });
+      } else if (message.spaceId) {
+        io.to(`space:${message.spaceId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "space",
+          spaceId: message.spaceId.toString(),
+        });
+      } else if (message.groupId) {
+        io.to(`group:${message.groupId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "group",
+          groupId: message.groupId.toString(),
+        });
+      }
+    } catch (err) {
+      console.error("Error in socket message:react:", err);
+    }
+  });
+
   socket.on("change-status", async ({ status } = {}) => {
     if (!status || !["active", "away", "offline"].includes(status)) return;
 

@@ -20,6 +20,7 @@ export const formatGroupMessage = (msg) => ({
     : undefined,
   content: msg.isDeleted ? null : msg.content,
   attachments: msg.attachments || [],
+  reactions: msg.reactions || [],
   isEdited: msg.isEdited || false,
   isDeleted: msg.isDeleted || false,
   createdAt: msg.createdAt,

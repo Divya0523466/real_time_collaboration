@@ -232,4 +232,19 @@ export const toggleBlockUserApi = async (userId) => {
   return data
 }
 
+export const toggleReactionApi = async (messageId, emoji, conversationType = "CHANNEL") => {
+  const response = await fetch(`${API_URL}/messages/${messageId}/react`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ emoji, conversationType }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to toggle reaction")
+  }
+  return data
+}
+
 

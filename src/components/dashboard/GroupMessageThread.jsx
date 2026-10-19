@@ -10,7 +10,12 @@ import socket, {
   sendGroupMessageSocket,
   onGroupMessageReceived,
   offGroupMessageReceived,
+  sendReactionSocket,
+  onReactionUpdated,
+  offReactionUpdated,
 } from "../../services/socket";
+import MessageReactionPicker from "../common/MessageReactionPicker";
+import MessageReactions from "../common/MessageReactions";
 import GroupInfoModal from "./GroupInfoModal";
 import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
@@ -75,7 +80,7 @@ const GroupMessageThread = ({
     };
   }, [groupId]);
 
-  // Listen for real-time group messages
+  // Listen for real-time group messages & reactions
   useEffect(() => {
     const handleNewMessage = (newMsg) => {
       if ((newMsg.groupId || newMsg.groupId?._id)?.toString() === groupId) {
@@ -93,11 +98,81 @@ const GroupMessageThread = ({
       }
     };
 
+    const handleReaction = (payload) => {
+      if (
+        payload?.conversationType !== "group" ||
+        payload?.groupId?.toString() !== groupId
+      )
+        return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === payload.messageId?.toString()
+            ? { ...m, reactions: payload.reactions }
+            : m,
+        ),
+      );
+    };
+
     onGroupMessageReceived(handleNewMessage);
+    onReactionUpdated(handleReaction);
+
     return () => {
       offGroupMessageReceived(handleNewMessage);
+      offReactionUpdated(handleReaction);
     };
   }, [groupId]);
+
+  const handleToggleReaction = (msg, emoji) => {
+    const msgId = (msg.id || msg._id)?.toString();
+    if (!msgId || !groupId) return;
+
+    const myId = (currentUser?.id || currentUser?._id || currentUserId)?.toString();
+    const myName = currentUser?.username || "You";
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if ((m.id || m._id)?.toString() !== msgId) return m;
+        const reactions = (m.reactions || []).map((r) => ({
+          ...r,
+          users: [...r.users],
+        }));
+
+        let previousEmoji = null;
+        for (const group of reactions) {
+          const uIdx = group.users.findIndex(
+            (u) => (u.userId?._id || u.userId)?.toString() === myId,
+          );
+          if (uIdx !== -1) {
+            previousEmoji = group.emoji;
+            group.users.splice(uIdx, 1);
+            break;
+          }
+        }
+
+        if (previousEmoji !== emoji) {
+          const targetGroup = reactions.find((r) => r.emoji === emoji);
+          if (targetGroup) {
+            targetGroup.users.push({ userId: myId, username: myName });
+          } else {
+            reactions.push({
+              emoji,
+              users: [{ userId: myId, username: myName }],
+            });
+          }
+        }
+
+        const filtered = reactions.filter((r) => r.users && r.users.length > 0);
+        return { ...m, reactions: filtered };
+      }),
+    );
+
+    sendReactionSocket({
+      messageId: msgId,
+      conversationType: "group",
+      conversationId: groupId,
+      emoji,
+    });
+  };
 
   const handleSendMessage = async (e) => {
     e?.preventDefault();
@@ -253,34 +328,61 @@ const GroupMessageThread = ({
                   </div>
                 )}
 
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-xs shadow-xs ${
-                    isMe
-                      ? "bg-teal-600 text-white rounded-tr-xs shadow-xs"
-                      : "bg-white dark:bg-[#2C3333] text-gray-800 dark:text-[#E7F6F2] rounded-tl-xs border border-gray-200 dark:border-[#395B64]/40 shadow-xs"
-                  }`}
-                >
-                  {!isMe && (
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="font-bold text-teal-600 dark:text-teal-300">
-                        {senderName}
-                      </span>
-                      <span className="text-[10px] text-gray-400 dark:text-[#A5C9CA]/60 font-normal">
+                {isMe && (
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 self-center pointer-events-none group-hover:pointer-events-auto">
+                    <MessageReactionPicker
+                      onSelectEmoji={(emoji) => handleToggleReaction(msg, emoji)}
+                      align="right"
+                    />
+                  </div>
+                )}
+
+                <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[75%]`}>
+                  <div
+                    className={`w-fit max-w-full rounded-2xl px-4 py-2.5 text-xs shadow-xs ${
+                      isMe
+                        ? "bg-teal-600 text-white rounded-tr-xs shadow-xs"
+                        : "bg-white dark:bg-[#2C3333] text-gray-800 dark:text-[#E7F6F2] rounded-tl-xs border border-gray-200 dark:border-[#395B64]/40 shadow-xs"
+                    }`}
+                  >
+                    {!isMe && (
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="font-bold text-teal-600 dark:text-teal-300">
+                          {senderName}
+                        </span>
+                        <span className="text-[10px] text-gray-400 dark:text-[#A5C9CA]/60 font-normal">
+                          {formatMessageTime(msg.createdAt)}
+                        </span>
+                      </div>
+                    )}
+
+                    <p className="whitespace-pre-wrap break-words leading-relaxed">
+                      {msg.content}
+                    </p>
+
+                    {isMe && (
+                      <div className="mt-1 text-right text-[10px] text-teal-100/80">
                         {formatMessageTime(msg.createdAt)}
-                      </span>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
 
-                  <p className="whitespace-pre-wrap break-words leading-relaxed">
-                    {msg.content}
-                  </p>
-
-                  {isMe && (
-                    <div className="mt-1 text-right text-[10px] text-teal-100/80">
-                      {formatMessageTime(msg.createdAt)}
-                    </div>
-                  )}
+                  <MessageReactions
+                    reactions={msg.reactions || []}
+                    currentUserId={activeUserId}
+                    onToggleReaction={(emoji) => handleToggleReaction(msg, emoji)}
+                    className={isMe ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
+                  />
                 </div>
+
+                {!isMe && (
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 self-center pointer-events-none group-hover:pointer-events-auto">
+                    <MessageReactionPicker
+                      onSelectEmoji={(emoji) => handleToggleReaction(msg, emoji)}
+                      align="left"
+                    />
+                  </div>
+                )}
               </div>
             );
           })

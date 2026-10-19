@@ -181,6 +181,7 @@ const getDirectMessages = async (req, res) => {
             (id) => id.toString() === currentUserId.toString(),
           ),
         ),
+        reactions: msg.reactions || [],
       })),
     });
   } catch (error) {
@@ -252,6 +253,7 @@ const formatChannelMessage = (message, currentUserId = null) => ({
     currentUserId &&
     message.starredBy.some((id) => id.toString() === currentUserId.toString()),
   ),
+  reactions: message.reactions || [],
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 });
@@ -1589,6 +1591,128 @@ const toggleBlockUser = async (req, res) => {
   }
 };
 
+const toggleReaction = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji, conversationType } = req.body;
+    const userId = req.userId;
+
+    if (!emoji || !emoji.trim()) {
+      return res.status(400).json({ message: "Emoji is required" });
+    }
+
+    const user = await User.findById(userId).select("username displayName").lean();
+    const username = user?.displayName || user?.username || "Someone";
+
+    let message = null;
+    let isDirect = false;
+
+    if (conversationType === "DIRECT" || conversationType === "dm") {
+      message = await Message.findById(messageId);
+      isDirect = true;
+    } else {
+      message = await ChannelMessage.findById(messageId);
+      if (!message) {
+        message = await Message.findById(messageId);
+        if (message) isDirect = true;
+      }
+    }
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    if (message.isDeleted) {
+      return res.status(400).json({ message: "Cannot react to deleted message" });
+    }
+
+    message.reactions = message.reactions || [];
+    const emojiStr = emoji.trim();
+
+    // Check if user previously reacted with any emoji on this message
+    let previousEmoji = null;
+    for (const group of message.reactions) {
+      const idx = group.users.findIndex(
+        (u) => (u.userId?._id || u.userId).toString() === userId.toString()
+      );
+      if (idx !== -1) {
+        previousEmoji = group.emoji;
+        group.users.splice(idx, 1);
+        break;
+      }
+    }
+
+    let hasReacted = false;
+    // If the user clicked the same emoji they already had, it's a toggle off
+    if (previousEmoji === emojiStr) {
+      hasReacted = false;
+    } else {
+      // User clicked a new emoji or replaced previous emoji
+      let targetGroup = message.reactions.find((r) => r.emoji === emojiStr);
+      if (targetGroup) {
+        targetGroup.users.push({ userId, username });
+      } else {
+        message.reactions.push({
+          emoji: emojiStr,
+          users: [{ userId, username }],
+        });
+      }
+      hasReacted = true;
+    }
+
+    // Clean up empty reaction groups
+    message.reactions = message.reactions.filter((r) => r.users && r.users.length > 0);
+
+    await message.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      const payload = {
+        messageId: message._id.toString(),
+        reactions: message.reactions,
+        userId: userId.toString(),
+        emoji: emojiStr,
+        hasReacted,
+      };
+
+      if (isDirect) {
+        io.to(`user:${message.senderId}`).to(`user:${message.receiverId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "dm",
+        });
+      } else if (message.channelId) {
+        io.to(`channel:${message.channelId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "channel",
+          channelId: message.channelId.toString(),
+        });
+      } else if (message.spaceId) {
+        io.to(`space:${message.spaceId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "space",
+          spaceId: message.spaceId.toString(),
+        });
+      } else if (message.groupId) {
+        io.to(`group:${message.groupId}`).emit("message:reaction-updated", {
+          ...payload,
+          conversationType: "group",
+          groupId: message.groupId.toString(),
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      messageId: message._id,
+      reactions: message.reactions,
+      hasReacted,
+    });
+  } catch (error) {
+    console.error("Error in toggleReaction:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export {
   getDirectMessages,
   getChannelMessages,
@@ -1608,4 +1732,5 @@ export {
   forwardMessage,
   deleteDirectConversation,
   toggleBlockUser,
+  toggleReaction,
 };

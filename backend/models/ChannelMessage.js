@@ -59,6 +59,35 @@ const mentionSchema = new mongoose.Schema(
   { _id: false }
 )
 
+const reactionUserSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    username: {
+      type: String,
+      default: "",
+    },
+  },
+  { _id: false }
+)
+
+const reactionSchema = new mongoose.Schema(
+  {
+    emoji: {
+      type: String,
+      required: true,
+    },
+    users: {
+      type: [reactionUserSchema],
+      default: [],
+    },
+  },
+  { _id: false }
+)
+
 const forwardedFromSchema = new mongoose.Schema(
   {
     originalMessageId: {
@@ -168,6 +197,10 @@ const channelMessageSchema = new mongoose.Schema(
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
       index: true,
+    },
+    reactions: {
+      type: [reactionSchema],
+      default: [],
     },
   },
   { timestamps: true },

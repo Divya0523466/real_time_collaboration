@@ -8,7 +8,12 @@ import socket, {
   onChannelMessageDeleted,
   offChannelMessageEdited,
   offChannelMessageDeleted,
+  sendReactionSocket,
+  onReactionUpdated,
+  offReactionUpdated,
 } from "../../services/socket";
+import MessageReactionPicker from "../common/MessageReactionPicker";
+import MessageReactions from "../common/MessageReactions";
 import FileUpload from "../common/FileUpload";
 import MessageContent from "../common/MessageContent";
 import DateSeparator from "../common/DateSeparator";
@@ -290,6 +295,7 @@ const MessageRow = ({
   onStartReply,
   onDelete,
   onToggleStar,
+  onToggleReaction,
   onForwardMessage,
   onNavigateSource = null,
   isReply = false,
@@ -378,6 +384,11 @@ const MessageRow = ({
               </span>
             </div>
           )}
+
+          <MessageReactionPicker
+            onSelectEmoji={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
+            align="right"
+          />
 
           <div className="group/tip relative">
             <button
@@ -515,84 +526,94 @@ const MessageRow = ({
           </p>
         </div>
       ) : (
-        <div
-          className={`max-w-[85%] sm:max-w-[75%] md:max-w-[65%] break-words text-left ${
-            isPureAttachment || isPureForwarded
-              ? "bg-transparent border-0 shadow-none px-0 py-0"
-              : `rounded-2xl px-3 py-1.5 shadow-xs ${
-                  isSender
-                    ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50"
-                    : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535]"
-                }`
-          }`}
-        >
-          {/* Sender username in Channels (for other users) */}
-          {!isSender && username && (
-            <p className="text-xs sm:text-[13px] font-bold text-[#395B64] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
-              {username}
-            </p>
-          )}
-
-          {/* Orphan reply reference */}
-          {showOrphanRef && (
-            <ReplyReference
-              replyToMessage={message.replyToMessage}
-              isSender={isSender}
-            />
-          )}
-
-          {/* Content and timestamp */}
-          <div className="flex flex-col">
-            {(Boolean(message.content?.trim()) || Boolean(message.attachments?.length) || Boolean(attachments?.length)) && (
-              <div className="min-w-0 break-words leading-relaxed">
-                <MessageContent
-                  content={message.content}
-                  attachments={
-                    message.attachments?.length
-                      ? message.attachments
-                      : attachments
-                  }
-                  mentions={message.mentions || []}
-                  currentUserId={activeUserId}
-                  isSender={isSender}
-                  className="text-[15px] sm:text-base leading-relaxed break-words"
-                />
-              </div>
+        <div className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] md:max-w-[65%]`}>
+          <div
+            className={`w-fit max-w-full break-words text-left ${
+              isPureAttachment || isPureForwarded
+                ? "bg-transparent border-0 shadow-none px-0 py-0"
+                : `rounded-2xl px-3 py-1.5 shadow-xs ${
+                    isSender
+                      ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50"
+                      : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535]"
+                  }`
+            }`}
+          >
+            {/* Sender username in Channels (for other users) */}
+            {!isSender && username && (
+              <p className="text-xs sm:text-[13px] font-bold text-[#395B64] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
+                {username}
+              </p>
             )}
-            {message.forwardedFrom && (
-              <ForwardedMessageCard
-                forwardedFrom={message.forwardedFrom}
+
+            {/* Orphan reply reference */}
+            {showOrphanRef && (
+              <ReplyReference
+                replyToMessage={message.replyToMessage}
                 isSender={isSender}
-                onNavigateSource={onNavigateSource}
-                timestamp={formatMessageTime(message.createdAt)}
-                isEdited={message.isEdited && !isDeleted}
-                isStarred={message.isStarred && !isDeleted && !isImageOrFile}
-                onToggleStar={() => onToggleStar && onToggleStar(message)}
               />
             )}
-            {!message.forwardedFrom && (
-              <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none">
-                <span className="whitespace-nowrap">
-                  {formatMessageTime(message.createdAt)}
-                </span>
-                {message.isEdited && !isDeleted && (
-                  <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
-                    (edited)
+
+            {/* Content and timestamp */}
+            <div className="flex flex-col">
+              {(Boolean(message.content?.trim()) || Boolean(message.attachments?.length) || Boolean(attachments?.length)) && (
+                <div className="min-w-0 break-words leading-relaxed">
+                  <MessageContent
+                    content={message.content}
+                    attachments={
+                      message.attachments?.length
+                        ? message.attachments
+                        : attachments
+                    }
+                    mentions={message.mentions || []}
+                    currentUserId={activeUserId}
+                    isSender={isSender}
+                    className="text-[15px] sm:text-base leading-relaxed break-words"
+                  />
+                </div>
+              )}
+              {message.forwardedFrom && (
+                <ForwardedMessageCard
+                  forwardedFrom={message.forwardedFrom}
+                  isSender={isSender}
+                  onNavigateSource={onNavigateSource}
+                  timestamp={formatMessageTime(message.createdAt)}
+                  isEdited={message.isEdited && !isDeleted}
+                  isStarred={message.isStarred && !isDeleted && !isImageOrFile}
+                  onToggleStar={() => onToggleStar && onToggleStar(message)}
+                />
+              )}
+              {!message.forwardedFrom && (
+                <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none">
+                  <span className="whitespace-nowrap">
+                    {formatMessageTime(message.createdAt)}
                   </span>
-                )}
-                {message.isStarred && !isDeleted && !isImageOrFile && (
-                  <button
-                    type="button"
-                    onClick={() => onToggleStar && onToggleStar(message)}
-                    title="Starred message (click to unstar)"
-                    className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
-                  >
-                    <i className="fa-solid fa-star text-[9px]" />
-                  </button>
-                )}
-              </div>
-            )}
+                  {message.isEdited && !isDeleted && (
+                    <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                      (edited)
+                    </span>
+                  )}
+                  {message.isStarred && !isDeleted && !isImageOrFile && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleStar && onToggleStar(message)}
+                      title="Starred message (click to unstar)"
+                      className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                    >
+                      <i className="fa-solid fa-star text-[9px]" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+          {!isDeleted && (
+            <MessageReactions
+              reactions={message.reactions || []}
+              currentUserId={activeUserId}
+              onToggleReaction={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
+              className={isSender ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
+            />
+          )}
         </div>
       )}
 
@@ -625,6 +646,11 @@ const MessageRow = ({
               </span>
             </div>
           )}
+
+          <MessageReactionPicker
+            onSelectEmoji={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
+            align="left"
+          />
 
           <div className="group/tip relative">
             <button
@@ -902,12 +928,28 @@ const ChannelMessageThread = ({
       setError(socketError.message || "Unable to access this channel");
     };
 
+    const handleReaction = (payload) => {
+      if (
+        payload?.conversationType !== "channel" ||
+        payload?.channelId?.toString() !== channel?.id?.toString()
+      )
+        return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === payload.messageId?.toString()
+            ? { ...m, reactions: payload.reactions }
+            : m,
+        ),
+      );
+    };
+
     loadHistory();
     socket.on("receive-channel-message", addMessage);
     socket.on("join-channel-error", handleSocketError);
     socket.on("send-channel-message-error", handleSocketError);
     onChannelMessageEdited(handleEdited);
     onChannelMessageDeleted(handleDeleted);
+    onReactionUpdated(handleReaction);
     joinChannel(channel?.id || channel?._id);
 
     return () => {
@@ -917,6 +959,7 @@ const ChannelMessageThread = ({
       socket.off("send-channel-message-error", handleSocketError);
       offChannelMessageEdited(handleEdited);
       offChannelMessageDeleted(handleDeleted);
+      offReactionUpdated(handleReaction);
     };
   }, [apiUrl, channel?.id]);
 
@@ -1089,6 +1132,58 @@ const ChannelMessageThread = ({
     }
   };
 
+  const handleToggleReaction = (message, emoji) => {
+    const messageId = (message.id || message._id)?.toString();
+    if (!messageId || !channel?.id) return;
+
+    const myId = (user?.id || user?._id)?.toString();
+    const myName = user?.username || "You";
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if ((m.id || m._id)?.toString() !== messageId) return m;
+        const reactions = (m.reactions || []).map((r) => ({
+          ...r,
+          users: [...r.users],
+        }));
+
+        let previousEmoji = null;
+        for (const group of reactions) {
+          const uIdx = group.users.findIndex(
+            (u) => (u.userId?._id || u.userId)?.toString() === myId,
+          );
+          if (uIdx !== -1) {
+            previousEmoji = group.emoji;
+            group.users.splice(uIdx, 1);
+            break;
+          }
+        }
+
+        if (previousEmoji !== emoji) {
+          const targetGroup = reactions.find((r) => r.emoji === emoji);
+          if (targetGroup) {
+            targetGroup.users.push({ userId: myId, username: myName });
+          } else {
+            reactions.push({
+              emoji,
+              users: [{ userId: myId, username: myName }],
+            });
+          }
+        }
+
+        const filtered = reactions.filter((r) => r.users && r.users.length > 0);
+        return { ...m, reactions: filtered };
+      }),
+    );
+
+    sendReactionSocket({
+      messageId,
+      conversationType: "channel",
+      conversationId: channel.id,
+      emoji,
+    });
+  };
+
   const toggleThread = (rootId) => {
     setExpandedThreads((prev) => {
       const next = new Set(prev);
@@ -1112,6 +1207,7 @@ const ChannelMessageThread = ({
     onStartReply: startReply,
     onDelete: handleDelete,
     onToggleStar: handleToggleStar,
+    onToggleReaction: handleToggleReaction,
     onForwardMessage,
     onNavigateSource,
   };

@@ -17,6 +17,7 @@ import {
   forwardMessage,
   deleteDirectConversation,
   toggleBlockUser,
+  toggleReaction,
 } from "../controllers/messageController.js"
 
 const router = express.Router()
@@ -24,6 +25,7 @@ const router = express.Router()
 router.use(authenticateToken)
 
 router.post("/forward", forwardMessage)
+router.post("/:messageId/react", toggleReaction)
 router.get("/unread-counts", getUnreadMessageCounts)
 router.get("/starred", getStarredMessages)
 router.get("/mentions", getUserMentions)

@@ -47,6 +47,7 @@ export const formatSpaceMessage = (message, currentUserId = null) => ({
     currentUserId &&
     message.starredBy.some((id) => id.toString() === currentUserId.toString())
   ),
+  reactions: message.reactions || [],
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 })

@@ -334,4 +334,26 @@ export const offOnlineStatuses = (callback) => {
   socket.off("get-online-statuses", callback);
 };
 
+export const sendReactionSocket = ({
+  messageId,
+  conversationType,
+  conversationId,
+  emoji,
+}) => {
+  socket.emit("message:react", {
+    messageId,
+    conversationType,
+    conversationId,
+    emoji,
+  });
+};
+
+export const onReactionUpdated = (callback) => {
+  socket.on("message:reaction-updated", callback);
+};
+
+export const offReactionUpdated = (callback) => {
+  socket.off("message:reaction-updated", callback);
+};
+
 export default socket;

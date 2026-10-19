@@ -10,7 +10,12 @@ import socket, {
   offSpaceMessageEdited,
   onSpaceMessageDeleted,
   offSpaceMessageDeleted,
+  sendReactionSocket,
+  onReactionUpdated,
+  offReactionUpdated,
 } from "../../services/socket"
+import MessageReactionPicker from "../common/MessageReactionPicker"
+import MessageReactions from "../common/MessageReactions"
 import {
   fetchSpaceMessagesApi,
   markSpaceAsReadApi,
@@ -224,16 +229,33 @@ const SpaceMessageThread = ({
       )
     }
 
+    const handleReaction = (payload) => {
+      if (
+        payload?.conversationType !== "space" ||
+        payload?.spaceId?.toString() !== sId
+      )
+        return
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === payload.messageId?.toString()
+            ? { ...m, reactions: payload.reactions }
+            : m
+        )
+      )
+    }
+
     socket.on("receive-space-message", handleReceiveMessage)
     socket.on("space-message-sent", handleMessageSent)
     onSpaceMessageEdited(handleMessageEdited)
     onSpaceMessageDeleted(handleMessageDeleted)
+    onReactionUpdated(handleReaction)
 
     return () => {
       socket.off("receive-space-message", handleReceiveMessage)
       socket.off("space-message-sent", handleMessageSent)
       offSpaceMessageEdited(handleMessageEdited)
       offSpaceMessageDeleted(handleMessageDeleted)
+      offReactionUpdated(handleReaction)
     }
   }, [space?._id, space?.id])
 
@@ -341,6 +363,59 @@ const SpaceMessageThread = ({
   const handleDeleteMessage = (message) => {
     const msgId = message.id || message._id
     deleteSpaceMessage(msgId)
+  }
+
+  const handleToggleReaction = (message, emoji) => {
+    const msgId = (message.id || message._id)?.toString()
+    const spaceId = (space?.id || space?._id)?.toString()
+    if (!msgId || !spaceId) return
+
+    const myId = (currentUser?.id || currentUser?._id)?.toString()
+    const myName = currentUser?.username || "You"
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if ((m.id || m._id)?.toString() !== msgId) return m
+        const reactions = (m.reactions || []).map((r) => ({
+          ...r,
+          users: [...r.users],
+        }))
+
+        let previousEmoji = null
+        for (const group of reactions) {
+          const uIdx = group.users.findIndex(
+            (u) => (u.userId?._id || u.userId)?.toString() === myId
+          )
+          if (uIdx !== -1) {
+            previousEmoji = group.emoji
+            group.users.splice(uIdx, 1)
+            break
+          }
+        }
+
+        if (previousEmoji !== emoji) {
+          const targetGroup = reactions.find((r) => r.emoji === emoji)
+          if (targetGroup) {
+            targetGroup.users.push({ userId: myId, username: myName })
+          } else {
+            reactions.push({
+              emoji,
+              users: [{ userId: myId, username: myName }],
+            })
+          }
+        }
+
+        const filtered = reactions.filter((r) => r.users && r.users.length > 0)
+        return { ...m, reactions: filtered }
+      })
+    )
+
+    sendReactionSocket({
+      messageId: msgId,
+      conversationType: "space",
+      conversationId: spaceId,
+      emoji,
+    })
   }
 
   return (
@@ -535,6 +610,11 @@ const SpaceMessageThread = ({
                         </div>
                       )}
 
+                      <MessageReactionPicker
+                        onSelectEmoji={(emoji) => handleToggleReaction(message, emoji)}
+                        align="right"
+                      />
+
                       <div className="group/tip relative">
                         <button
                           type="button"
@@ -624,74 +704,84 @@ const SpaceMessageThread = ({
                       </p>
                     </div>
                   ) : (
-                    <div
-                      className={`max-w-[78%] sm:max-w-[65%] text-sm ${
-                        isPureAttachment
-                          ? "bg-transparent border-0 shadow-none px-0 py-0"
-                          : `rounded-2xl px-3.5 py-2 shadow-xs ${
-                              isSender
-                                ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50 rounded-br-xs"
-                                : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535] rounded-bl-xs"
-                            }`
-                      }`}
-                    >
-                      {!isSender && username && (
-                        <p className="text-xs font-bold text-[#00897b] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
-                          {username}
-                        </p>
-                      )}
+                    <div className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[78%] sm:max-w-[65%]`}>
+                      <div
+                        className={`w-fit max-w-full text-sm ${
+                          isPureAttachment
+                            ? "bg-transparent border-0 shadow-none px-0 py-0"
+                            : `rounded-2xl px-3.5 py-2 shadow-xs ${
+                                isSender
+                                  ? "bg-[#E7F6F2] dark:bg-[#1E2E30] text-[#2C3333] dark:text-[#E7F6F2] border border-[#A5C9CA]/50 dark:border-[#395B64]/50 rounded-br-xs"
+                                  : "bg-[#F4F7F6] dark:bg-[#202727] text-[#2C3333] dark:text-[#E7F6F2] border border-[#E0E7E6] dark:border-[#2C3535] rounded-bl-xs"
+                              }`
+                        }`}
+                      >
+                        {!isSender && username && (
+                          <p className="text-xs font-bold text-[#00897b] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
+                            {username}
+                          </p>
+                        )}
 
-                      {message.replyToMessage && (
-                        <ReplyReference replyToMessage={message.replyToMessage} isSender={isSender} />
-                      )}
+                        {message.replyToMessage && (
+                          <ReplyReference replyToMessage={message.replyToMessage} isSender={isSender} />
+                        )}
 
-                      {message.forwardedFrom && (
-                        <ForwardedMessageCard
-                          forwardedFrom={message.forwardedFrom}
+                        {message.forwardedFrom && (
+                          <ForwardedMessageCard
+                            forwardedFrom={message.forwardedFrom}
+                            isSender={isSender}
+                            onNavigateSource={onNavigateSource}
+                            timestamp={formatMessageTime(message.createdAt)}
+                            isEdited={message.isEdited && !isDeleted}
+                            isStarred={message.isStarred && !isDeleted && !isImageOrFile}
+                            onToggleStar={() => handleToggleStar(message)}
+                          />
+                        )}
+
+                        <MessageContent
+                          content={message.content}
+                          attachments={
+                            message.attachments?.length
+                              ? message.attachments
+                              : attachments
+                          }
+                          mentions={message.mentions || []}
+                          currentUserId={activeUserId}
                           isSender={isSender}
-                          onNavigateSource={onNavigateSource}
-                          timestamp={formatMessageTime(message.createdAt)}
-                          isEdited={message.isEdited && !isDeleted}
-                          isStarred={message.isStarred && !isDeleted && !isImageOrFile}
-                          onToggleStar={() => handleToggleStar(message)}
+                          isPure={isPureAttachment}
+                          className="text-sm leading-relaxed break-words"
                         />
-                      )}
 
-                      <MessageContent
-                        content={message.content}
-                        attachments={
-                          message.attachments?.length
-                            ? message.attachments
-                            : attachments
-                        }
-                        mentions={message.mentions || []}
-                        currentUserId={activeUserId}
-                        isSender={isSender}
-                        isPure={isPureAttachment}
-                        className="text-sm leading-relaxed break-words"
-                      />
-
-                      {!message.forwardedFrom && (
-                        <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none">
-                          <span className="whitespace-nowrap">
-                            {formatMessageTime(message.createdAt)}
-                          </span>
-                          {message.isEdited && !isDeleted && (
-                            <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
-                              (edited)
+                        {!message.forwardedFrom && (
+                          <div className="flex items-center justify-end gap-1 self-end ml-auto mt-0.5 text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 select-none leading-none">
+                            <span className="whitespace-nowrap">
+                              {formatMessageTime(message.createdAt)}
                             </span>
-                          )}
-                          {message.isStarred && !isDeleted && !isImageOrFile && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleStar(message)}
-                              title="Starred message (click to unstar)"
-                              className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
-                            >
-                              <i className="fa-solid fa-star text-[9px]" />
-                            </button>
-                          )}
-                        </div>
+                            {message.isEdited && !isDeleted && (
+                              <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 opacity-60 leading-none whitespace-nowrap">
+                                (edited)
+                              </span>
+                            )}
+                            {message.isStarred && !isDeleted && !isImageOrFile && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStar(message)}
+                                title="Starred message (click to unstar)"
+                                className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                              >
+                                <i className="fa-solid fa-star text-[9px]" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {!isDeleted && (
+                        <MessageReactions
+                          reactions={message.reactions || []}
+                          currentUserId={activeUserId}
+                          onToggleReaction={(emoji) => handleToggleReaction(message, emoji)}
+                          className={isSender ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
+                        />
                       )}
                     </div>
                   )}
@@ -721,6 +811,11 @@ const SpaceMessageThread = ({
                           </span>
                         </div>
                       )}
+
+                      <MessageReactionPicker
+                        onSelectEmoji={(emoji) => handleToggleReaction(message, emoji)}
+                        align="left"
+                      />
 
                       <div className="group/tip relative">
                         <button
