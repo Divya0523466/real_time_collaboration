@@ -202,6 +202,16 @@ const channelMessageSchema = new mongoose.Schema(
       type: [reactionSchema],
       default: [],
     },
+    readBy: {
+      type: [
+        {
+          userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          username: { type: String, default: "" },
+          avatar: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true },
 )

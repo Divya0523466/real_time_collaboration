@@ -356,4 +356,16 @@ export const offReactionUpdated = (callback) => {
   socket.off("message:reaction-updated", callback);
 };
 
+export const markMessagesSeenSocket = ({ type, targetId }) => {
+  socket.emit("message:mark-seen", { type, targetId });
+};
+
+export const onDirectMessagesRead = (callback) => {
+  socket.on("direct-messages-read", callback);
+};
+
+export const offDirectMessagesRead = (callback) => {
+  socket.off("direct-messages-read", callback);
+};
+
 export default socket;

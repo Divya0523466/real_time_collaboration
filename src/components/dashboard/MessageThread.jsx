@@ -23,6 +23,7 @@ import StatusBadge from "../common/StatusBadge"
 import StatusSelector from "../common/StatusSelector"
 import MessageReactionPicker from "../common/MessageReactionPicker"
 import MessageReactions from "../common/MessageReactions"
+import { SeenAvatarItem } from "../common/SeenAvatars"
 
 const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
 const avatarColor = (username) =>
@@ -126,6 +127,17 @@ const MessageThread = ({
     currentUserId: resolvedCurrentUserId,
     includeAll: false,
   })
+
+  const lastReadSenderMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const isMsgSender = (msg.senderId?._id || msg.senderId)?.toString() === resolvedCurrentUserId;
+      if (isMsgSender && msg.isRead && !msg.isDeleted) {
+        return (msg.id || msg._id)?.toString();
+      }
+    }
+    return null;
+  }, [messages, resolvedCurrentUserId]);
 
   const targetUserId = (activeSelectedUser?.id || activeSelectedUser?._id || selectedUser?.id || selectedUser?._id)?.toString()
   const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
@@ -600,6 +612,14 @@ const MessageThread = ({
                           onToggleReaction={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
                           className={isSender ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
                         />
+                      )}
+                      {isSender && !isDeleted && (message.id || message._id)?.toString() === lastReadSenderMessageId && (
+                        <div
+                          className="flex justify-end mt-1 mr-1 select-none"
+                          title={`Seen by ${activeSelectedUser?.username || activeSelectedUser?.name || "User"}`}
+                        >
+                          <SeenAvatarItem user={activeSelectedUser} />
+                        </div>
                       )}
                     </div>
                   )}

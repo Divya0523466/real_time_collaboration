@@ -48,6 +48,7 @@ export const formatSpaceMessage = (message, currentUserId = null) => ({
     message.starredBy.some((id) => id.toString() === currentUserId.toString())
   ),
   reactions: message.reactions || [],
+  readBy: message.readBy || [],
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 })
@@ -454,6 +455,37 @@ export const getSpaceMessages = async (req, res) => {
       { $set: { lastReadAt: new Date() } },
       { upsert: true }
     ).catch(() => {})
+
+    const currentUser = await User.findById(req.userId).select("username avatar");
+    if (currentUser) {
+      await ChannelMessage.updateMany(
+        {
+          spaceId,
+          senderId: { $ne: req.userId },
+          "readBy.userId": { $ne: req.userId },
+        },
+        {
+          $addToSet: {
+            readBy: {
+              userId: currentUser._id,
+              username: currentUser.username,
+              avatar: currentUser.avatar || "",
+            },
+          },
+        }
+      );
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`space:${spaceId}`).emit("space-messages-read", {
+          spaceId,
+          user: {
+            userId: currentUser._id,
+            username: currentUser.username,
+            avatar: currentUser.avatar || "",
+          },
+        });
+      }
+    }
 
     return res.json({
       messages: messages.map((msg) => formatSpaceMessage(msg, req.userId)),

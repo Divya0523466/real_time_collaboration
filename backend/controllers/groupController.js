@@ -21,6 +21,7 @@ export const formatGroupMessage = (msg) => ({
   content: msg.isDeleted ? null : msg.content,
   attachments: msg.attachments || [],
   reactions: msg.reactions || [],
+  readBy: msg.readBy || [],
   isEdited: msg.isEdited || false,
   isDeleted: msg.isDeleted || false,
   createdAt: msg.createdAt,
@@ -183,6 +184,37 @@ export const getGroupMessages = async (req, res) => {
       .populate("senderId", "username avatar email displayName")
       .sort({ createdAt: 1 })
       .lean();
+
+    const currentUser = await User.findById(req.userId).select("username avatar displayName");
+    if (currentUser) {
+      await ChannelMessage.updateMany(
+        {
+          groupId,
+          senderId: { $ne: req.userId },
+          "readBy.userId": { $ne: req.userId },
+        },
+        {
+          $addToSet: {
+            readBy: {
+              userId: currentUser._id,
+              username: currentUser.username || currentUser.displayName || "User",
+              avatar: currentUser.avatar || "",
+            },
+          },
+        }
+      );
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`group:${groupId}`).emit("group-messages-read", {
+          groupId,
+          user: {
+            userId: currentUser._id,
+            username: currentUser.username || currentUser.displayName || "User",
+            avatar: currentUser.avatar || "",
+          },
+        });
+      }
+    }
 
     const formatted = messages.map((m) => formatGroupMessage(m));
     return res.json({ success: true, messages: formatted });

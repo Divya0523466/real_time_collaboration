@@ -16,6 +16,7 @@ import socket, {
 } from "../../services/socket"
 import MessageReactionPicker from "../common/MessageReactionPicker"
 import MessageReactions from "../common/MessageReactions"
+import SeenAvatars from "../common/SeenAvatars"
 import {
   fetchSpaceMessagesApi,
   markSpaceAsReadApi,
@@ -128,6 +129,17 @@ const SpaceMessageThread = ({
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false)
 
   const activeUserId = (currentUserId || currentUser?._id || currentUser?.id)?.toString()
+
+  const lastReadSenderMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const isMsgSender = (msg.senderId?._id || msg.senderId)?.toString() === activeUserId;
+      if (isMsgSender && msg.readBy?.length > 0 && !msg.isDeleted) {
+        return (msg.id || msg._id)?.toString();
+      }
+    }
+    return null;
+  }, [messages, activeUserId]);
   const handleManageMembers = onManageMembers || onOpenManageMembers
   const handleEditSpace = onEditSpace || onOpenEditSpace
   const handleDeleteSpace = onDeleteSpace || onOpenDeleteSpace
@@ -249,6 +261,24 @@ const SpaceMessageThread = ({
     onSpaceMessageEdited(handleMessageEdited)
     onSpaceMessageDeleted(handleMessageDeleted)
     onReactionUpdated(handleReaction)
+    const handleSpaceMessagesRead = (payload) => {
+      if (payload.spaceId?.toString() === sId) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.senderId?.toString() === payload.user?.userId?.toString()) return m;
+            const alreadyRead = (m.readBy || []).some(
+              (r) => r.userId?.toString() === payload.user?.userId?.toString()
+            );
+            if (alreadyRead) return m;
+            return {
+              ...m,
+              readBy: [...(m.readBy || []), payload.user],
+            };
+          })
+        );
+      }
+    };
+    socket.on("space-messages-read", handleSpaceMessagesRead);
 
     return () => {
       socket.off("receive-space-message", handleReceiveMessage)
@@ -256,6 +286,7 @@ const SpaceMessageThread = ({
       offSpaceMessageEdited(handleMessageEdited)
       offSpaceMessageDeleted(handleMessageDeleted)
       offReactionUpdated(handleReaction)
+      socket.off("space-messages-read", handleSpaceMessagesRead)
     }
   }, [space?._id, space?.id])
 
@@ -782,6 +813,9 @@ const SpaceMessageThread = ({
                           onToggleReaction={(emoji) => handleToggleReaction(message, emoji)}
                           className={isSender ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
                         />
+                      )}
+                      {isSender && message.readBy?.length > 0 && (
+                        <SeenAvatars readBy={message.readBy} className="justify-end mt-1 mr-1" />
                       )}
                     </div>
                   )}

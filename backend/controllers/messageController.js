@@ -148,6 +148,13 @@ const getDirectMessages = async (req, res) => {
       { $set: { isRead: true } },
     );
 
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`user:${otherUserId}`).emit("direct-messages-read", {
+        readerId: currentUserId,
+      });
+    }
+
     return res.json({
       messages: populatedMessages.map((msg) => ({
         id: msg._id,
@@ -254,6 +261,7 @@ const formatChannelMessage = (message, currentUserId = null) => ({
     message.starredBy.some((id) => id.toString() === currentUserId.toString()),
   ),
   reactions: message.reactions || [],
+  readBy: message.readBy || [],
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 });
@@ -284,6 +292,37 @@ const getChannelMessages = async (req, res) => {
       { $set: { lastReadAt: new Date() } },
       { upsert: true },
     );
+
+    const currentUser = await User.findById(req.userId).select("username avatar");
+    if (currentUser) {
+      await ChannelMessage.updateMany(
+        {
+          channelId,
+          senderId: { $ne: req.userId },
+          "readBy.userId": { $ne: req.userId },
+        },
+        {
+          $addToSet: {
+            readBy: {
+              userId: currentUser._id,
+              username: currentUser.username,
+              avatar: currentUser.avatar || "",
+            },
+          },
+        }
+      );
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`channel:${channelId}`).emit("channel-messages-read", {
+          channelId,
+          user: {
+            userId: currentUser._id,
+            username: currentUser.username,
+            avatar: currentUser.avatar || "",
+          },
+        });
+      }
+    }
 
     return res.json({
       messages: populatedMessages.map((msg) =>

@@ -21,6 +21,9 @@ import {
   sendReactionSocket,
   onReactionUpdated,
   offReactionUpdated,
+  onDirectMessagesRead,
+  offDirectMessagesRead,
+  markMessagesSeenSocket,
 } from "../../services/socket";
 import {
   starMessageApi,
@@ -84,6 +87,10 @@ const DirectMessaging = ({
         if (!cancelled) {
           const history = data.messages || [];
           setMessages(history);
+          markMessagesSeenSocket({
+            type: "dm",
+            targetId: currentSelectedUser?.id || currentSelectedUser?._id,
+          });
           messageIdsRef.current = new Set(
             history.map((msg) => msg.id.toString()),
           );
@@ -188,6 +195,18 @@ const DirectMessaging = ({
     );
   };
 
+  const handleDirectMessagesRead = (payload) => {
+    if (payload.readerId?.toString() === (currentSelectedUser?.id || currentSelectedUser?._id)?.toString()) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.senderId?.toString() !== payload.readerId?.toString()
+            ? { ...m, isRead: true }
+            : m,
+        ),
+      );
+    }
+  };
+
   // Setup socket listeners — all registered in one effect, all cleaned up together
   useEffect(() => {
     onDirectMessageReceived(handleDirectMessageReceived);
@@ -198,6 +217,7 @@ const DirectMessaging = ({
     onDirectMessageEditError(handleDirectMessageError);
     onDirectMessageDeleteError(handleDirectMessageError);
     onReactionUpdated(handleReactionUpdated);
+    onDirectMessagesRead(handleDirectMessagesRead);
 
     return () => {
       offDirectMessageReceived(handleDirectMessageReceived);
@@ -208,6 +228,7 @@ const DirectMessaging = ({
       offDirectMessageEditError(handleDirectMessageError);
       offDirectMessageDeleteError(handleDirectMessageError);
       offReactionUpdated(handleReactionUpdated);
+      offDirectMessagesRead(handleDirectMessagesRead);
     };
   }, [currentSelectedUser]);
 

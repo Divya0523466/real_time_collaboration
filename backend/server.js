@@ -1697,6 +1697,58 @@ io.on("connection", async (socket) => {
     }
   });
 
+  socket.on("message:mark-seen", async ({ type, targetId } = {}) => {
+    try {
+      if (!targetId || !socket.userId) return;
+      const user = await User.findById(socket.userId).select("username avatar displayName");
+      if (!user) return;
+      const userInfo = {
+        userId: user._id,
+        username: user.username || user.displayName || "User",
+        avatar: user.avatar || "",
+      };
+
+      if (type === "dm") {
+        await Message.updateMany(
+          { senderId: targetId, receiverId: socket.userId, isRead: false },
+          { $set: { isRead: true } }
+        );
+        io.to(`user:${targetId}`).emit("direct-messages-read", {
+          readerId: socket.userId,
+        });
+      } else if (type === "channel") {
+        await ChannelMessage.updateMany(
+          { channelId: targetId, senderId: { $ne: socket.userId }, "readBy.userId": { $ne: socket.userId } },
+          { $addToSet: { readBy: userInfo } }
+        );
+        io.to(`channel:${targetId}`).emit("channel-messages-read", {
+          channelId: targetId,
+          user: userInfo,
+        });
+      } else if (type === "space") {
+        await ChannelMessage.updateMany(
+          { spaceId: targetId, senderId: { $ne: socket.userId }, "readBy.userId": { $ne: socket.userId } },
+          { $addToSet: { readBy: userInfo } }
+        );
+        io.to(`space:${targetId}`).emit("space-messages-read", {
+          spaceId: targetId,
+          user: userInfo,
+        });
+      } else if (type === "group") {
+        await ChannelMessage.updateMany(
+          { groupId: targetId, senderId: { $ne: socket.userId }, "readBy.userId": { $ne: socket.userId } },
+          { $addToSet: { readBy: userInfo } }
+        );
+        io.to(`group:${targetId}`).emit("group-messages-read", {
+          groupId: targetId,
+          user: userInfo,
+        });
+      }
+    } catch (err) {
+      console.error("Error in message:mark-seen:", err);
+    }
+  });
+
   socket.on("change-status", async ({ status } = {}) => {
     if (!status || !["active", "away", "offline"].includes(status)) return;
 

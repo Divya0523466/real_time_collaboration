@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { toast } from "react-toastify";
 import {
   fetchGroupMessagesApi,
@@ -16,6 +16,7 @@ import socket, {
 } from "../../services/socket";
 import MessageReactionPicker from "../common/MessageReactionPicker";
 import MessageReactions from "../common/MessageReactions";
+import SeenAvatars from "../common/SeenAvatars";
 import GroupInfoModal from "./GroupInfoModal";
 import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
@@ -42,9 +43,19 @@ const GroupMessageThread = ({
   const [showInfoModal, setShowInfoModal] = useState(false);
   const { isDark, toggleTheme } = useTheme();
   const messagesEndRef = useRef(null);
-
   const groupId = (group?._id || group?.id)?.toString();
   const activeUserId = (currentUserId || currentUser?._id || currentUser?.id)?.toString();
+
+  const lastReadSenderMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const isMsgSender = (msg.senderId?._id || msg.senderId)?.toString() === activeUserId;
+      if (isMsgSender && msg.readBy?.length > 0 && !msg.isDeleted) {
+        return (msg.id || msg._id)?.toString();
+      }
+    }
+    return null;
+  }, [messages, activeUserId]);
 
   const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
     type: "group",
@@ -115,10 +126,29 @@ const GroupMessageThread = ({
 
     onGroupMessageReceived(handleNewMessage);
     onReactionUpdated(handleReaction);
+    const handleGroupMessagesRead = (payload) => {
+      if (payload.groupId?.toString() === groupId) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.senderId?.toString() === payload.user?.userId?.toString()) return m;
+            const alreadyRead = (m.readBy || []).some(
+              (r) => r.userId?.toString() === payload.user?.userId?.toString()
+            );
+            if (alreadyRead) return m;
+            return {
+              ...m,
+              readBy: [...(m.readBy || []), payload.user],
+            };
+          })
+        );
+      }
+    };
+    socket.on("group-messages-read", handleGroupMessagesRead);
 
     return () => {
       offGroupMessageReceived(handleNewMessage);
       offReactionUpdated(handleReaction);
+      socket.off("group-messages-read", handleGroupMessagesRead);
     };
   }, [groupId]);
 
@@ -373,6 +403,9 @@ const GroupMessageThread = ({
                     onToggleReaction={(emoji) => handleToggleReaction(msg, emoji)}
                     className={isMe ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
                   />
+                  {isMe && msg.readBy?.length > 0 && (
+                    <SeenAvatars readBy={msg.readBy} className="justify-end mt-1 mr-1" />
+                  )}
                 </div>
 
                 {!isMe && (
