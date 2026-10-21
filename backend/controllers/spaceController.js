@@ -49,6 +49,9 @@ export const formatSpaceMessage = (message, currentUserId = null) => ({
   ),
   reactions: message.reactions || [],
   readBy: message.readBy || [],
+  isPinned: message.isPinned || false,
+  pinnedBy: message.pinnedBy || null,
+  pinnedAt: message.pinnedAt || null,
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 })

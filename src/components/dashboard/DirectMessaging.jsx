@@ -28,7 +28,9 @@ import {
 import {
   starMessageApi,
   unstarMessageApi,
+  togglePinMessageApi,
 } from "../../services/messageService";
+import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { isImageOrFileMessage } from "../../utils/fileUtils";
 import { toast } from "react-toastify";
 import MessageThread from "./MessageThread";
@@ -207,6 +209,44 @@ const DirectMessaging = ({
     }
   };
 
+  const handlePinnedUpdated = (payload) => {
+    if (payload.conversationType !== "dm") return;
+    setMessages((prev) =>
+      prev.map((m) =>
+        (m.id || m._id)?.toString() === payload.messageId?.toString()
+          ? { ...m, isPinned: payload.isPinned, pinnedBy: payload.pinnedBy, pinnedAt: payload.pinnedAt }
+          : m
+      )
+    );
+  };
+
+  const handleTogglePin = async (message) => {
+    const msgId = (message.id || message._id)?.toString();
+    if (!msgId) return;
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        (m.id || m._id)?.toString() === msgId
+          ? { ...m, isPinned: !m.isPinned }
+          : m
+      )
+    );
+
+    try {
+      const res = await togglePinMessageApi(msgId);
+      toast.success(res.isPinned ? "Message pinned" : "Message unpinned");
+    } catch {
+      toast.error("Failed to update pin status");
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === msgId
+            ? { ...m, isPinned: message.isPinned }
+            : m
+        )
+      );
+    }
+  };
+
   // Setup socket listeners — all registered in one effect, all cleaned up together
   useEffect(() => {
     onDirectMessageReceived(handleDirectMessageReceived);
@@ -218,6 +258,7 @@ const DirectMessaging = ({
     onDirectMessageDeleteError(handleDirectMessageError);
     onReactionUpdated(handleReactionUpdated);
     onDirectMessagesRead(handleDirectMessagesRead);
+    onPinnedUpdated(handlePinnedUpdated);
 
     return () => {
       offDirectMessageReceived(handleDirectMessageReceived);
@@ -229,6 +270,7 @@ const DirectMessaging = ({
       offDirectMessageDeleteError(handleDirectMessageError);
       offReactionUpdated(handleReactionUpdated);
       offDirectMessagesRead(handleDirectMessagesRead);
+      offPinnedUpdated(handlePinnedUpdated);
     };
   }, [currentSelectedUser]);
 
@@ -363,6 +405,7 @@ const DirectMessaging = ({
       onEditMessage={handleEditMessage}
       onDeleteMessage={handleDeleteMessage}
       onToggleStar={handleToggleStar}
+      onTogglePin={handleTogglePin}
       onToggleReaction={handleToggleReaction}
       onForwardMessage={onForwardMessage}
       onNavigateSource={onNavigateSource}

@@ -21,6 +21,8 @@ import {
   fetchSpaceMessagesApi,
   markSpaceAsReadApi,
 } from "../../services/spaceService"
+import { togglePinMessageApi } from "../../services/messageService"
+import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket"
 import FileUpload from "../common/FileUpload"
 import MessageContent from "../common/MessageContent"
 import DateSeparator from "../common/DateSeparator"
@@ -31,6 +33,7 @@ import MentionSuggestions from "../common/MentionSuggestions"
 import { useMentionInput } from "../../hooks/useMentionInput"
 import AttachmentRenderer from "../common/AttachmentRenderer"
 import EmojiPickerButton from "../common/EmojiPickerButton"
+import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
 import TypingIndicator from "../common/TypingIndicator"
 import useTypingIndicator from "../../hooks/useTypingIndicator"
@@ -145,6 +148,19 @@ const SpaceMessageThread = ({
   const handleDeleteSpace = onDeleteSpace || onOpenDeleteSpace
   const handleOpenSidebar = onOpenSidebar || onMobileMenuClick
   const spaceMembers = useMemo(() => space?.members || [], [space?.members])
+  const [showPinnedDrawer, setShowPinnedDrawer] = useState(false)
+  const pinnedMessages = useMemo(() => messages.filter((m) => m.isPinned && !m.isDeleted), [messages])
+
+  const handleJumpToMessage = (messageId) => {
+    const el = document.getElementById(`msg-${messageId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" })
+
+
+
+
+    }
+  }
 
   // Mention input restricted strictly to Space members only
   const mention = useMentionInput({
@@ -278,7 +294,18 @@ const SpaceMessageThread = ({
         );
       }
     };
-    socket.on("space-messages-read", handleSpaceMessagesRead);
+    socket.on("space-messages-read", handleSpaceMessagesRead)
+    const handlePinnedUpdated = (payload) => {
+      if (payload.conversationType !== "space" || payload.spaceId?.toString() !== sId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === payload.messageId?.toString()
+            ? { ...m, isPinned: payload.isPinned, pinnedBy: payload.pinnedBy, pinnedAt: payload.pinnedAt }
+            : m
+        )
+      );
+    };
+    onPinnedUpdated(handlePinnedUpdated);
 
     return () => {
       socket.off("receive-space-message", handleReceiveMessage)
@@ -287,6 +314,7 @@ const SpaceMessageThread = ({
       offSpaceMessageDeleted(handleMessageDeleted)
       offReactionUpdated(handleReaction)
       socket.off("space-messages-read", handleSpaceMessagesRead)
+      offPinnedUpdated(handlePinnedUpdated)
     }
   }, [space?._id, space?.id])
 
@@ -354,6 +382,33 @@ const SpaceMessageThread = ({
       el.setSelectionRange(start + emoji.length, start + emoji.length)
     }, 0)
   }
+
+  const handleTogglePin = async (message) => {
+    const msgId = (message.id || message._id)?.toString();
+    if (!msgId) return;
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        (m.id || m._id)?.toString() === msgId
+          ? { ...m, isPinned: !m.isPinned }
+          : m
+      )
+    );
+
+    try {
+      const res = await togglePinMessageApi(msgId);
+      toast.success(res.isPinned ? "Message pinned" : "Message unpinned");
+    } catch {
+      toast.error("Failed to update pin status");
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === msgId
+            ? { ...m, isPinned: message.isPinned }
+            : m
+        )
+      );
+    }
+  };
 
   const handleToggleStar = async (message) => {
     try {
@@ -506,6 +561,26 @@ const SpaceMessageThread = ({
             <span className="hidden sm:inline">Members</span>
           </button>
 
+          {/* Pinned Messages Button */}
+          <button
+            type="button"
+            onClick={() => setShowPinnedDrawer(true)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showPinnedDrawer
+                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Pinned messages in this Space"
+          >
+            <i className="fa-solid fa-thumbtack text-xs" />
+            <span className="hidden sm:inline">Pinned</span>
+            {pinnedMessages.length > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64]/50 text-gray-700 dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                {pinnedMessages.length}
+              </span>
+            )}
+          </button>
+
           {isSuperAdmin && (
             <div className="relative">
               <button
@@ -605,6 +680,7 @@ const SpaceMessageThread = ({
               <div key={message.id || message._id || idx}>
                 {showDate && <DateSeparator date={message.createdAt} />}
                 <div
+                  id={`msg-${(message.id || message._id)?.toString()}`}
                   className={`group flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015] ${
                     isSender ? "justify-end" : "justify-start"
                   }`}
@@ -640,6 +716,24 @@ const SpaceMessageThread = ({
                           </span>
                         </div>
                       )}
+                      {/* Pin button */}
+                      <div className="group/tip relative">
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePin(message)}
+                          aria-label={message.isPinned ? "Unpin message" : "Pin message"}
+                          className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                            message.isPinned
+                              ? "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40"
+                              : "text-[#52656A] dark:text-[#A5C9CA] hover:text-teal-600 dark:hover:text-teal-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                          }`}
+                        >
+                          <i className="fa-solid fa-thumbtack text-[10px]" />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                          {message.isPinned ? "Unpin" : "Pin"}
+                        </span>
+                      </div>
 
                       <MessageReactionPicker
                         onSelectEmoji={(emoji) => handleToggleReaction(message, emoji)}
@@ -736,6 +830,7 @@ const SpaceMessageThread = ({
                     </div>
                   ) : (
                     <div className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[78%] sm:max-w-[65%]`}>
+
                       <div
                         className={`w-fit max-w-full text-sm ${
                           isPureAttachment
@@ -803,6 +898,16 @@ const SpaceMessageThread = ({
                                 <i className="fa-solid fa-star text-[9px]" />
                               </button>
                             )}
+                            {message.isPinned && !isDeleted && (
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePin(message)}
+                                title="Pinned message (click to unpin)"
+                                className="text-teal-600 dark:text-teal-400 hover:text-teal-700 transition-colors p-0.5"
+                              >
+                                <i className="fa-solid fa-thumbtack text-[9px]" />
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -845,6 +950,24 @@ const SpaceMessageThread = ({
                           </span>
                         </div>
                       )}
+                      {/* Pin button */}
+                      <div className="group/tip relative">
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePin(message)}
+                          aria-label={message.isPinned ? "Unpin message" : "Pin message"}
+                          className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                            message.isPinned
+                              ? "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40"
+                              : "text-[#52656A] dark:text-[#A5C9CA] hover:text-teal-600 dark:hover:text-teal-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                          }`}
+                        >
+                          <i className="fa-solid fa-thumbtack text-[10px]" />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                          {message.isPinned ? "Unpin" : "Pin"}
+                        </span>
+                      </div>
 
                       <MessageReactionPicker
                         onSelectEmoji={(emoji) => handleToggleReaction(message, emoji)}
@@ -1024,6 +1147,17 @@ const SpaceMessageThread = ({
           <EmojiPickerButton
             buttonClassName="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 dark:text-[#A5C9CA] hover:bg-gray-100 dark:hover:bg-[#395B64]/50 transition cursor-pointer"
             onEmojiSelect={handleEmojiSelect}
+          />
+
+          {/* Pinned Messages Drawer for Space */}
+          <ConversationPinnedDrawer
+            isOpen={showPinnedDrawer}
+            onClose={() => setShowPinnedDrawer(false)}
+            pinnedMessages={pinnedMessages}
+            onTogglePin={handleTogglePin}
+            onJumpToMessage={handleJumpToMessage}
+            conversationTitle={space?.name || "Space"}
+            conversationType="space"
           />
 
           <button

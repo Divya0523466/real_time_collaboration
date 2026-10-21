@@ -31,7 +31,9 @@ import {
 import {
   starMessageApi,
   unstarMessageApi,
+  togglePinMessageApi,
 } from "../../services/messageService";
+import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { toast } from "react-toastify";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import MentionSuggestions from "../common/MentionSuggestions";
@@ -297,6 +299,7 @@ const MessageRow = ({
   onStartReply,
   onDelete,
   onToggleStar,
+  onTogglePin,
   onToggleReaction,
   onForwardMessage,
   onNavigateSource = null,
@@ -343,9 +346,11 @@ const MessageRow = ({
        null);
 
   const showOrphanRef = !isReply && Boolean(message.replyToMessage);
+  const msgDomId = `msg-${(message.id || message._id)?.toString()}`;
 
   return (
     <div
+      id={msgDomId}
       className={`group flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015] ${
         isReply ? "py-0.5" : ""
       } ${isSender ? "justify-end" : "justify-start"}`}
@@ -386,6 +391,25 @@ const MessageRow = ({
               </span>
             </div>
           )}
+
+          {/* Pin button */}
+          <div className="group/tip relative">
+            <button
+              type="button"
+              onClick={() => onTogglePin && onTogglePin(message)}
+              aria-label={message.isPinned ? "Unpin message" : "Pin message"}
+              className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                message.isPinned
+                  ? "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:text-teal-600 dark:hover:text-teal-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+              }`}
+            >
+              <i className="fa-solid fa-thumbtack text-[10px]" />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+              {message.isPinned ? "Unpin" : "Pin"}
+            </span>
+          </div>
 
           <MessageReactionPicker
             onSelectEmoji={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
@@ -529,6 +553,7 @@ const MessageRow = ({
         </div>
       ) : (
         <div className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] md:max-w-[65%]`}>
+
           <div
             className={`w-fit max-w-full break-words text-left ${
               isPureAttachment || isPureForwarded
@@ -604,6 +629,16 @@ const MessageRow = ({
                       <i className="fa-solid fa-star text-[9px]" />
                     </button>
                   )}
+                  {message.isPinned && !isDeleted && (
+                    <button
+                      type="button"
+                      onClick={() => onTogglePin && onTogglePin(message)}
+                      title="Pinned message (click to unpin)"
+                      className="text-teal-600 dark:text-teal-400 hover:text-teal-700 transition-colors p-0.5"
+                    >
+                      <i className="fa-solid fa-thumbtack text-[9px]" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -651,6 +686,25 @@ const MessageRow = ({
               </span>
             </div>
           )}
+
+          {/* Pin button */}
+          <div className="group/tip relative">
+            <button
+              type="button"
+              onClick={() => onTogglePin && onTogglePin(message)}
+              aria-label={message.isPinned ? "Unpin message" : "Pin message"}
+              className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                message.isPinned
+                  ? "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:text-teal-600 dark:hover:text-teal-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+              }`}
+            >
+              <i className="fa-solid fa-thumbtack text-[10px]" />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+              {message.isPinned ? "Unpin" : "Pin"}
+            </span>
+          </div>
 
           <MessageReactionPicker
             onSelectEmoji={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
@@ -984,6 +1038,17 @@ const ChannelMessageThread = ({
       }
     };
     socket.on("channel-messages-read", handleChannelMessagesRead);
+    const handlePinnedUpdated = (payload) => {
+      if (payload.conversationType !== "channel" || payload.channelId?.toString() !== (channel?.id || channel?._id)?.toString()) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === payload.messageId?.toString()
+            ? { ...m, isPinned: payload.isPinned, pinnedBy: payload.pinnedBy, pinnedAt: payload.pinnedAt }
+            : m
+        )
+      );
+    };
+    onPinnedUpdated(handlePinnedUpdated);
     joinChannel(channel?.id || channel?._id);
 
     return () => {
@@ -995,6 +1060,7 @@ const ChannelMessageThread = ({
       offChannelMessageDeleted(handleDeleted);
       offReactionUpdated(handleReaction);
       socket.off("channel-messages-read", handleChannelMessagesRead);
+      offPinnedUpdated(handlePinnedUpdated);
     };
   }, [apiUrl, channel?.id]);
 
@@ -1131,6 +1197,33 @@ const ChannelMessageThread = ({
     deleteChannelMessage(message.id?.toString());
   };
 
+  const handleTogglePin = async (message) => {
+    const msgId = (message.id || message._id)?.toString();
+    if (!msgId) return;
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        (m.id || m._id)?.toString() === msgId
+          ? { ...m, isPinned: !m.isPinned }
+          : m
+      )
+    );
+
+    try {
+      const res = await togglePinMessageApi(msgId);
+      toast.success(res.isPinned ? "Message pinned" : "Message unpinned");
+    } catch {
+      toast.error("Failed to update pin status");
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === msgId
+            ? { ...m, isPinned: message.isPinned }
+            : m
+        )
+      );
+    }
+  };
+
   const handleToggleStar = async (message) => {
     if (!message || isImageOrFileMessage(message)) return;
     const msgId = (message.id || message._id)?.toString();
@@ -1243,6 +1336,7 @@ const ChannelMessageThread = ({
     onStartReply: startReply,
     onDelete: handleDelete,
     onToggleStar: handleToggleStar,
+    onTogglePin: handleTogglePin,
     onToggleReaction: handleToggleReaction,
     onForwardMessage,
     onNavigateSource,

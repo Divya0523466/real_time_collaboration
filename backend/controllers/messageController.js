@@ -136,7 +136,7 @@ const getDirectMessages = async (req, res) => {
     })
       .populate("senderId", "username avatar")
       .select(
-        "_id senderId receiverId content attachments mentions forwardedFrom createdAt updatedAt isEdited isDeleted isRead starredBy",
+        "_id senderId receiverId content attachments mentions forwardedFrom createdAt updatedAt isEdited isDeleted isRead starredBy isPinned pinnedBy pinnedAt reactions",
       )
       .sort({ createdAt: 1 })
       .lean();
@@ -189,6 +189,9 @@ const getDirectMessages = async (req, res) => {
           ),
         ),
         reactions: msg.reactions || [],
+        isPinned: msg.isPinned || false,
+        pinnedBy: msg.pinnedBy || null,
+        pinnedAt: msg.pinnedAt || null,
       })),
     });
   } catch (error) {
@@ -262,6 +265,9 @@ const formatChannelMessage = (message, currentUserId = null) => ({
   ),
   reactions: message.reactions || [],
   readBy: message.readBy || [],
+  isPinned: message.isPinned || false,
+  pinnedBy: message.pinnedBy || null,
+  pinnedAt: message.pinnedAt || null,
   createdAt: message.createdAt,
   updatedAt: message.updatedAt,
 });
@@ -1752,7 +1758,257 @@ const toggleReaction = async (req, res) => {
   }
 };
 
+// Pin or unpin a message across channels, spaces, groups, and DMs
+const togglePinMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.isValidObjectId(messageId)) {
+      return res.status(400).json({ message: "Invalid message ID" });
+    }
+
+    let message = await ChannelMessage.findById(messageId);
+    let isChannelMsg = true;
+
+    if (!message) {
+      message = await Message.findById(messageId);
+      isChannelMsg = false;
+    }
+
+    if (!message || message.isDeleted) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    const nextIsPinned = !message.isPinned;
+    const now = nextIsPinned ? new Date() : null;
+    const pinnedByUser = nextIsPinned ? userId : null;
+
+    message.isPinned = nextIsPinned;
+    message.pinnedBy = pinnedByUser;
+    message.pinnedAt = now;
+    await message.save();
+
+    const currentUser = await User.findById(userId).select("username displayName avatar");
+    const pinnerInfo = nextIsPinned && currentUser ? {
+      userId: currentUser._id,
+      username: currentUser.username || currentUser.displayName || "User",
+      avatar: currentUser.avatar || "",
+    } : null;
+
+    // Real-time broadcast via Socket.io
+    const io = req.app.get("io");
+    if (io) {
+      const payload = {
+        messageId: message._id.toString(),
+        isPinned: nextIsPinned,
+        pinnedBy: pinnerInfo,
+        pinnedAt: now,
+      };
+
+      if (isChannelMsg) {
+        if (message.channelId) {
+          io.to(`channel:${message.channelId}`).emit("message:pinned-updated", { ...payload, conversationType: "channel", channelId: message.channelId });
+        } else if (message.spaceId) {
+          io.to(`space:${message.spaceId}`).emit("message:pinned-updated", { ...payload, conversationType: "space", spaceId: message.spaceId });
+        } else if (message.groupId) {
+          io.to(`group:${message.groupId}`).emit("message:pinned-updated", { ...payload, conversationType: "group", groupId: message.groupId });
+        }
+      } else {
+        io.to(`user:${message.senderId}`).to(`user:${message.receiverId}`).emit("message:pinned-updated", { ...payload, conversationType: "dm" });
+      }
+    }
+
+    return res.json({
+      success: true,
+      messageId: message._id,
+      isPinned: nextIsPinned,
+      pinnedBy: pinnerInfo,
+      pinnedAt: now,
+    });
+  } catch (error) {
+    console.error("Error in togglePinMessage:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Get pinned messages (workspace-wide or filtered by conversation)
+const getPinnedMessages = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { workspaceId, channelId, spaceId, groupId, otherUserId } = req.query;
+
+    // Filter by channel
+    if (channelId) {
+      const pinned = await ChannelMessage.find({ channelId, isPinned: true, isDeleted: false })
+        .populate("senderId", "username avatar displayName")
+        .populate("pinnedBy", "username avatar displayName")
+        .sort({ pinnedAt: -1 })
+        .lean();
+      return res.json({
+        success: true,
+        pinnedMessages: pinned.map((m) => ({
+          id: m._id,
+          _id: m._id,
+          content: m.content,
+          attachments: m.attachments || [],
+          sender: m.senderId,
+          pinnedBy: m.pinnedBy,
+          pinnedAt: m.pinnedAt,
+          isPinned: m.isPinned,
+          createdAt: m.createdAt,
+        })),
+      });
+    }
+
+    if (spaceId) {
+      const pinned = await ChannelMessage.find({ spaceId, isPinned: true, isDeleted: false })
+        .populate("senderId", "username avatar displayName")
+        .populate("pinnedBy", "username avatar displayName")
+        .sort({ pinnedAt: -1 })
+        .lean();
+      return res.json({
+        success: true,
+        pinnedMessages: pinned.map((m) => ({
+          id: m._id,
+          _id: m._id,
+          content: m.content,
+          attachments: m.attachments || [],
+          sender: m.senderId,
+          pinnedBy: m.pinnedBy,
+          pinnedAt: m.pinnedAt,
+          isPinned: m.isPinned,
+          createdAt: m.createdAt,
+        })),
+      });
+    }
+
+    if (groupId) {
+      const pinned = await ChannelMessage.find({ groupId, isPinned: true, isDeleted: false })
+        .populate("senderId", "username avatar displayName")
+        .populate("pinnedBy", "username avatar displayName")
+        .sort({ pinnedAt: -1 })
+        .lean();
+      return res.json({
+        success: true,
+        pinnedMessages: pinned.map((m) => ({
+          id: m._id,
+          _id: m._id,
+          content: m.content,
+          attachments: m.attachments || [],
+          sender: m.senderId,
+          pinnedBy: m.pinnedBy,
+          pinnedAt: m.pinnedAt,
+          isPinned: m.isPinned,
+          createdAt: m.createdAt,
+        })),
+      });
+    }
+
+    if (otherUserId) {
+      const userObjId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+      const otherUserObjId = mongoose.Types.ObjectId.isValid(otherUserId) ? new mongoose.Types.ObjectId(otherUserId) : otherUserId;
+      const pinned = await Message.find({
+        $or: [
+          { senderId: userObjId, receiverId: otherUserObjId },
+          { senderId: otherUserObjId, receiverId: userObjId },
+        ],
+        isPinned: true,
+        isDeleted: false,
+      })
+        .populate("senderId", "username avatar displayName")
+        .populate("pinnedBy", "username avatar displayName")
+        .sort({ pinnedAt: -1 })
+        .lean();
+      return res.json({
+        success: true,
+        pinnedMessages: pinned.map((m) => ({
+          id: m._id,
+          _id: m._id,
+          content: m.content,
+          attachments: m.attachments || [],
+          sender: m.senderId,
+          pinnedBy: m.pinnedBy,
+          pinnedAt: m.pinnedAt,
+          isPinned: m.isPinned,
+          createdAt: m.createdAt,
+        })),
+      });
+    }
+
+    // Workspace-wide pinned messages across channels, spaces, groups, and DMs
+    const [channelMsgs, dmMsgs] = await Promise.all([
+      ChannelMessage.find({ isPinned: true, isDeleted: false })
+        .populate("channelId", "name workspaceId")
+        .populate("spaceId", "name")
+        .populate("groupId", "name")
+        .populate("senderId", "username avatar displayName")
+        .populate("pinnedBy", "username avatar displayName")
+        .sort({ pinnedAt: -1 })
+        .lean(),
+      Message.find({
+        $or: [{ senderId: userId }, { receiverId: userId }],
+        isPinned: true,
+        isDeleted: false,
+      })
+        .populate("senderId", "username avatar displayName")
+        .populate("receiverId", "username avatar displayName")
+        .populate("pinnedBy", "username avatar displayName")
+        .sort({ pinnedAt: -1 })
+        .lean(),
+    ]);
+
+    const formattedChannel = channelMsgs.map((m) => ({
+      id: m._id,
+      _id: m._id,
+      content: m.content,
+      attachments: m.attachments || [],
+      sender: m.senderId,
+      pinnedBy: m.pinnedBy,
+      pinnedAt: m.pinnedAt,
+      channelId: m.channelId?._id || m.channelId,
+      channelName: m.channelId?.name,
+      spaceId: m.spaceId?._id || m.spaceId,
+      spaceName: m.spaceId?.name,
+      groupId: m.groupId?._id || m.groupId,
+      groupName: m.groupId?.name,
+      sourceType: m.spaceId ? "SPACE" : m.groupId ? "GROUP" : "CHANNEL",
+      createdAt: m.createdAt,
+    }));
+
+    const formattedDM = dmMsgs.map((m) => {
+      const otherUser = m.senderId?._id?.toString() === userId.toString() ? m.receiverId : m.senderId;
+      return {
+        id: m._id,
+        _id: m._id,
+        content: m.content,
+        attachments: m.attachments || [],
+        sender: m.senderId,
+        pinnedBy: m.pinnedBy,
+        pinnedAt: m.pinnedAt,
+        otherUser,
+        sourceType: "DIRECT",
+        createdAt: m.createdAt,
+      };
+    });
+
+    const allPinned = [...formattedChannel, ...formattedDM].sort(
+      (a, b) => new Date(b.pinnedAt || b.createdAt) - new Date(a.pinnedAt || a.createdAt)
+    );
+
+    return res.json({
+      success: true,
+      pinnedMessages: allPinned,
+    });
+  } catch (error) {
+    console.error("Error in getPinnedMessages:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export {
+  togglePinMessage,
+  getPinnedMessages,
   getDirectMessages,
   getChannelMessages,
   formatChannelMessage,

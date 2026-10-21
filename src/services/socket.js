@@ -368,4 +368,12 @@ export const offDirectMessagesRead = (callback) => {
   socket.off("direct-messages-read", callback);
 };
 
+export const onPinnedUpdated = (callback) => {
+  socket.on("message:pinned-updated", callback);
+};
+
+export const offPinnedUpdated = (callback) => {
+  socket.off("message:pinned-updated", callback);
+};
+
 export default socket;

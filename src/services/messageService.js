@@ -248,3 +248,38 @@ export const toggleReactionApi = async (messageId, emoji, conversationType = "CH
 }
 
 
+
+export const togglePinMessageApi = async (messageId) => {
+  const response = await fetch(`${API_URL}/messages/${messageId}/pin`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to update pin status");
+  }
+  return data;
+};
+
+export const fetchPinnedMessagesApi = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.workspaceId) query.append("workspaceId", params.workspaceId);
+  if (params.channelId) query.append("channelId", params.channelId);
+  if (params.spaceId) query.append("spaceId", params.spaceId);
+  if (params.groupId) query.append("groupId", params.groupId);
+  if (params.otherUserId) query.append("otherUserId", params.otherUserId);
+
+  const response = await fetch(`${API_URL}/messages/pinned?${query.toString()}`, {
+    credentials: "include",
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch pinned messages");
+  }
+  return data;
+};

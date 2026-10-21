@@ -212,6 +212,21 @@ const channelMessageSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    // Message Pinning
+    isPinned: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    pinnedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    pinnedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 )

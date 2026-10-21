@@ -4,6 +4,8 @@ import {
   fetchGroupMessagesApi,
   sendGroupMessageApi,
 } from "../../services/groupService";
+import { togglePinMessageApi } from "../../services/messageService";
+import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import socket, {
   joinGroup,
   leaveGroup,
@@ -18,6 +20,7 @@ import MessageReactionPicker from "../common/MessageReactionPicker";
 import MessageReactions from "../common/MessageReactions";
 import SeenAvatars from "../common/SeenAvatars";
 import GroupInfoModal from "./GroupInfoModal";
+import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
 import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
 import TypingIndicator from "../common/TypingIndicator";
@@ -41,15 +44,21 @@ const GroupMessageThread = ({
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showPinnedDrawer, setShowPinnedDrawer] = useState(false);
   const { isDark, toggleTheme } = useTheme();
   const messagesEndRef = useRef(null);
   const groupId = (group?._id || group?.id)?.toString();
-  const activeUserId = (currentUserId || currentUser?._id || currentUser?.id)?.toString();
+  const activeUserId = (
+    currentUserId ||
+    currentUser?._id ||
+    currentUser?.id
+  )?.toString();
 
   const lastReadSenderMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
-      const isMsgSender = (msg.senderId?._id || msg.senderId)?.toString() === activeUserId;
+      const isMsgSender =
+        (msg.senderId?._id || msg.senderId)?.toString() === activeUserId;
       if (isMsgSender && msg.readBy?.length > 0 && !msg.isDeleted) {
         return (msg.id || msg._id)?.toString();
       }
@@ -57,11 +66,29 @@ const GroupMessageThread = ({
     return null;
   }, [messages, activeUserId]);
 
-  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
-    type: "group",
-    targetId: groupId,
-    currentUserId: activeUserId,
-  });
+  // Filter pinned messages specifically for this group conversation
+  const pinnedMessages = useMemo(
+    () => messages.filter((m) => m.isPinned && !m.isDeleted),
+    [messages],
+  );
+
+  const handleJumpToMessage = (messageId) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+
+
+
+    }
+  };
+
+  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } =
+    useTypingIndicator({
+      type: "group",
+      targetId: groupId,
+      currentUserId: activeUserId,
+    });
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -130,33 +157,86 @@ const GroupMessageThread = ({
       if (payload.groupId?.toString() === groupId) {
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.senderId?.toString() === payload.user?.userId?.toString()) return m;
+            if (m.senderId?.toString() === payload.user?.userId?.toString())
+              return m;
             const alreadyRead = (m.readBy || []).some(
-              (r) => r.userId?.toString() === payload.user?.userId?.toString()
+              (r) => r.userId?.toString() === payload.user?.userId?.toString(),
             );
             if (alreadyRead) return m;
             return {
               ...m,
               readBy: [...(m.readBy || []), payload.user],
             };
-          })
+          }),
         );
       }
     };
     socket.on("group-messages-read", handleGroupMessagesRead);
+    const handlePinnedUpdated = (payload) => {
+      if (
+        payload.conversationType !== "group" ||
+        payload.groupId?.toString() !== groupId
+      )
+        return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === payload.messageId?.toString()
+            ? {
+                ...m,
+                isPinned: payload.isPinned,
+                pinnedBy: payload.pinnedBy,
+                pinnedAt: payload.pinnedAt,
+              }
+            : m,
+        ),
+      );
+    };
+    onPinnedUpdated(handlePinnedUpdated);
 
     return () => {
       offGroupMessageReceived(handleNewMessage);
       offReactionUpdated(handleReaction);
       socket.off("group-messages-read", handleGroupMessagesRead);
+      offPinnedUpdated(handlePinnedUpdated);
     };
   }, [groupId]);
+
+  const handleTogglePin = async (msg) => {
+    const msgId = (msg.id || msg._id)?.toString();
+    if (!msgId) return;
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        (m.id || m._id)?.toString() === msgId
+          ? { ...m, isPinned: !m.isPinned }
+          : m,
+      ),
+    );
+
+    try {
+      const res = await togglePinMessageApi(msgId);
+      toast.success(res.isPinned ? "Message pinned" : "Message unpinned");
+    } catch {
+      toast.error("Failed to update pin status");
+      setMessages((prev) =>
+        prev.map((m) =>
+          (m.id || m._id)?.toString() === msgId
+            ? { ...m, isPinned: msg.isPinned }
+            : m,
+        ),
+      );
+    }
+  };
 
   const handleToggleReaction = (msg, emoji) => {
     const msgId = (msg.id || msg._id)?.toString();
     if (!msgId || !groupId) return;
 
-    const myId = (currentUser?.id || currentUser?._id || currentUserId)?.toString();
+    const myId = (
+      currentUser?.id ||
+      currentUser?._id ||
+      currentUserId
+    )?.toString();
     const myName = currentUser?.username || "You";
 
     setMessages((prev) =>
@@ -277,6 +357,25 @@ const GroupMessageThread = ({
         {/* Header Right Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <StatusSelector align="right" />
+          {/* Pinned Messages Button */}
+          <button
+            type="button"
+            onClick={() => setShowPinnedDrawer(true)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showPinnedDrawer
+                ? "border-teal-600 bg-teal-50 dark:bg-[#395B64]/40 text-teal-700 dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Pinned messages in this Group"
+          >
+            <i className="fa-solid fa-thumbtack text-xs" />
+            <span className="hidden sm:inline">Pinned</span>
+            {pinnedMessages.length > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64]/50 text-gray-700 dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                {pinnedMessages.length}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             onClick={() => setShowInfoModal(true)}
@@ -340,6 +439,7 @@ const GroupMessageThread = ({
             return (
               <div
                 key={msg.id || msg._id || index}
+                id={`msg-${(msg.id || msg._id)?.toString()}`}
                 className={`flex gap-3 items-start group ${
                   isMe ? "justify-end" : "justify-start"
                 }`}
@@ -361,13 +461,30 @@ const GroupMessageThread = ({
                 {isMe && (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 self-center pointer-events-none group-hover:pointer-events-auto">
                     <MessageReactionPicker
-                      onSelectEmoji={(emoji) => handleToggleReaction(msg, emoji)}
+                      onSelectEmoji={(emoji) =>
+                        handleToggleReaction(msg, emoji)
+                      }
                       align="right"
                     />
                   </div>
                 )}
 
-                <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[75%]`}>
+                <div
+                  className={`flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[75%]`}
+                >
+                  {/* Pinned message badge indicator */}
+                  {false && (
+                    <div
+                      className={`flex items-center gap-1.5 mb-1 px-1 text-xs font-semibold text-amber-600 dark:text-amber-400 select-none ${isMe ? "justify-end" : "justify-start"}`}
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400">
+                        <i className="fa-solid fa-thumbtack text-[9px] -rotate-45" />
+                      </span>
+                      <span className="text-[11px] font-bold tracking-wide uppercase">
+                        Pinned message
+                      </span>
+                    </div>
+                  )}
                   <div
                     className={`w-fit max-w-full rounded-2xl px-4 py-2.5 text-xs shadow-xs ${
                       isMe
@@ -390,32 +507,75 @@ const GroupMessageThread = ({
                       {msg.content}
                     </p>
 
-                    {isMe && (
-                      <div className="mt-1 text-right text-[10px] text-teal-100/80">
+                    <div className="flex items-center justify-end gap-1.5 mt-1 select-none">
+                      {msg.isPinned && (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePin(msg)}
+                          title="Pinned message (click to unpin)"
+                          className={
+                            isMe
+                              ? "text-white/90 hover:text-white"
+                              : "text-teal-600 dark:text-teal-400"
+                          }
+                        >
+                          <i className="fa-solid fa-thumbtack text-[9px]" />
+                        </button>
+                      )}
+                      <span
+                        className={
+                          isMe
+                            ? "text-[10px] text-teal-100/80"
+                            : "text-[10px] text-gray-400 dark:text-[#A5C9CA]/60"
+                        }
+                      >
                         {formatMessageTime(msg.createdAt)}
-                      </div>
-                    )}
+                      </span>
+                    </div>
                   </div>
 
                   <MessageReactions
                     reactions={msg.reactions || []}
                     currentUserId={activeUserId}
-                    onToggleReaction={(emoji) => handleToggleReaction(msg, emoji)}
-                    className={isMe ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
+                    onToggleReaction={(emoji) =>
+                      handleToggleReaction(msg, emoji)
+                    }
+                    className={
+                      isMe
+                        ? "justify-end -mt-2 mr-1 relative z-10"
+                        : "justify-start -mt-2 ml-1 relative z-10"
+                    }
                   />
                   {isMe && msg.readBy?.length > 0 && (
-                    <SeenAvatars readBy={msg.readBy} className="justify-end mt-1 mr-1" />
+                    <SeenAvatars
+                      readBy={msg.readBy}
+                      className="justify-end mt-1 mr-1"
+                    />
                   )}
                 </div>
 
-                {!isMe && (
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 self-center pointer-events-none group-hover:pointer-events-auto">
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 self-center pointer-events-none group-hover:pointer-events-auto">
+                  {!isMe && (
                     <MessageReactionPicker
-                      onSelectEmoji={(emoji) => handleToggleReaction(msg, emoji)}
+                      onSelectEmoji={(emoji) =>
+                        handleToggleReaction(msg, emoji)
+                      }
                       align="left"
                     />
-                  </div>
-                )}
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePin(msg)}
+                    title={msg.isPinned ? "Unpin message" : "Pin message"}
+                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                      msg.isPinned
+                        ? "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40"
+                        : "text-[#52656A] dark:text-[#A5C9CA] hover:text-amber-600 dark:hover:text-amber-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                    }`}
+                  >
+                    <i className="fa-solid fa-thumbtack text-[10px]" />
+                  </button>
+                </div>
               </div>
             );
           })
@@ -425,7 +585,11 @@ const GroupMessageThread = ({
 
       {/* ── Message Input Bar ───────────────────────────────── */}
       <div className="p-3 border-t border-gray-200 dark:border-[#2C3333] bg-white dark:bg-[#1A2121] flex-shrink-0">
-        <TypingIndicator typingText={typingText} isAnyoneTyping={isAnyoneTyping} className="mb-2 px-1" />
+        <TypingIndicator
+          typingText={typingText}
+          isAnyoneTyping={isAnyoneTyping}
+          className="mb-2 px-1"
+        />
         <form
           onSubmit={handleSendMessage}
           className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#2C3333] px-3 py-1.5 focus-within:border-teal-500 dark:focus-within:border-teal-400 transition"
@@ -466,6 +630,16 @@ const GroupMessageThread = ({
           currentUserId={currentUserId}
         />
       )}
+
+      <ConversationPinnedDrawer
+        isOpen={showPinnedDrawer}
+        onClose={() => setShowPinnedDrawer(false)}
+        pinnedMessages={pinnedMessages}
+        onTogglePin={handleTogglePin}
+        onJumpToMessage={handleJumpToMessage}
+        conversationTitle={group?.name || "Group Chat"}
+        conversationType="group"
+      />
     </div>
   );
 };

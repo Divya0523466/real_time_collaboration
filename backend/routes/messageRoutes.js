@@ -1,6 +1,8 @@
 import express from "express"
 import authenticateToken from "../middleware/authenticateToken.js"
 import {
+  togglePinMessage,
+  getPinnedMessages,
   getDirectMessages,
   getChannelMessages,
   getUnreadMessageCounts,
@@ -28,6 +30,8 @@ router.post("/forward", forwardMessage)
 router.post("/:messageId/react", toggleReaction)
 router.get("/unread-counts", getUnreadMessageCounts)
 router.get("/starred", getStarredMessages)
+router.get("/pinned", getPinnedMessages)
+router.post("/:messageId/pin", togglePinMessage)
 router.get("/mentions", getUserMentions)
 router.post("/mentions/read-all", markAllMentionsAsRead)
 router.patch("/mentions/read-all", markAllMentionsAsRead)

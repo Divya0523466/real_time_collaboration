@@ -20,6 +20,7 @@ import DirectMessaging from "./DirectMessaging";
 import ChannelMessageThread from "./ChannelMessageThread";
 import NotificationPanel from "./NotificationPanel";
 import StarredMessagesView from "./StarredMessagesView";
+import PinnedMessagesView from "./PinnedMessagesView";
 import MentionsView from "./MentionsView";
 import HomeView from "./HomeView";
 import ForwardMessageModal from "./ForwardMessageModal";
@@ -32,6 +33,9 @@ import CreateGroupModal from "./CreateGroupModal";
 import GroupMessageThread from "./GroupMessageThread";
 import StatusBadge from "../common/StatusBadge";
 import StatusSelector from "../common/StatusSelector";
+import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
+import { fetchPinnedMessagesApi, togglePinMessageApi } from "../../services/messageService";
+import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { fetchGroupsApi } from "../../services/groupService";
 import {
   fetchSpaces,
@@ -164,9 +168,12 @@ const SlackShell = () => {
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [isStarredView, setIsStarredView] = useState(false);
+  const [isPinnedView, setIsPinnedView] = useState(false);
   const [isMentionsView, setIsMentionsView] = useState(false);
   const [isHomeView, setIsHomeView] = useState(!channelId && !spaceId);
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null);
+  const [showChannelPinnedDrawer, setShowChannelPinnedDrawer] = useState(false);
+  const [channelPinnedMessages, setChannelPinnedMessages] = useState([]);
 
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
   const [isDMsCollapsed, setIsDMsCollapsed] = useState(false);
@@ -416,6 +423,58 @@ const SlackShell = () => {
       setHiddenDMIds(new Set());
     }
   }, [workspaceId, user?.id, user?._id]);
+
+  // Synchronize channel pinned messages in real-time
+  useEffect(() => {
+    const cId = (currentChannel?.id || currentChannel?._id || channelId)?.toString();
+    if (!cId) {
+      setChannelPinnedMessages([]);
+      return;
+    }
+
+    fetchPinnedMessagesApi({ channelId: cId })
+      .then((data) => setChannelPinnedMessages(data || []))
+      .catch(() => setChannelPinnedMessages([]));
+
+    const handlePinnedUpdated = (payload) => {
+      if (payload.conversationType !== "channel" || payload.channelId?.toString() !== cId) return;
+      if (payload.isPinned) {
+        fetchPinnedMessagesApi({ channelId: cId })
+          .then((data) => setChannelPinnedMessages(data || []))
+          .catch(() => {});
+      } else {
+        setChannelPinnedMessages((prev) =>
+          prev.filter((m) => (m.id || m._id)?.toString() !== payload.messageId?.toString())
+        );
+      }
+    };
+
+    onPinnedUpdated(handlePinnedUpdated);
+    return () => offPinnedUpdated(handlePinnedUpdated);
+  }, [currentChannel?.id, currentChannel?._id, channelId]);
+
+  const handleJumpToMessage = (messageId) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+
+    }
+  };
+
+  const handleToggleChannelMessagePin = async (msg) => {
+    const msgId = (msg.id || msg._id)?.toString();
+    if (!msgId) return;
+    try {
+      const res = await togglePinMessageApi(msgId);
+      toast.success(res.isPinned ? "Message pinned" : "Message unpinned");
+      setChannelPinnedMessages((prev) =>
+        res.isPinned ? [...prev, msg] : prev.filter((m) => (m.id || m._id)?.toString() !== msgId)
+      );
+    } catch {
+      toast.error("Failed to update pin status");
+    }
+  };
 
   const visibleDirectMessageMembers = useMemo(() => {
     return directMessageMembers.filter((member) => {
@@ -2323,6 +2382,7 @@ const SlackShell = () => {
                   onClick={() => {
                     setIsHomeView(false);
                     setIsStarredView(true);
+                    setIsPinnedView(false);
                     setIsMentionsView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
@@ -2337,6 +2397,28 @@ const SlackShell = () => {
                 >
                   <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
                   <span className="flex-1 text-left">Starred</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHomeView(false);
+                    return;
+                    setIsStarredView(false);
+                    setIsMentionsView(false);
+                    setSelectedDMUser(null);
+                    setSelectedSpace(null);
+                    setSelectedGroup(null);
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                    isPinnedView
+                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                  }`}
+                >
+                  <style>{`button:has(> #pinned-hidden-mobile) { display: none !important; }`}</style><span id="pinned-hidden-mobile" className="hidden" />
+
                 </button>
 
                 <button
@@ -3617,6 +3699,7 @@ const SlackShell = () => {
                 onClick={() => {
                   setIsHomeView(false);
                   setIsStarredView(true);
+                  setIsPinnedView(false);
                   setIsMentionsView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
@@ -3631,6 +3714,28 @@ const SlackShell = () => {
               >
                 <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
                 <span className="flex-1 text-left">Starred</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHomeView(false);
+                  return;
+                  setIsStarredView(false);
+                  setIsMentionsView(false);
+                  setSelectedDMUser(null);
+                  setSelectedSpace(null);
+                  setSelectedGroup(null);
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                  isPinnedView
+                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                }`}
+              >
+                <style>{`button:has(> #pinned-hidden-desktop) { display: none !important; }`}</style><span id="pinned-hidden-desktop" className="hidden" />
+
               </button>
 
               <button
@@ -4570,6 +4675,26 @@ const SlackShell = () => {
                   <span>{workspaceMembers.length}</span>
                 </button>
 
+                {/* Pinned Messages Header Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowChannelPinnedDrawer((prev) => !prev)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                    showChannelPinnedDrawer
+                      ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                      : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+                  }`}
+                  title="Pinned messages in this channel"
+                >
+                  <i className="fa-solid fa-thumbtack text-xs" />
+                  <span className="hidden sm:inline">Pinned</span>
+                  {channelPinnedMessages.length > 0 && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                      {channelPinnedMessages.length}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowDetailsPane((prev) => !prev)}
@@ -4603,6 +4728,45 @@ const SlackShell = () => {
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {isHomeView ? (
             <HomeView onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
+          ) : false ? (
+            <PinnedMessagesView
+              workspaceId={workspaceId}
+              onNavigateChannel={(cId) => {
+                setIsHomeView(false);
+                setIsPinnedView(false);
+                setSelectedDMUser(null);
+                setSelectedSpace(null);
+                navigate(`/app/workspace/${workspaceId}/channel/${cId}`);
+              }}
+              onNavigateSpace={(sId) => {
+                setIsHomeView(false);
+                setIsPinnedView(false);
+                setSelectedDMUser(null);
+                const found = spaces.find((sp) => (sp.id || sp._id)?.toString() === sId?.toString());
+                if (found) setSelectedSpace(found);
+              }}
+              onNavigateGroup={(gId) => {
+                setIsHomeView(false);
+                setIsPinnedView(false);
+                setSelectedDMUser(null);
+                setSelectedSpace(null);
+                const found = groups.find((gr) => (gr.id || gr._id)?.toString() === gId?.toString());
+                if (found) setSelectedGroup(found);
+              }}
+              onNavigateDM={(targetId, otherUser) => {
+                setIsHomeView(false);
+                setIsPinnedView(false);
+                setSelectedSpace(null);
+                if (otherUser && (otherUser.id || otherUser._id)) {
+                  setSelectedDMUser({
+                    id: otherUser.id || otherUser._id,
+                    username: otherUser.username,
+                    avatar: otherUser.avatar,
+                  });
+                }
+              }}
+              onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+            />
           ) : isStarredView ? (
             <StarredMessagesView
               workspaceId={workspaceId}
@@ -4848,6 +5012,56 @@ const SlackShell = () => {
                       <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
                         Members ({activeChannel?.members?.length || 0})
                       </h4>
+                    </div>
+                  </div>
+
+                  {/* Pinned Messages Section in Channel Details */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA] flex items-center gap-1.5">
+                        <i className="fa-solid fa-thumbtack text-[11px]" />
+                        <span>Pinned Messages ({channelPinnedMessages.length})</span>
+                      </h4>
+                      {channelPinnedMessages.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowChannelPinnedDrawer(true)}
+                          className="text-[11px] font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:underline cursor-pointer"
+                        >
+                          View all
+                        </button>
+                      )}
+                    </div>
+                    {channelPinnedMessages.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-[#E0E7E6] dark:border-[#2C3333] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]/70">
+                        No pinned messages in this channel
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {channelPinnedMessages.slice(0, 3).map((pm) => (
+                          <div
+                            key={pm.id || pm._id}
+                            onClick={() => handleJumpToMessage(pm.id || pm._id)}
+                            className="cursor-pointer rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#242D2D]/60 p-2.5 hover:bg-[#F0F4F4] dark:hover:bg-[#2A3434] transition shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between text-[11px] font-semibold text-[#395B64] dark:text-[#A5C9CA]">
+                              <span>{pm.sender?.username || "User"}</span>
+                              <i className="fa-solid fa-arrow-turn-up -rotate-90 text-[10px] opacity-70" />
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-xs text-[#2C3333] dark:text-[#E7F6F2]">
+                              {pm.content || (pm.attachments?.length ? "[Attachment]" : "Message")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
+                        Members ({activeChannel?.members?.length || 0})
+                      </h4>
                       {permissions.canManageChannelMembers && activeChannel && (
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-[#395B64] dark:text-[#A5C9CA]">
                           Manage
@@ -4928,6 +5142,17 @@ const SlackShell = () => {
             )}
         </div>
       </main>
+
+      {/* Channel Pinned Messages Drawer */}
+      <ConversationPinnedDrawer
+        isOpen={showChannelPinnedDrawer}
+        onClose={() => setShowChannelPinnedDrawer(false)}
+        pinnedMessages={channelPinnedMessages}
+        onTogglePin={handleToggleChannelMessagePin}
+        onJumpToMessage={handleJumpToMessage}
+        conversationTitle={currentChannel?.name || "channel"}
+        conversationType="channel"
+      />
 
       {/* Create Workspace Modal */}
       {showCreateWorkspaceModal && (

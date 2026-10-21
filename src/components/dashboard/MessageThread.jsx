@@ -1,33 +1,44 @@
-import { useState, useEffect, useRef, useMemo } from "react"
-import { FiSun, FiMoon } from "react-icons/fi"
-import { useWorkspace } from "../../context/WorkspaceContext"
-import { useTheme } from "../../context/ThemeContext"
-import FileUpload from "../common/FileUpload"
-import MessageContent from "../common/MessageContent"
-import AttachmentRenderer from "../common/AttachmentRenderer"
-import DateSeparator from "../common/DateSeparator"
-import MentionSuggestions from "../common/MentionSuggestions"
-import useMentionInput from "../../hooks/useMentionInput"
-import { extractMentionIdsFromText } from "../../utils/mentionUtils"
-import { formatMessageDate, formatMessageTime, isSameDay } from "../../utils/dateUtils"
+import { useState, useEffect, useRef, useMemo } from "react";
+import { FiSun, FiMoon } from "react-icons/fi";
+import { useWorkspace } from "../../context/WorkspaceContext";
+import { useTheme } from "../../context/ThemeContext";
+import FileUpload from "../common/FileUpload";
+import MessageContent from "../common/MessageContent";
+import DateSeparator from "../common/DateSeparator";
+import MentionSuggestions from "../common/MentionSuggestions";
+import useMentionInput from "../../hooks/useMentionInput";
+import { extractMentionIdsFromText } from "../../utils/mentionUtils";
+import {
+  formatMessageDate,
+  formatMessageTime,
+  isSameDay,
+} from "../../utils/dateUtils";
 import {
   isImageOrFileMessage,
   isPureAttachmentMessage,
   getMessageAttachments,
-} from "../../utils/fileUtils"
-import EmojiPickerButton from "../common/EmojiPickerButton"
-import ForwardedMessageCard from "../common/ForwardedMessageCard"
-import TypingIndicator from "../common/TypingIndicator"
-import useTypingIndicator from "../../hooks/useTypingIndicator"
-import StatusBadge from "../common/StatusBadge"
-import StatusSelector from "../common/StatusSelector"
-import MessageReactionPicker from "../common/MessageReactionPicker"
-import MessageReactions from "../common/MessageReactions"
-import { SeenAvatarItem } from "../common/SeenAvatars"
+} from "../../utils/fileUtils";
+import EmojiPickerButton from "../common/EmojiPickerButton";
+import ForwardedMessageCard from "../common/ForwardedMessageCard";
+import TypingIndicator from "../common/TypingIndicator";
+import useTypingIndicator from "../../hooks/useTypingIndicator";
+import StatusBadge from "../common/StatusBadge";
+import StatusSelector from "../common/StatusSelector";
+import MessageReactionPicker from "../common/MessageReactionPicker";
+import MessageReactions from "../common/MessageReactions";
+import { SeenAvatarItem } from "../common/SeenAvatars";
+import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
 
-const AVATAR_COLORS = ["#395B64", "#4A7C88", "#52656A", "#2E6E79", "#3D7A52", "#5B6E7C"]
+const AVATAR_COLORS = [
+  "#395B64",
+  "#4A7C88",
+  "#52656A",
+  "#2E6E79",
+  "#3D7A52",
+  "#5B6E7C",
+];
 const avatarColor = (username) =>
-  AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
+  AVATAR_COLORS[(username?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
 
 const Avatar = ({ username = null, avatar = null, small = false }) => {
   if (avatar) {
@@ -39,7 +50,7 @@ const Avatar = ({ username = null, avatar = null, small = false }) => {
           small ? "w-5.5 h-5.5" : "w-7 h-7"
         }`}
       />
-    )
+    );
   }
   return (
     <div
@@ -50,8 +61,8 @@ const Avatar = ({ username = null, avatar = null, small = false }) => {
     >
       {(username ?? "?").charAt(0).toUpperCase()}
     </div>
-  )
-}
+  );
+};
 
 const MessageThread = ({
   selectedUser = null,
@@ -62,6 +73,7 @@ const MessageThread = ({
   onEditMessage = () => {},
   onDeleteMessage = () => {},
   onToggleStar = () => {},
+  onTogglePin = () => {},
   onToggleReaction = () => {},
   onForwardMessage = () => {},
   onNavigateSource = () => {},
@@ -71,53 +83,83 @@ const MessageThread = ({
   onToggleBlock,
   onClearError,
 }) => {
-  const { isUserOnline, workspaceData, user, getUserPresenceStatus } = useWorkspace()
-  const resolvedCurrentUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
-  const { toggleTheme, isDark } = useTheme()
-  const [inputValue, setInputValue] = useState("")
-  const [attachedFile, setAttachedFile] = useState(null)
-  const [uploadError, setUploadError] = useState(null)
+  const { isUserOnline, workspaceData, user, getUserPresenceStatus } =
+    useWorkspace();
+  const resolvedCurrentUserId = (
+    currentUserId?._id ||
+    currentUserId?.id ||
+    currentUserId ||
+    user?.id ||
+    user?._id
+  )?.toString();
+  const { toggleTheme, isDark } = useTheme();
+  const [inputValue, setInputValue] = useState("");
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const [showPinnedDrawer, setShowPinnedDrawer] = useState(false);
   // editingState: { messageId: string, draftContent: string } | null
-  const [editingState, setEditingState] = useState(null)
-  const messagesContainerRef = useRef(null)
-  const messagesEndRef = useRef(null)
-  const mainTextareaRef = useRef(null)
-  const prevCountRef = useRef(0)
-  const prevUserIdRef = useRef(null)
+  const [editingState, setEditingState] = useState(null);
+  const messagesContainerRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const mainTextareaRef = useRef(null);
+  const prevCountRef = useRef(0);
+  const prevUserIdRef = useRef(null);
 
   const scrollToBottom = (behavior = "auto") => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
     }
-    messagesEndRef.current?.scrollIntoView({ behavior })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  };
+
+  // Filter pinned messages specifically for this DM conversation
+  const pinnedMessages = useMemo(
+    () => messages.filter((m) => m.isPinned && !m.isDeleted),
+    [messages],
+  );
+  const handleJumpToMessage = (messageId) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+
+
+
+    }
+  };
 
   // Keep selected user synchronized with latest profile in workspace
   const activeSelectedUser = useMemo(() => {
-    if (!selectedUser) return null
-    const sId = (selectedUser.id || selectedUser._id)?.toString()
+    if (!selectedUser) return null;
+    const sId = (selectedUser.id || selectedUser._id)?.toString();
     const live = (workspaceData?.members || []).find(
-      (m) => (m.id || m._id || m.userId)?.toString() === sId
-    )
+      (m) => (m.id || m._id || m.userId)?.toString() === sId,
+    );
     if (live) {
       return {
         ...selectedUser,
         username: live.username || selectedUser.username,
         avatar: live.avatar || live.avatarUrl || selectedUser.avatar,
         avatarUrl: live.avatar || live.avatarUrl || selectedUser.avatarUrl,
-      }
+      };
     }
-    return selectedUser
-  }, [selectedUser, workspaceData?.members])
+    return selectedUser;
+  }, [selectedUser, workspaceData?.members]);
 
   // DM mentionable members: all members in current workspace
   const dmMembers = useMemo(() => {
-    const list = workspaceData?.members || []
-    if (selectedUser && !list.some((m) => (m.id || m._id)?.toString() === selectedUser.id?.toString())) {
-      return [...list, selectedUser]
+    const list = workspaceData?.members || [];
+    if (
+      selectedUser &&
+      !list.some(
+        (m) => (m.id || m._id)?.toString() === selectedUser.id?.toString(),
+      )
+    ) {
+      return [...list, selectedUser];
     }
-    return list
-  }, [workspaceData?.members, selectedUser])
+    return list;
+  }, [workspaceData?.members, selectedUser]);
 
   const mention = useMentionInput({
     members: dmMembers,
@@ -126,12 +168,14 @@ const MessageThread = ({
     textareaRef: mainTextareaRef,
     currentUserId: resolvedCurrentUserId,
     includeAll: false,
-  })
+  });
 
   const lastReadSenderMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
-      const isMsgSender = (msg.senderId?._id || msg.senderId)?.toString() === resolvedCurrentUserId;
+      const isMsgSender =
+        (msg.senderId?._id || msg.senderId)?.toString() ===
+        resolvedCurrentUserId;
       if (isMsgSender && msg.isRead && !msg.isDeleted) {
         return (msg.id || msg._id)?.toString();
       }
@@ -139,115 +183,128 @@ const MessageThread = ({
     return null;
   }, [messages, resolvedCurrentUserId]);
 
-  const targetUserId = (activeSelectedUser?.id || activeSelectedUser?._id || selectedUser?.id || selectedUser?._id)?.toString()
-  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } = useTypingIndicator({
-    type: "dm",
-    targetId: targetUserId,
-    currentUserId: resolvedCurrentUserId,
-  })
+  const targetUserId = (
+    activeSelectedUser?.id ||
+    activeSelectedUser?._id ||
+    selectedUser?.id ||
+    selectedUser?._id
+  )?.toString();
+  const { typingText, isAnyoneTyping, handleKeystroke, handleStopTypingNow } =
+    useTypingIndicator({
+      type: "dm",
+      targetId: targetUserId,
+      currentUserId: resolvedCurrentUserId,
+    });
 
   const handleInputChange = (e) => {
-    mention.handleInputChange(e)
-    handleKeystroke(e.target.value)
-  }
+    mention.handleInputChange(e);
+    handleKeystroke(e.target.value);
+  };
 
   // Auto-scroll to bottom only when new messages arrive or when switching conversation,
   // not when starring, unstarring, editing, or deleting existing messages.
   useEffect(() => {
-    if (loading) return
+    if (loading) return;
 
-    const isNewUser = prevUserIdRef.current !== selectedUser?.id
-    const prevCount = prevCountRef.current
-    const currentCount = messages.length
+    const isNewUser = prevUserIdRef.current !== selectedUser?.id;
+    const prevCount = prevCountRef.current;
+    const currentCount = messages.length;
 
     if (isNewUser) {
-      prevUserIdRef.current = selectedUser?.id
-      prevCountRef.current = currentCount
+      prevUserIdRef.current = selectedUser?.id;
+      prevCountRef.current = currentCount;
       if (currentCount > 0) {
-        scrollToBottom("auto")
+        scrollToBottom("auto");
         const timer = setTimeout(() => {
-          scrollToBottom("auto")
-        }, 50)
-        return () => clearTimeout(timer)
+          scrollToBottom("auto");
+        }, 50);
+        return () => clearTimeout(timer);
       }
-      return
+      return;
     }
 
     if (currentCount > prevCount) {
-      prevCountRef.current = currentCount
+      prevCountRef.current = currentCount;
       if (prevCount === 0) {
-        scrollToBottom("auto")
+        scrollToBottom("auto");
         const timer = setTimeout(() => {
-          scrollToBottom("auto")
-        }, 50)
-        return () => clearTimeout(timer)
+          scrollToBottom("auto");
+        }, 50);
+        return () => clearTimeout(timer);
       } else {
-        scrollToBottom("smooth")
+        scrollToBottom("smooth");
       }
     } else {
-      prevCountRef.current = currentCount
+      prevCountRef.current = currentCount;
     }
-  }, [messages, selectedUser?.id, loading])
+  }, [messages, selectedUser?.id, loading]);
 
   const handleSendClick = () => {
-    const text = inputValue.trim()
-    if (!text && !attachedFile) return
+    const text = inputValue.trim();
+    if (!text && !attachedFile) return;
 
-    handleStopTypingNow()
-    const attachments = attachedFile ? [attachedFile] : []
-    const mentions = mention.getMentionedUserIds(inputValue)
-    onSendMessage(text, attachments, mentions)
-    setInputValue("")
-    setAttachedFile(null)
-  }
+    handleStopTypingNow();
+    const attachments = attachedFile ? [attachedFile] : [];
+    const mentions = mention.getMentionedUserIds(inputValue);
+    onSendMessage(text, attachments, mentions);
+    setInputValue("");
+    setAttachedFile(null);
+  };
 
   const handleKeyDown = (e) => {
     if (mention.handleKeyDown(e)) {
-      return
+      return;
     }
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendClick()
+      e.preventDefault();
+      handleSendClick();
     }
-  }
+  };
 
   const handleEmojiSelect = (emoji) => {
-    const el = mainTextareaRef.current
+    const el = mainTextareaRef.current;
     if (!el) {
-      const updated = (inputValue || "") + emoji
-      setInputValue(updated)
-      handleKeystroke(updated)
-      return
+      const updated = (inputValue || "") + emoji;
+      setInputValue(updated);
+      handleKeystroke(updated);
+      return;
     }
-    const start = el.selectionStart ?? inputValue.length
-    const end = el.selectionEnd ?? inputValue.length
-    const text = inputValue || ""
-    const updated = text.substring(0, start) + emoji + text.substring(end)
-    setInputValue(updated)
-    handleKeystroke(updated)
+    const start = el.selectionStart ?? inputValue.length;
+    const end = el.selectionEnd ?? inputValue.length;
+    const text = inputValue || "";
+    const updated = text.substring(0, start) + emoji + text.substring(end);
+    setInputValue(updated);
+    handleKeystroke(updated);
     setTimeout(() => {
-      el.focus()
-      el.setSelectionRange(start + emoji.length, start + emoji.length)
-    }, 0)
-  }
+      el.focus();
+      el.setSelectionRange(start + emoji.length, start + emoji.length);
+    }, 0);
+  };
 
   const startEdit = (message) => {
-    setEditingState({ messageId: message.id?.toString(), draftContent: message.content || "" })
-  }
+    setEditingState({
+      messageId: message.id?.toString(),
+      draftContent: message.content || "",
+    });
+  };
 
-  const cancelEdit = () => setEditingState(null)
+  const cancelEdit = () => setEditingState(null);
 
   const submitEdit = () => {
-    if (!editingState?.draftContent?.trim()) return
+    if (!editingState?.draftContent?.trim()) return;
     const mentions = extractMentionIdsFromText(
       editingState.draftContent.trim(),
       dmMembers,
       null,
-      { currentUserId }
-    )
-    onEditMessage(editingState.messageId, editingState.draftContent.trim(), mentions)
-    setEditingState(null)
-  }
+      { currentUserId },
+    );
+    onEditMessage(
+      editingState.messageId,
+      editingState.draftContent.trim(),
+      mentions,
+    );
+    setEditingState(null);
+  };
 
   if (!selectedUser) {
     return (
@@ -256,10 +313,12 @@ const MessageThread = ({
           <div className="text-gray-400 dark:text-[#A5C9CA]/60 mb-2">
             <i className="fa-solid fa-message text-4xl" />
           </div>
-          <p className="text-gray-500 dark:text-[#A5C9CA]">Select a user to start messaging</p>
+          <p className="text-gray-500 dark:text-[#A5C9CA]">
+            Select a user to start messaging
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -276,12 +335,18 @@ const MessageThread = ({
           >
             <i className="fa-solid fa-bars text-sm" />
           </button>
-          
+
           <div className="relative flex-shrink-0">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white shadow-xs overflow-hidden">
-              {(activeSelectedUser.avatar || activeSelectedUser.avatarUrl || activeSelectedUser.profileImage) ? (
+              {activeSelectedUser.avatar ||
+              activeSelectedUser.avatarUrl ||
+              activeSelectedUser.profileImage ? (
                 <img
-                  src={activeSelectedUser.avatar || activeSelectedUser.avatarUrl || activeSelectedUser.profileImage}
+                  src={
+                    activeSelectedUser.avatar ||
+                    activeSelectedUser.avatarUrl ||
+                    activeSelectedUser.profileImage
+                  }
                   alt={activeSelectedUser.username}
                   className="h-full w-full object-cover"
                 />
@@ -305,23 +370,46 @@ const MessageThread = ({
                   getUserPresenceStatus(selectedUser.id) === "active"
                     ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50"
                     : getUserPresenceStatus(selectedUser.id) === "away"
-                    ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50"
-                    : "bg-gray-100 dark:bg-[#2C3333] text-gray-500 dark:text-[#A5C9CA] border border-gray-200 dark:border-gray-700"
+                      ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50"
+                      : "bg-gray-100 dark:bg-[#2C3333] text-gray-500 dark:text-[#A5C9CA] border border-gray-200 dark:border-gray-700"
                 }`}
               >
                 <StatusBadge
                   status={getUserPresenceStatus(selectedUser.id)}
                   size="xs"
                 />
-                <span className="capitalize">{getUserPresenceStatus(selectedUser.id)}</span>
+                <span className="capitalize">
+                  {getUserPresenceStatus(selectedUser.id)}
+                </span>
               </span>
             </div>
-            <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80">{selectedUser.email || ""}</p>
+            <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80">
+              {selectedUser.email || ""}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowPinnedDrawer(true)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              showPinnedDrawer
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+            }`}
+            title="Pinned messages in this conversation"
+          >
+            <i className="fa-solid fa-thumbtack text-xs" />
+            <span className="hidden sm:inline">Pinned</span>
+            {pinnedMessages.length > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                {pinnedMessages.length}
+              </span>
+            )}
+          </button>
           <StatusSelector align="right" />
+
           <button
             type="button"
             onClick={toggleTheme}
@@ -339,7 +427,10 @@ const MessageThread = ({
       </div>
 
       {/* Messages Area */}
-      <div ref={messagesContainerRef} className="flex-1 space-y-2 overflow-y-auto p-4">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 space-y-2 overflow-y-auto p-4"
+      >
         {error && (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-2.5 text-xs sm:text-sm text-amber-800 dark:text-amber-200 shadow-xs">
             <div className="flex items-center gap-2">
@@ -361,26 +452,52 @@ const MessageThread = ({
 
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-[#52656A] dark:text-[#A5C9CA]">Loading messages...</p>
+            <p className="text-[#52656A] dark:text-[#A5C9CA]">
+              Loading messages...
+            </p>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-[#52656A] dark:text-[#A5C9CA]">No messages yet. Start the conversation!</p>
+            <p className="text-[#52656A] dark:text-[#A5C9CA]">
+              No messages yet. Start the conversation!
+            </p>
           </div>
         ) : (
           messages.map((message, index) => {
-            const activeUserId = (currentUserId?._id || currentUserId?.id || currentUserId || user?.id || user?._id)?.toString()
-            const senderId = (message.senderId?._id || message.senderId?.id || message.senderId || message.sender?.id || message.sender?._id)?.toString()
-            const isSender = Boolean(senderId && activeUserId && senderId === activeUserId)
-            const isDeleted = message.isDeleted === true
-            const isBeingEdited = editingState?.messageId === message.id?.toString()
-            const isPureAttachment = !isDeleted && isPureAttachmentMessage(message)
-            const isPureForwarded = !isDeleted && Boolean(message.forwardedFrom && !message.content?.trim())
-            const attachments = getMessageAttachments(message)
+            const activeUserId = (
+              currentUserId?._id ||
+              currentUserId?.id ||
+              currentUserId ||
+              user?.id ||
+              user?._id
+            )?.toString();
+            const senderId = (
+              message.senderId?._id ||
+              message.senderId?.id ||
+              message.senderId ||
+              message.sender?.id ||
+              message.sender?._id
+            )?.toString();
+            const isSender = Boolean(
+              senderId && activeUserId && senderId === activeUserId,
+            );
+            const isDeleted = message.isDeleted === true;
+            const isBeingEdited =
+              editingState?.messageId === message.id?.toString();
+            const isPureAttachment =
+              !isDeleted && isPureAttachmentMessage(message);
+            const isPureForwarded =
+              !isDeleted &&
+              Boolean(message.forwardedFrom && !message.content?.trim());
+            const attachments = getMessageAttachments(message);
 
-            const prevMessage = index > 0 ? messages[index - 1] : null
-            const showDateSeparator = !prevMessage || !isSameDay(prevMessage.createdAt, message.createdAt)
-            const dateLabel = showDateSeparator ? formatMessageDate(message.createdAt) : null
+            const prevMessage = index > 0 ? messages[index - 1] : null;
+            const showDateSeparator =
+              !prevMessage ||
+              !isSameDay(prevMessage.createdAt, message.createdAt);
+            const dateLabel = showDateSeparator
+              ? formatMessageDate(message.createdAt)
+              : null;
 
             return (
               <div key={message.id}>
@@ -397,12 +514,16 @@ const MessageThread = ({
                     <div className="flex-shrink-0 mb-0.5">
                       <Avatar
                         username={activeSelectedUser?.username}
-                        avatar={activeSelectedUser?.avatar || activeSelectedUser?.avatarUrl || activeSelectedUser?.profileImage}
+                        avatar={
+                          activeSelectedUser?.avatar ||
+                          activeSelectedUser?.avatarUrl ||
+                          activeSelectedUser?.profileImage
+                        }
                         small
                       />
                     </div>
                   )}
-            
+
                   {isSender && !isDeleted && !isBeingEdited && (
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-0.5 pointer-events-none group-hover:pointer-events-auto">
                       {!isImageOrFileMessage(message) && (
@@ -410,38 +531,71 @@ const MessageThread = ({
                           <button
                             type="button"
                             onClick={(e) => {
-                              e.currentTarget.blur()
-                              onToggleStar(message)
+                              e.currentTarget.blur();
+                              onToggleStar(message);
                             }}
-                           
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
                               message.isStarred
                                 ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                                 : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
                             }`}
                           >
-                            <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                            <i
+                              className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`}
+                            />
                           </button>
                           <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                             {message.isStarred ? "Unstar" : "Star"}
                           </span>
                         </div>
                       )}
+                      <div className="group/tip relative">
+                        <button
+                          type="button"
+                          onClick={() => onTogglePin && onTogglePin(message)}
+                          aria-label={
+                            message.isPinned ? "Unpin message" : "Pin message"
+                          }
+                          className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                            message.isPinned
+                              ? "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40"
+                              : "text-[#52656A] dark:text-[#A5C9CA] hover:text-amber-600 dark:hover:text-amber-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                          }`}
+                        >
+                          <i className="fa-solid fa-thumbtack text-[10px]" />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                          {message.isPinned ? "Unpin" : "Pin"}
+                        </span>
+                      </div>
                       <MessageReactionPicker
-                        onSelectEmoji={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
+                        onSelectEmoji={(emoji) =>
+                          onToggleReaction && onToggleReaction(message, emoji)
+                        }
                         align="right"
                       />
                       <div className="group/tip relative">
                         <button
                           type="button"
                           onClick={(e) => {
-                            e.currentTarget.blur()
-                            onForwardMessage && onForwardMessage(message, {
-                              sourceType: "DIRECT",
-                              sourceName: activeSelectedUser?.username || "Direct Message",
-                              sourceId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
-                              otherUserId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
-                            })
+                            e.currentTarget.blur();
+                            onForwardMessage &&
+                              onForwardMessage(message, {
+                                sourceType: "DIRECT",
+                                sourceName:
+                                  activeSelectedUser?.username ||
+                                  "Direct Message",
+                                sourceId: (
+                                  activeSelectedUser?.id ||
+                                  activeSelectedUser?._id ||
+                                  ""
+                                )?.toString(),
+                                otherUserId: (
+                                  activeSelectedUser?.id ||
+                                  activeSelectedUser?._id ||
+                                  ""
+                                )?.toString(),
+                              });
                           }}
                           aria-label="Forward message"
                           className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
@@ -457,8 +611,8 @@ const MessageThread = ({
                           <button
                             type="button"
                             onClick={(e) => {
-                              e.currentTarget.blur()
-                              startEdit(message)
+                              e.currentTarget.blur();
+                              startEdit(message);
                             }}
                             aria-label="Edit message"
                             className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
@@ -474,8 +628,8 @@ const MessageThread = ({
                         <button
                           type="button"
                           onClick={(e) => {
-                            e.currentTarget.blur()
-                            onDeleteMessage(message.id?.toString())
+                            e.currentTarget.blur();
+                            onDeleteMessage(message.id?.toString());
                           }}
                           aria-label="Delete message"
                           className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
@@ -496,18 +650,25 @@ const MessageThread = ({
                         className="w-full text-sm text-[#2C3333] dark:text-[#E7F6F2] bg-white dark:bg-[#1E2525] border border-[#A5C9CA] dark:border-[#395B64] rounded-lg px-3 py-2 outline-none focus:border-[#395B64] focus:ring-1 focus:ring-[#E7F6F2] dark:focus:ring-[#395B64]/30 resize-none transition-colors leading-relaxed shadow-xs"
                         value={editingState.draftContent}
                         onChange={(e) =>
-                          setEditingState((s) => ({ ...s, draftContent: e.target.value }))
+                          setEditingState((s) => ({
+                            ...s,
+                            draftContent: e.target.value,
+                          }))
                         }
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            submitEdit()
+                            e.preventDefault();
+                            submitEdit();
                           }
-                          if (e.key === "Escape") cancelEdit()
+                          if (e.key === "Escape") cancelEdit();
                         }}
                         rows={Math.min(
-                          Math.max((editingState.draftContent || "").split("\n").length, 1),
-                          5
+                          Math.max(
+                            (editingState.draftContent || "").split("\n")
+                              .length,
+                            1,
+                          ),
+                          5,
                         )}
                         autoFocus
                       />
@@ -542,10 +703,26 @@ const MessageThread = ({
                     </div>
                   ) : isDeleted ? (
                     <div className="rounded-2xl px-3.5 py-2 border border-dashed border-[#D0DCDB] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#1E2525]">
-                      <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">This message was deleted</p>
+                      <p className="text-sm italic text-[#52656A] dark:text-[#A5C9CA]/60 opacity-50">
+                        This message was deleted
+                      </p>
                     </div>
                   ) : (
-                    <div className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] md:max-w-[65%]`}>
+                    <div
+                      className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] md:max-w-[65%]`}
+                    >
+                      {false && (
+                        <div
+                          className={`flex items-center gap-1.5 mb-1 px-1 text-xs font-semibold text-amber-600 dark:text-amber-400 select-none ${isSender ? "justify-end" : "justify-start"}`}
+                        >
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400">
+                            <i className="fa-solid fa-thumbtack text-[9px] -rotate-45" />
+                          </span>
+                          <span className="text-[11px] font-bold tracking-wide uppercase">
+                            Pinned message
+                          </span>
+                        </div>
+                      )}
                       <div
                         className={`w-fit max-w-full break-words text-left ${
                           isPureAttachment || isPureForwarded
@@ -558,11 +735,17 @@ const MessageThread = ({
                         }`}
                       >
                         <div className="flex flex-col">
-                          {(Boolean(message.content?.trim()) || Boolean(message.attachments?.length) || Boolean(attachments?.length)) && (
+                          {(Boolean(message.content?.trim()) ||
+                            Boolean(message.attachments?.length) ||
+                            Boolean(attachments?.length)) && (
                             <div className="min-w-0 break-words leading-relaxed">
                               <MessageContent
                                 content={message.content}
-                                attachments={message.attachments?.length ? message.attachments : attachments}
+                                attachments={
+                                  message.attachments?.length
+                                    ? message.attachments
+                                    : attachments
+                                }
                                 isSender={isSender}
                                 mentions={message.mentions || []}
                                 currentUserId={activeUserId}
@@ -577,7 +760,11 @@ const MessageThread = ({
                               onNavigateSource={onNavigateSource}
                               timestamp={formatMessageTime(message.createdAt)}
                               isEdited={message.isEdited && !isDeleted}
-                              isStarred={message.isStarred && !isDeleted && !isImageOrFileMessage(message)}
+                              isStarred={
+                                message.isStarred &&
+                                !isDeleted &&
+                                !isImageOrFileMessage(message)
+                              }
                               onToggleStar={() => onToggleStar(message)}
                             />
                           )}
@@ -591,14 +778,28 @@ const MessageThread = ({
                                   (edited)
                                 </span>
                               )}
-                              {message.isStarred && !isDeleted && !isImageOrFileMessage(message) && (
+                              {message.isStarred &&
+                                !isDeleted &&
+                                !isImageOrFileMessage(message) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onToggleStar(message)}
+                                    title="Starred message (click to unstar)"
+                                    className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                                  >
+                                    <i className="fa-solid fa-star text-[9px]" />
+                                  </button>
+                                )}
+                              {message.isPinned && !isDeleted && (
                                 <button
                                   type="button"
-                                  onClick={() => onToggleStar(message)}
-                                  title="Starred message (click to unstar)"
-                                  className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+                                  onClick={() =>
+                                    onTogglePin && onTogglePin(message)
+                                  }
+                                  title="Pinned message (click to unpin)"
+                                  className="text-amber-600 dark:text-amber-400 hover:text-amber-700 transition-colors p-0.5"
                                 >
-                                  <i className="fa-solid fa-star text-[9px]" />
+                                  <i className="fa-solid fa-thumbtack text-[9px]" />
                                 </button>
                               )}
                             </div>
@@ -609,18 +810,27 @@ const MessageThread = ({
                         <MessageReactions
                           reactions={message.reactions || []}
                           currentUserId={resolvedCurrentUserId}
-                          onToggleReaction={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
-                          className={isSender ? "justify-end -mt-2 mr-1 relative z-10" : "justify-start -mt-2 ml-1 relative z-10"}
+                          onToggleReaction={(emoji) =>
+                            onToggleReaction && onToggleReaction(message, emoji)
+                          }
+                          className={
+                            isSender
+                              ? "justify-end -mt-2 mr-1 relative z-10"
+                              : "justify-start -mt-2 ml-1 relative z-10"
+                          }
                         />
                       )}
-                      {isSender && !isDeleted && (message.id || message._id)?.toString() === lastReadSenderMessageId && (
-                        <div
-                          className="flex justify-end mt-1 mr-1 select-none"
-                          title={`Seen by ${activeSelectedUser?.username || activeSelectedUser?.name || "User"}`}
-                        >
-                          <SeenAvatarItem user={activeSelectedUser} />
-                        </div>
-                      )}
+                      {isSender &&
+                        !isDeleted &&
+                        (message.id || message._id)?.toString() ===
+                          lastReadSenderMessageId && (
+                          <div
+                            className="flex justify-end mt-1 mr-1 select-none"
+                            title={`Seen by ${activeSelectedUser?.username || activeSelectedUser?.name || "User"}`}
+                          >
+                            <SeenAvatarItem user={activeSelectedUser} />
+                          </div>
+                        )}
                     </div>
                   )}
 
@@ -628,7 +838,9 @@ const MessageThread = ({
                   {!isSender && !isDeleted && (
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-[#242D2D] rounded-lg border border-[#E0E7E6] dark:border-[#395B64]/50 shadow-sm px-1 py-0.5 flex-shrink-0 mb-0.5 pointer-events-none group-hover:pointer-events-auto">
                       <MessageReactionPicker
-                        onSelectEmoji={(emoji) => onToggleReaction && onToggleReaction(message, emoji)}
+                        onSelectEmoji={(emoji) =>
+                          onToggleReaction && onToggleReaction(message, emoji)
+                        }
                         align="left"
                       />
                       {!isImageOrFileMessage(message) && (
@@ -636,17 +848,23 @@ const MessageThread = ({
                           <button
                             type="button"
                             onClick={(e) => {
-                              e.currentTarget.blur()
-                              onToggleStar(message)
+                              e.currentTarget.blur();
+                              onToggleStar(message);
                             }}
-                            aria-label={message.isStarred ? "Unstar message" : "Star message"}
+                            aria-label={
+                              message.isStarred
+                                ? "Unstar message"
+                                : "Star message"
+                            }
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
                               message.isStarred
                                 ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                                 : "text-[#52656A] dark:text-[#A5C9CA] hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
                             }`}
                           >
-                            <i className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`} />
+                            <i
+                              className={`${message.isStarred ? "fa-solid fa-star text-emerald-500" : "fa-regular fa-star"} text-[10px]`}
+                            />
                           </button>
                           <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
                             {message.isStarred ? "Unstar" : "Star"}
@@ -656,14 +874,44 @@ const MessageThread = ({
                       <div className="group/tip relative">
                         <button
                           type="button"
+                          onClick={() => onTogglePin && onTogglePin(message)}
+                          aria-label={
+                            message.isPinned ? "Unpin message" : "Pin message"
+                          }
+                          className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                            message.isPinned
+                              ? "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40"
+                              : "text-[#52656A] dark:text-[#A5C9CA] hover:text-amber-600 dark:hover:text-amber-400 hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525]"
+                          }`}
+                        >
+                          <i className="fa-solid fa-thumbtack text-[10px]" />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-[#2C3333] px-2 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 z-10 hidden sm:block">
+                          {message.isPinned ? "Unpin" : "Pin"}
+                        </span>
+                      </div>
+                      <div className="group/tip relative">
+                        <button
+                          type="button"
                           onClick={(e) => {
-                            e.currentTarget.blur()
-                            onForwardMessage && onForwardMessage(message, {
-                              sourceType: "DIRECT",
-                              sourceName: activeSelectedUser?.username || "Direct Message",
-                              sourceId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
-                              otherUserId: (activeSelectedUser?.id || activeSelectedUser?._id || "")?.toString(),
-                            })
+                            e.currentTarget.blur();
+                            onForwardMessage &&
+                              onForwardMessage(message, {
+                                sourceType: "DIRECT",
+                                sourceName:
+                                  activeSelectedUser?.username ||
+                                  "Direct Message",
+                                sourceId: (
+                                  activeSelectedUser?.id ||
+                                  activeSelectedUser?._id ||
+                                  ""
+                                )?.toString(),
+                                otherUserId: (
+                                  activeSelectedUser?.id ||
+                                  activeSelectedUser?._id ||
+                                  ""
+                                )?.toString(),
+                              });
                           }}
                           aria-label="Forward message"
                           className="flex h-6 w-6 items-center justify-center rounded-md text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-white hover:bg-[#E7F6F2] dark:hover:bg-[#1E2525] transition-colors"
@@ -682,27 +930,46 @@ const MessageThread = ({
                     <div className="flex-shrink-0 mb-0.5">
                       <Avatar
                         username={user?.username || "You"}
-                        avatar={user?.avatar || user?.avatarUrl || user?.profileImage}
+                        avatar={
+                          user?.avatar || user?.avatarUrl || user?.profileImage
+                        }
                         small
                       />
                     </div>
                   )}
                 </div>
               </div>
-            )
+            );
           })
         )}
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Pinned Messages Drawer for DM */}
+      <ConversationPinnedDrawer
+        isOpen={showPinnedDrawer}
+        onClose={() => setShowPinnedDrawer(false)}
+        pinnedMessages={pinnedMessages}
+        onTogglePin={onTogglePin}
+        onJumpToMessage={handleJumpToMessage}
+        conversationTitle={activeSelectedUser?.username || "User"}
+        conversationType="dm"
+      />
+
       {/* Input Area */}
       <div className="border-t border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121] p-4 transition-colors">
-        <TypingIndicator typingText={typingText} isAnyoneTyping={isAnyoneTyping} className="mb-2 px-1" />
+        <TypingIndicator
+          typingText={typingText}
+          isAnyoneTyping={isAnyoneTyping}
+          className="mb-2 px-1"
+        />
         {isBlocked ? (
           <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-xs sm:text-sm text-amber-700 dark:text-amber-300">
             <div className="flex items-center gap-2">
               <i className="fa-solid fa-ban text-amber-500" />
-              <span>You have blocked this user. Unblock them to send messages.</span>
+              <span>
+                You have blocked this user. Unblock them to send messages.
+              </span>
             </div>
             {onToggleBlock && (
               <button
@@ -721,8 +988,12 @@ const MessageThread = ({
               <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#F8FAFB] dark:bg-[#242D2D] px-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] border border-[#D0DCDB] dark:border-[#395B64]/60">
                 <div className="flex items-center gap-2 truncate">
                   <i className="fa-solid fa-paperclip text-[#395B64] dark:text-[#A5C9CA]" />
-                  <span className="font-medium truncate">{attachedFile.originalName}</span>
-                  <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70">({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+                  <span className="font-medium truncate">
+                    {attachedFile.originalName}
+                  </span>
+                  <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                    ({(attachedFile.size / 1024).toFixed(1)} KB)
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -782,9 +1053,7 @@ const MessageThread = ({
                 rows="2"
               />
 
-              <EmojiPickerButton
-                onEmojiSelect={handleEmojiSelect}
-              />
+              <EmojiPickerButton onEmojiSelect={handleEmojiSelect} />
 
               <button
                 type="button"
@@ -800,7 +1069,7 @@ const MessageThread = ({
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MessageThread
+export default MessageThread;
