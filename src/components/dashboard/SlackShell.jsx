@@ -121,6 +121,7 @@ const SlackShell = () => {
     isConversationMuted,
     isUserOnline,
     getUserPresenceStatus,
+    isDndActive,
     loading,
     error,
   } = useWorkspace();
@@ -2757,6 +2758,7 @@ const SlackShell = () => {
                               </span>
                               <StatusBadge
                                 status={getUserPresenceStatus(member.id)}
+                        isDnd={isDndActive?.(member)}
                                 size="xs"
                                 className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
                               />
@@ -4094,6 +4096,7 @@ const SlackShell = () => {
                             </span>
                             <StatusBadge
                               status={getUserPresenceStatus(member.id)}
+                        isDnd={isDndActive?.(member)}
                               size="xs"
                               className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
                             />
@@ -5481,6 +5484,7 @@ const SlackShell = () => {
                       </div>
                       <StatusBadge
                         status={getUserPresenceStatus(member.id)}
+                        isDnd={isDndActive?.(member)}
                         size="sm"
                         className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#242D2D]"
                       />
@@ -5645,6 +5649,7 @@ const SlackShell = () => {
                         </span>
                         <StatusBadge
                           status={getUserPresenceStatus(member.id)}
+                        isDnd={isDndActive?.(member)}
                           size="xs"
                           className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
                         />
@@ -5659,6 +5664,7 @@ const SlackShell = () => {
                       </div>
                       <StatusBadge
                         status={getUserPresenceStatus(member.id)}
+                        isDnd={isDndActive?.(member)}
                         size="xs"
                       />
                     </button>

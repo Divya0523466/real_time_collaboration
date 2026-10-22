@@ -79,6 +79,10 @@ const userSchema = new mongoose.Schema(
         default: null,
       },
     },
+    dndUntil: {
+      type: Date,
+      default: null,
+    },
     resetOtp: {
       type: String,
       default: null,

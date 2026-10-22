@@ -14,24 +14,49 @@ const getAuthHeaders = () => {
   return headers;
 };
 
+const STATUS_PRESETS = [
+  { icon: "fa-regular fa-calendar", text: "In a meeting", emoji: "📅" },
+  { icon: "fa-solid fa-car-side", text: "Commuting", emoji: "🚗" },
+  { icon: "fa-solid fa-head-side-cough", text: "Out sick", emoji: "🤒" },
+  { icon: "fa-solid fa-umbrella-beach", text: "On vacation", emoji: "🌴" },
+  { icon: "fa-solid fa-bullseye", text: "Focusing", emoji: "🎯" },
+];
+
 const ProfileModal = ({ onClose }) => {
-  const { user, setUser, updateUserProfile } = useWorkspace();
+  const {
+    user,
+    setUser,
+    updateUserProfile,
+    updateUserPresenceStatus,
+    updateDndMode,
+    isDndActive,
+  } = useWorkspace();
+
   const [username, setUsername] = useState(user?.username || "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [statusText, setStatusText] = useState(user?.customStatus?.text || "");
-  const [statusEmoji, setStatusEmoji] = useState(user?.customStatus?.emoji || "");
+  const [statusEmoji, setStatusEmoji] = useState(
+    user?.customStatus?.emoji || "",
+  );
+  const [presenceStatus, setPresenceStatus] = useState(
+    user?.presenceStatus || "active",
+  );
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+
+  const isDnd = isDndActive
+    ? isDndActive(user)
+    : Boolean(user?.dndUntil && new Date(user.dndUntil).getTime() > Date.now());
 
   const [twoFactorMode, setTwoFactorMode] = useState("idle");
   const [setupOtp, setSetupOtp] = useState("");
   const [is2FALoading, setIs2FALoading] = useState(false);
   const [twoFactorError, setTwoFactorError] = useState("");
   const [setupCooldown, setSetupCooldown] = useState(0);
-  // countdown for 2fa
+
   useEffect(() => {
     let timer;
     if (setupCooldown > 0) {
@@ -86,7 +111,6 @@ const ProfileModal = ({ onClose }) => {
     setAvatarUrl("");
   };
 
-  // Request 2FA setup OTP
   const handleStart2FASetup = async () => {
     setTwoFactorError("");
     setIs2FALoading(true);
@@ -117,7 +141,6 @@ const ProfileModal = ({ onClose }) => {
     }
   };
 
-  // Confirm and enable 2FA
   const handleConfirmEnable2FA = async () => {
     const cleanOtp = setupOtp.trim();
     if (cleanOtp.length !== 6) {
@@ -148,7 +171,6 @@ const ProfileModal = ({ onClose }) => {
       setTwoFactorMode("idle");
       setSetupOtp("");
 
-      // Update user state immediately in context and localStorage
       if (setUser) {
         setUser((prev) => {
           const updated = { ...prev, twoFactorEnabled: true };
@@ -165,7 +187,6 @@ const ProfileModal = ({ onClose }) => {
     }
   };
 
-  // Request 2FA disable OTP
   const handleStart2FADisable = async () => {
     setTwoFactorError("");
     setIs2FALoading(true);
@@ -196,7 +217,6 @@ const ProfileModal = ({ onClose }) => {
     }
   };
 
-  // Confirm and disable 2FA with OTP
   const handleConfirmDisable2FA = async () => {
     const cleanOtp = setupOtp.trim();
     if (cleanOtp.length !== 6) {
@@ -221,11 +241,12 @@ const ProfileModal = ({ onClose }) => {
         return;
       }
 
-      toast.success(data.message || "Two-factor authentication disabled.");
+      toast.success(
+        data.message || "Two-factor authentication disabled successfully.",
+      );
       setTwoFactorMode("idle");
       setSetupOtp("");
 
-      // Update user state immediately in context and localStorage
       if (setUser) {
         setUser((prev) => {
           const updated = { ...prev, twoFactorEnabled: false };
@@ -242,7 +263,6 @@ const ProfileModal = ({ onClose }) => {
     }
   };
 
-  // toggle handler: requests OTP to enable if off, or requests OTP to disable if on
   const handleToggle2FA = () => {
     if (is2FALoading) return;
 
@@ -265,6 +285,12 @@ const ProfileModal = ({ onClose }) => {
     }
   };
 
+  const formatDndTime = (dndDate) => {
+    if (!dndDate) return "";
+    const d = new Date(dndDate);
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -282,6 +308,10 @@ const ProfileModal = ({ onClose }) => {
 
     setIsSaving(true);
     try {
+      if (presenceStatus !== user?.presenceStatus && updateUserPresenceStatus) {
+        await updateUserPresenceStatus(presenceStatus);
+      }
+
       await updateUserProfile({
         username: trimmedUsername,
         avatar: avatarUrl,
@@ -301,418 +331,462 @@ const ProfileModal = ({ onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 grid overflow-y-auto bg-[#2C3333]/60 px-4 py-6 backdrop-blur-xs sm:px-6"
+      className="fixed inset-0 z-50 grid overflow-y-auto bg-black/55 px-4 py-6 backdrop-blur-xs sm:px-6 animate-[fadeIn_0.15s_ease-out]"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="m-auto w-full max-w-[440px] rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-5 shadow-[0_20px_60px_rgba(44,51,51,0.3)] transition-colors"
+        className="m-auto w-full max-w-2xl rounded-2xl bg-white dark:bg-[#181F20] border border-gray-200/80 dark:border-[#2C3636] p-5 sm:p-6 shadow-2xl transition-colors"
         role="dialog"
         aria-modal="true"
       >
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4 pb-2.5 border-b border-[#E0E7E6] dark:border-[#2C3333]">
+        {/* Header - No horizontal line */}
+        <div className="flex justify-between items-start mb-5">
           <div>
-            <h2 className="text-base font-bold text-[#2C3333] dark:text-[#E7F6F2]">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
               Edit Profile
             </h2>
-            <p className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70">
-              Update your photo and account security
+            <p className="text-sm text-gray-500 dark:text-[#A5C9CA]/80 mt-0.5">
+              Manage your personal information, status, and account settings
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-sm text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-[#A5C9CA] dark:hover:bg-[#242D2D] dark:hover:text-white transition cursor-pointer"
             aria-label="Close"
           >
-            <i className="fa-solid fa-xmark" />
+            <i className="fa-solid fa-xmark text-base" />
           </button>
         </div>
 
         {error && (
-          <div className="mb-3.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-xs text-rose-700 dark:text-rose-400 flex items-center gap-2">
-            <i className="fa-solid fa-circle-exclamation flex-shrink-0 text-[11px]" />
+          <div className="mb-3.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-3.5 py-2.5 text-xs text-rose-700 dark:text-rose-400 flex items-center gap-2">
+            <i className="fa-solid fa-circle-exclamation flex-shrink-0 text-xs" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* Horizontal compact Avatar section */}
-          <div className="flex items-center gap-3.5 rounded-xl border border-[#E0E7E6] dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D]/60 p-2.5">
-            <div className="relative flex-shrink-0">
-              <div className="h-14 w-14 rounded-full overflow-hidden border border-[#395B64] dark:border-[#A5C9CA] bg-[#395B64] flex items-center justify-center shadow-xs">
-                {isUploadingAvatar ? (
-                  <i className="fa-solid fa-spinner fa-spin text-base text-white" />
-                ) : avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={username || "User"}
-                    className="h-full w-full object-cover"
-                  />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 2-Column Responsive Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+            {/* ── Left Column: Photo, Status & Account (5 cols) ── */}
+            <div className="md:col-span-5 space-y-4">
+              {/* Photo & Actions */}
+              <div className="flex items-center gap-3.5">
+                <div className="relative flex-shrink-0">
+                  <div className="h-16 w-16 rounded-full overflow-hidden ring-2 ring-gray-150 dark:ring-[#2C3636] bg-[#395B64] flex items-center justify-center shadow-xs">
+                    {isUploadingAvatar ? (
+                      <i className="fa-solid fa-circle-notch fa-spin text-lg text-white" />
+                    ) : avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={username || "User"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xl font-bold text-white select-none">
+                        {username?.charAt(0)?.toUpperCase() || "U"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleAvatarFileSelect}
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                />
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#354141] bg-white dark:bg-[#202727] text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#283232] transition shadow-2xs disabled:opacity-50 cursor-pointer"
+                    >
+                      <i className="fa-solid fa-cloud-arrow-up text-[11px]" />
+                      <span>Upload</span>
+                    </button>
+
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        disabled={isUploadingAvatar}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                        title="Remove photo"
+                      >
+                        <i className="fa-regular fa-trash-can text-[11px]" />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    JPG, PNG or WEBP up to 5MB
+                  </p>
+                </div>
+              </div>
+
+              {/* Availability Status */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                  Availability
+                </label>
+                <div className="grid grid-cols-3 gap-1 rounded-xl border border-gray-200/80 dark:border-[#354141] p-1 bg-gray-50/60 dark:bg-[#1C2324]">
+                  {[
+                    { key: "active", label: "Active", dot: "bg-emerald-500" },
+                    { key: "away", label: "Away", dot: "bg-amber-500" },
+                    { key: "offline", label: "Offline", dot: "bg-gray-400" },
+                  ].map((item) => {
+                    const isSelected = presenceStatus === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setPresenceStatus(item.key)}
+                        className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                          isSelected
+                            ? "bg-white dark:bg-[#283232] text-gray-900 dark:text-white shadow-2xs"
+                            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        }`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${item.dot} shrink-0`}
+                        />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Do Not Disturb (DND) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Do Not Disturb
+                  </label>
+                  <i className="fa-solid fa-moon text-rose-500 text-xs" />
+                </div>
+
+                {isDnd ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40">
+                    <div className="min-w-0 pr-2">
+                      <p className="text-sm font-bold text-rose-700 dark:text-rose-300 leading-tight">
+                        DND mode turned on
+                      </p>
+                      <p className="text-xs font-medium text-rose-600/90 dark:text-rose-400/90 leading-tight mt-0.5">
+                        Until {formatDndTime(user?.dndUntil)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateDndMode && updateDndMode(0)}
+                      className="px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
+                    >
+                      Turn off DND
+                    </button>
+                  </div>
                 ) : (
-                  <span className="text-lg font-bold text-white select-none">
-                    {username?.charAt(0)?.toUpperCase() || "U"}
-                  </span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { label: "30m", minutes: 30 },
+                      { label: "1 hour", minutes: 60 },
+                      { label: "2 hours", minutes: 120 },
+                      { label: "8 hours", minutes: 480 },
+                    ].map((opt) => (
+                      <button
+                        key={opt.minutes}
+                        type="button"
+                        onClick={() =>
+                          updateDndMode && updateDndMode(opt.minutes)
+                        }
+                        className="py-2 px-1 rounded-lg border border-gray-200/80 dark:border-[#354141] bg-white dark:bg-[#202727] hover:border-[#007A5A] hover:text-[#007A5A] text-xs font-semibold text-gray-700 dark:text-gray-300 transition cursor-pointer text-center"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 )}
+              </div>
+
+              {/* Email (Read-Only) */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                  Email
+                </label>
+                <div className="px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-[#1E2525] border border-gray-200/80 dark:border-[#354141] flex items-center justify-between text-sm text-gray-700 dark:text-gray-300">
+                  <span className="truncate font-medium">{user?.email}</span>
+                  <i
+                    className="fa-solid fa-lock text-gray-400 text-xs ml-1 flex-shrink-0"
+                    title="Primary email (verified)"
+                  />
+                </div>
               </div>
             </div>
 
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleAvatarFileSelect}
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-            />
-
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-[#2C3333] dark:text-[#E7F6F2]">
-                Profile Photo
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingAvatar}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] text-[11px] font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#395B64] transition disabled:opacity-50 cursor-pointer shadow-2xs"
-                >
-                  <i className="fa-solid fa-arrow-up-from-bracket text-[10px]" />
-                  <span>Upload</span>
-                </button>
-
-                {avatarUrl && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveAvatar}
-                    disabled={isUploadingAvatar}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                  >
-                    <i className="fa-solid fa-trash-can text-[10px]" />
-                    <span>Remove</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Username Field */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA] mb-1">
-              Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Display name"
-              maxLength={50}
-              className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#2C3333] px-3 py-2 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#2C3333] focus:outline-none transition"
-            />
-          </div>
-
-          {/* Email Field (Read-only) */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA] mb-1">
-              Email
-            </label>
-            <div className="relative">
-              <input
-                type="email"
-                value={user?.email || ""}
-                disabled
-                className="w-full rounded-xl border border-[#E0E7E6] dark:border-[#395B64]/40 bg-gray-100 dark:bg-[#242D2D]/60 px-3 py-2 text-xs text-[#52656A] dark:text-[#A5C9CA]/60 cursor-not-allowed select-none"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#52656A] dark:text-[#A5C9CA]/50">
-                <i className="fa-solid fa-lock" />
-              </span>
-            </div>
-          </div>
-
-          {/* Custom Status Field (Slack Style) */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
-                Custom Status
-              </label>
-              {(statusEmoji || statusText) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatusEmoji("");
-                    setStatusText("");
-                  }}
-                  className="text-[10px] text-gray-500 hover:text-rose-500 dark:text-gray-400 dark:hover:text-rose-400 transition cursor-pointer"
-                >
-                  Clear status
-                </button>
-              )}
-            </div>
-
-            {/* Unified Input Container */}
-            <div className="relative flex items-center rounded-xl border border-[#A5C9CA]/80 dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#242D2D] focus-within:bg-white dark:focus-within:bg-[#202727] focus-within:border-[#007A5A] dark:focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-[#007A5A]/15 transition-all shadow-2xs">
-              <div className="flex items-center pl-2.5 pr-1">
+            <div className="md:col-span-7 space-y-4">
+              {/* Display Name */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                  Display Name
+                </label>
                 <input
                   type="text"
-                  value={statusEmoji}
-                  onChange={(e) => setStatusEmoji(e.target.value)}
-                  placeholder="💬"
-                  maxLength={4}
-                  className="w-8 text-center bg-transparent text-sm focus:outline-none cursor-pointer select-none"
-                  title="Emoji"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Your full name"
+                  maxLength={50}
+                  className="w-full rounded-xl border border-gray-200 dark:border-[#354141] bg-gray-50/50 dark:bg-[#1C2324] px-3.5 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:focus:bg-[#1E2525] focus:border-[#007A5A] dark:focus:border-teal-400 focus:ring-1 focus:ring-[#007A5A]/20 outline-none transition-all"
                 />
-                <div className="h-4 w-px bg-gray-200 dark:bg-[#395B64]/60 mx-1" />
               </div>
-              <input
-                type="text"
-                value={statusText}
-                onChange={(e) => setStatusText(e.target.value)}
-                placeholder="What's your status? (e.g. In a meeting)"
-                maxLength={100}
-                className="flex-1 bg-transparent py-2 pr-2 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:outline-none"
-              />
-              {(statusEmoji || statusText) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatusEmoji("");
-                    setStatusText("");
-                  }}
-                  className="pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs transition cursor-pointer"
-                  title="Clear"
-                >
-                  <i className="fa-solid fa-xmark text-[11px]" />
-                </button>
-              )}
-            </div>
 
-            {/* Quick Slack-style presets */}
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {[
-                { emoji: "📅", text: "In a meeting" },
-                { emoji: "🚗", text: "Commuting" },
-                { emoji: "🤒", text: "Out sick" },
-                { emoji: "🌴", text: "On vacation" },
-                { emoji: "🎯", text: "Focusing" },
-              ].map((preset) => {
-                const isSelected =
-                  statusEmoji === preset.emoji && statusText === preset.text;
-                return (
-                  <button
-                    key={preset.text}
-                    type="button"
-                    onClick={() => {
-                      setStatusEmoji(preset.emoji);
-                      setStatusText(preset.text);
-                    }}
-                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-normal transition-all cursor-pointer ${
-                      isSelected
-                        ? "border border-[#007A5A] dark:border-teal-400 bg-teal-50 dark:bg-teal-950/40 text-[#007A5A] dark:text-teal-300 font-medium"
-                        : "border border-gray-200/80 dark:border-[#354141] bg-white dark:bg-[#1E2525] text-gray-600 dark:text-[#A5C9CA] hover:border-gray-300 dark:hover:border-[#4A5757] hover:bg-gray-50 dark:hover:bg-[#263030]"
-                    }`}
-                  >
-                    <span className="text-xs">{preset.emoji}</span>
-                    <span>{preset.text}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Bio ("About Me") */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
-                About Me / Bio
-              </label>
-              <span className="text-[10px] font-mono text-gray-400 dark:text-[#A5C9CA]/60">
-                {bio.length}/250
-              </span>
-            </div>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value.slice(0, 250))}
-              placeholder="Tell your team a little about yourself (role, interests)..."
-              rows={2}
-              maxLength={250}
-              className="w-full resize-none rounded-xl border border-[#A5C9CA]/80 dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#242D2D] px-3.5 py-2.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:bg-white dark:focus:bg-[#202727] focus:border-[#007A5A] dark:focus:border-teal-400 focus:ring-2 focus:ring-[#007A5A]/15 outline-none transition-all shadow-2xs leading-relaxed"
-            />
-          </div>
-
-          {/* Two-Factor Authentication Section */}
-          <div className="rounded-xl border border-[#E0E7E6] dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D]/60 p-3.5 transition-all">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div
-                  className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
-                    user?.twoFactorEnabled
-                      ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400"
-                      : "bg-[#E0E7E6] text-[#52656A] dark:bg-[#2C3333] dark:text-[#A5C9CA]/80"
-                  }`}
-                >
-                  <i className="fa-solid fa-shield-halved text-xs" />
+              {/* Custom Status */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Custom Status
+                  </label>
+                  {(statusEmoji || statusText) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatusEmoji("");
+                        setStatusText("");
+                      }}
+                      className="text-xs text-gray-400 hover:text-rose-500 transition cursor-pointer"
+                    >
+                      Clear status
+                    </button>
+                  )}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#2C3333] dark:text-[#E7F6F2] truncate">
-                    Two-Factor Authentication
-                  </p>
-                  <p className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 truncate">
-                    {user?.twoFactorEnabled
-                      ? "Active • 6-digit email OTP required on login"
-                      : "Inactive • Add extra email security to your account"}
-                  </p>
-                </div>
-              </div>
 
-              {/* Toggler Switch */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {is2FALoading && (
-                  <i className="fa-solid fa-spinner fa-spin text-xs text-[#395B64] dark:text-[#A5C9CA]" />
-                )}
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={Boolean(user?.twoFactorEnabled)}
-                  onClick={handleToggle2FA}
-                  disabled={is2FALoading}
-                  title={
-                    user?.twoFactorEnabled
-                      ? "Click to disable 2FA"
-                      : "Click to enable 2FA"
-                  }
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#395B64] focus:ring-offset-2 ${
-                    user?.twoFactorEnabled
-                      ? twoFactorMode === "disable"
-                        ? "bg-rose-400"
-                        : "bg-emerald-600"
-                      : twoFactorMode === "setup"
-                        ? "bg-[#395B64]/50"
-                        : "bg-gray-300 dark:bg-gray-600"
-                  } ${is2FALoading ? "opacity-60 cursor-not-allowed" : ""}`}
-                >
-                  <span className="sr-only">
-                    Toggle two-factor authentication
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      user?.twoFactorEnabled ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {twoFactorError && (
-              <div className="mt-2.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1.5 text-[11px] text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
-                <i className="fa-solid fa-circle-exclamation flex-shrink-0 text-[10px]" />
-                <span>{twoFactorError}</span>
-              </div>
-            )}
-
-            {/* Setup or Disable Mode: Enter 6-digit OTP */}
-            {(twoFactorMode === "setup" || twoFactorMode === "disable") && (
-              <div className="mt-3 pt-3 border-t border-[#E0E7E6] dark:border-[#395B64]/30 space-y-2.5">
-                <p className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/80">
-                  Enter the 6-digit verification code sent to{" "}
-                  <strong className="text-[#2C3333] dark:text-[#E7F6F2]">
-                    {user?.email}
-                  </strong>{" "}
-                  to {twoFactorMode === "setup" ? "enable" : "disable"} 2FA:
-                </p>
-
-                <div className="flex items-center gap-2">
+                <div className="relative flex items-center rounded-xl border border-gray-200 dark:border-[#354141] bg-gray-50/50 dark:bg-[#1C2324] focus-within:bg-white dark:focus-within:bg-[#1E2525] focus-within:border-[#007A5A] dark:focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-[#007A5A]/20 transition-all">
+                  <div className="flex items-center pl-3 pr-1">
+                    <input
+                      type="text"
+                      value={statusEmoji}
+                      onChange={(e) => setStatusEmoji(e.target.value)}
+                      placeholder="💬"
+                      maxLength={4}
+                      className="w-8 text-center bg-transparent text-base focus:outline-none cursor-pointer select-none"
+                      title="Emoji"
+                    />
+                    <div className="h-4 w-px bg-gray-200 dark:bg-[#354141] mx-1" />
+                  </div>
                   <input
                     type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    value={setupOtp}
-                    onChange={(e) => {
-                      setSetupOtp(
-                        e.target.value.replace(/\D/g, "").slice(0, 6),
-                      );
-                      setTwoFactorError("");
-                    }}
-                    placeholder="000000"
-                    className="flex-1 sm:w-32 rounded-lg border border-[#A5C9CA] dark:border-[#395B64] bg-white dark:bg-[#1E2525] px-2.5 py-1.5 text-center font-mono text-sm font-bold tracking-widest text-[#2C3333] dark:text-white outline-none focus:border-[#395B64]"
-                    autoFocus
+                    value={statusText}
+                    onChange={(e) => setStatusText(e.target.value)}
+                    placeholder="What's your status? (e.g. In a meeting)"
+                    maxLength={100}
+                    className="flex-1 bg-transparent py-2 pr-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none"
                   />
-
-                  <button
-                    type="button"
-                    onClick={
-                      twoFactorMode === "setup"
-                        ? handleConfirmEnable2FA
-                        : handleConfirmDisable2FA
-                    }
-                    disabled={is2FALoading || setupOtp.trim().length !== 6}
-                    className={`cursor-pointer px-3.5 py-1.5 rounded-lg text-[11px] font-bold text-white transition disabled:opacity-50 shadow-2xs whitespace-nowrap ${
-                      twoFactorMode === "setup"
-                        ? "bg-emerald-600 hover:bg-emerald-700"
-                        : "bg-rose-600 hover:bg-rose-700"
-                    }`}
-                  >
-                    {is2FALoading
-                      ? "Verifying..."
-                      : twoFactorMode === "setup"
-                        ? "Verify & Enable"
-                        : "Verify & Disable"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactorMode("idle");
-                      setSetupOtp("");
-                      setTwoFactorError("");
-                    }}
-                    className="cursor-pointer px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#395B64]/50 text-[11px] font-medium text-[#52656A] dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#1E2525] transition"
-                  >
-                    Cancel
-                  </button>
+                  {(statusEmoji || statusText) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatusEmoji("");
+                        setStatusText("");
+                      }}
+                      className="pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs transition cursor-pointer"
+                      title="Clear"
+                    >
+                      <i className="fa-solid fa-xmark text-xs" />
+                    </button>
+                  )}
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 pt-0.5">
-                  <span>Didn't get the code?</span>
-                  <button
-                    type="button"
-                    onClick={
-                      twoFactorMode === "setup"
-                        ? handleStart2FASetup
-                        : handleStart2FADisable
-                    }
-                    disabled={setupCooldown > 0 || is2FALoading}
-                    className="cursor-pointer font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
-                  >
-                    {setupCooldown > 0
-                      ? `Resend in ${setupCooldown}s`
-                      : "Resend code"}
-                  </button>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {STATUS_PRESETS.map((preset) => {
+                    const isSelected =
+                      statusEmoji === preset.emoji &&
+                      statusText === preset.text;
+                    return (
+                      <button
+                        key={preset.text}
+                        type="button"
+                        onClick={() => {
+                          setStatusEmoji(preset.emoji);
+                          setStatusText(preset.text);
+                        }}
+                        className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                          isSelected
+                            ? "border border-[#007A5A] dark:border-teal-400 bg-teal-50 dark:bg-teal-950/40 text-[#007A5A] dark:text-teal-300 font-semibold"
+                            : "border border-gray-200/80 dark:border-[#354141] bg-white dark:bg-[#202727] text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-[#283232]"
+                        }`}
+                      >
+                        <i className={`${preset.icon} text-xs`} />
+                        <span>{preset.text}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            )}
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    About Me
+                  </label>
+                  <span className="text-xs font-mono text-gray-400 dark:text-gray-500">
+                    {bio.length}/250
+                  </span>
+                </div>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value.slice(0, 250))}
+                  placeholder="Share a short bio (role, interests)..."
+                  rows={2}
+                  maxLength={250}
+                  className="w-full resize-none rounded-xl border border-gray-200 dark:border-[#354141] bg-gray-50/50 dark:bg-[#1C2324] px-3.5 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:focus:bg-[#1E2525] focus:border-[#007A5A] dark:focus:border-teal-400 focus:ring-1 focus:ring-[#007A5A]/20 outline-none transition-all leading-relaxed"
+                />
+              </div>
+
+              <div className="rounded-xl border border-gray-200/80 dark:border-[#354141] bg-gray-50/50 dark:bg-[#1F2727]/50 p-3 transition-all">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
+                        user?.twoFactorEnabled
+                          ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400"
+                          : "bg-gray-200 text-gray-500 dark:bg-[#2C3333] dark:text-gray-400"
+                      }`}
+                    >
+                      <i className="fa-solid fa-shield-halved text-xs" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate leading-tight">
+                        Two-Factor Authentication
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">
+                        {user?.twoFactorEnabled
+                          ? "Active • Email OTP required on login"
+                          : "Inactive • Add extra email security"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(user?.twoFactorEnabled)}
+                    onClick={handleToggle2FA}
+                    disabled={is2FALoading}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      user?.twoFactorEnabled
+                        ? twoFactorMode === "disable"
+                          ? "bg-rose-400"
+                          : "bg-[#007A5A]"
+                        : twoFactorMode === "setup"
+                          ? "bg-[#007A5A]/50"
+                          : "bg-gray-300 dark:bg-gray-600"
+                    } ${is2FALoading ? "opacity-60 cursor-not-allowed" : ""}`}
+                  >
+                    <span className="sr-only">Toggle 2FA</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                        user?.twoFactorEnabled
+                          ? "translate-x-4"
+                          : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {twoFactorError && (
+                  <div className="mt-2.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1.5 text-xs text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                    <i className="fa-solid fa-circle-exclamation flex-shrink-0 text-xs" />
+                    <span>{twoFactorError}</span>
+                  </div>
+                )}
+
+                {(twoFactorMode === "setup" || twoFactorMode === "disable") && (
+                  <div className="mt-3 pt-2.5 border-t border-gray-200/80 dark:border-[#354141] space-y-2">
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
+                      Enter the 6-digit code sent to{" "}
+                      <strong className="text-gray-900 dark:text-white">
+                        {user?.email}
+                      </strong>
+                      :
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        value={setupOtp}
+                        onChange={(e) => {
+                          setSetupOtp(
+                            e.target.value.replace(/\D/g, "").slice(0, 6),
+                          );
+                          setTwoFactorError("");
+                        }}
+                        placeholder="000000"
+                        className="w-28 rounded-lg border border-gray-200 dark:border-[#354141] bg-white dark:bg-[#181F20] px-2.5 py-1.5 text-center font-mono text-sm font-bold tracking-widest text-gray-900 dark:text-white outline-none focus:border-[#007A5A]"
+                        autoFocus
+                      />
+
+                      <button
+                        type="button"
+                        onClick={
+                          twoFactorMode === "setup"
+                            ? handleConfirmEnable2FA
+                            : handleConfirmDisable2FA
+                        }
+                        disabled={is2FALoading || setupOtp.trim().length !== 6}
+                        className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold text-white transition disabled:opacity-50 whitespace-nowrap ${
+                          twoFactorMode === "setup"
+                            ? "bg-[#007A5A] hover:bg-[#00664B]"
+                            : "bg-rose-600 hover:bg-rose-700"
+                        }`}
+                      >
+                        {is2FALoading ? "Verifying..." : "Verify"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTwoFactorMode("idle");
+                          setSetupOtp("");
+                          setTwoFactorError("");
+                        }}
+                        className="cursor-pointer px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#354141] text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#242D2D] transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Footer Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E0E7E6] dark:border-[#2C3333]">
+          {/* Footer - No horizontal line */}
+          <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition cursor-pointer"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#202727] transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving || isUploadingAvatar || !username.trim()}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#395B64] hover:bg-[#2C3333] dark:hover:bg-[#4A7C88] transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-sm font-semibold text-white bg-[#007A5A] hover:bg-[#00664B] active:bg-[#005A42] transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isSaving && (
-                <i className="fa-solid fa-spinner fa-spin text-xs" />
+                <i className="fa-solid fa-circle-notch fa-spin text-xs" />
               )}
               <span>{isSaving ? "Saving..." : "Save Changes"}</span>
             </button>

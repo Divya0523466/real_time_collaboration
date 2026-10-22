@@ -121,6 +121,10 @@ const UserProfileCardModal = ({
             <StatusBadge
               status={presence}
               size="sm"
+              isDnd={Boolean(
+                profileData?.dndUntil &&
+                  new Date(profileData.dndUntil).getTime() > Date.now(),
+              )}
               className="absolute bottom-0.5 right-0.5 ring-[2.5px] ring-white dark:ring-[#181F20]"
             />
           </div>
@@ -173,6 +177,28 @@ const UserProfileCardModal = ({
               @{username.toLowerCase().replace(/\s+/g, "")}
             </p>
           </div>
+
+          {/* Do Not Disturb Banner */}
+          {Boolean(
+            profileData?.dndUntil &&
+              new Date(profileData.dndUntil).getTime() > Date.now(),
+          ) && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-rose-50/80 dark:bg-rose-950/30 px-3 py-2 text-xs text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-900/40">
+              <i className="fa-solid fa-moon text-xs text-rose-500 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <span className="font-semibold block leading-tight">
+                  Do Not Disturb turned on
+                </span>
+                <span className="text-[11px] opacity-80 block leading-tight mt-0.5">
+                  DND mode active until{" "}
+                  {new Date(profileData.dndUntil).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Custom Status Card (Slack Style) */}
           {hasCustomStatus && (

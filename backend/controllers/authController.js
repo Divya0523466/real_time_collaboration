@@ -988,7 +988,7 @@ const updatePresenceStatus = async (req, res) => {
 const getUserProfile = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId).select("username email avatar bio customStatus presenceStatus status role createdAt");
+    const user = await User.findById(userId).select("username email avatar bio customStatus dndUntil presenceStatus status role createdAt");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -1000,6 +1000,7 @@ const getUserProfile = async (req, res) => {
         avatar: user.avatar,
         bio: user.bio || "",
         customStatus: user.customStatus || { text: "", emoji: "" },
+        dndUntil: user.dndUntil || null,
         presenceStatus: user.presenceStatus || "active",
         status: user.status || "active",
         role: user.role || "user",
@@ -1011,7 +1012,54 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+const updateDnd = async (req, res) => {
+  try {
+    const userId = req.userId || req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { durationMinutes, dndUntil: explicitUntil } = req.body;
+    let newDndUntil = null;
+
+    if (durationMinutes && typeof durationMinutes === "number" && durationMinutes > 0) {
+      newDndUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
+    } else if (explicitUntil) {
+      const parsed = new Date(explicitUntil);
+      if (!isNaN(parsed.getTime()) && parsed > new Date()) {
+        newDndUntil = parsed;
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { dndUntil: newDndUntil },
+      { new: true, runValidators: true }
+    ).select("username email dndUntil presenceStatus");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("user-dnd-updated", {
+        userId: updatedUser._id.toString(),
+        dndUntil: updatedUser.dndUntil,
+      });
+    }
+
+    return res.status(200).json({
+      message: newDndUntil ? "Do Not Disturb activated" : "Do Not Disturb turned off",
+      dndUntil: updatedUser.dndUntil,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update DND mode", error: error.message });
+  }
+};
+
 export {
+  updateDnd,
   register,
   login,
   verify2FA,

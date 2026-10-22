@@ -50,6 +50,7 @@ export const getMe = async (req, res) => {
         twoFactorEnabled: Boolean(user.twoFactorEnabled),
         bio: user.bio || "",
         customStatus: user.customStatus || { text: "", emoji: "" },
+        dndUntil: user.dndUntil || null,
         blockedUsers: (user.blockedUsers || []).map((id) => id.toString()),
       },
       workspaces,

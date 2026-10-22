@@ -131,6 +131,15 @@ export const WorkspaceProvider = ({ children }) => {
   const mutedConversationsRef = useRef(mutedConversations);
   mutedConversationsRef.current = mutedConversations;
 
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  const isDndActive = useCallback((targetUser) => {
+    const dndTime = targetUser?.dndUntil;
+    if (!dndTime) return false;
+    return new Date(dndTime).getTime() > Date.now();
+  }, []);
+
   const toggleMuteConversation = useCallback((type, id) => {
     if (!type || !id) return;
     const key = `${type}:${id}`;
@@ -360,6 +369,7 @@ export const WorkspaceProvider = ({ children }) => {
       setUnreadNotificationsCount((prev) => prev + 1);
 
       if (isMutedGlobalRef.current) return;
+      if (userRef.current?.dndUntil && new Date(userRef.current.dndUntil).getTime() > Date.now()) return;
 
       const cId = (newNotif.channelId?._id || newNotif.channelId)?.toString();
       const sId = (newNotif.spaceId?._id || newNotif.spaceId)?.toString();
@@ -451,11 +461,36 @@ export const WorkspaceProvider = ({ children }) => {
       }
     };
 
+    const handleUserDndUpdated = ({ userId, dndUntil }) => {
+      if (!userId) return;
+      const myId = (userRef.current?.id || userRef.current?._id)?.toString();
+      if (userId === myId) {
+        setUser((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev, dndUntil };
+          try {
+            localStorage.setItem("worknestUser", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+      setWorkspaceData((prev) => {
+        if (!prev || !Array.isArray(prev.members)) return prev;
+        return {
+          ...prev,
+          members: prev.members.map((m) =>
+            (m._id || m.id)?.toString() === userId ? { ...m, dndUntil } : m,
+          ),
+        };
+      });
+    };
+
     const handleSocketConnect = () => {
       requestOnlineUsers();
     };
 
     socket.on("receive-notification", handleNotification);
+    socket.on("user-dnd-updated", handleUserDndUpdated);
     socket.on("channel-member-removed", handleChannelMemberRemoved);
     socket.on("channel-member-added", handleChannelMemberAdded);
     socket.on("connect", handleSocketConnect);
@@ -470,6 +505,7 @@ export const WorkspaceProvider = ({ children }) => {
 
     return () => {
       socket.off("receive-notification", handleNotification);
+      socket.off("user-dnd-updated", handleUserDndUpdated);
       socket.off("channel-member-removed", handleChannelMemberRemoved);
       socket.off("channel-member-added", handleChannelMemberAdded);
       socket.off("connect", handleSocketConnect);
@@ -1262,6 +1298,41 @@ export const WorkspaceProvider = ({ children }) => {
     [API_URL],
   );
 
+  const updateDndMode = useCallback(
+    async (durationMinutes) => {
+      try {
+        const response = await fetch(`${API_URL}/auth/dnd`, {
+          method: "PUT",
+          credentials: "include",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ durationMinutes }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to update DND mode");
+        }
+        setUser((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev, dndUntil: data.dndUntil };
+          try {
+            localStorage.setItem("worknestUser", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        if (data.dndUntil) {
+          toast.info("Do Not Disturb turned on");
+        } else {
+          toast.success("Do Not Disturb turned off");
+        }
+        return data;
+      } catch (err) {
+        toast.error(err.message || "Failed to update DND mode");
+        throw err;
+      }
+    },
+    [API_URL],
+  );
+
   const value = {
     isInitializing,
     user,
@@ -1279,6 +1350,8 @@ export const WorkspaceProvider = ({ children }) => {
     userStatuses,
     getUserPresenceStatus,
     updateUserPresenceStatus,
+    updateDndMode,
+    isDndActive,
     initializeFromAuth,
     clearAuth,
     fetchPendingInvitations,

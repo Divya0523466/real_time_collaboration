@@ -84,7 +84,7 @@ const MessageThread = ({
   onClearError,
   onViewProfile,
 }) => {
-  const { isUserOnline, workspaceData, user, getUserPresenceStatus } =
+  const { isUserOnline, workspaceData, user, getUserPresenceStatus, isDndActive } =
     useWorkspace();
   const resolvedCurrentUserId = (
     currentUserId?._id ||
@@ -358,6 +358,7 @@ const MessageThread = ({
             <StatusBadge
               status={getUserPresenceStatus(activeSelectedUser.id)}
               size="md"
+              isDnd={isDndActive?.(activeSelectedUser)}
               className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#1A2121]"
             />
           </div>
@@ -366,6 +367,17 @@ const MessageThread = ({
               <h3 className="font-bold text-base text-[#2C3333] dark:text-white cursor-pointer hover:underline" onClick={() => onViewProfile && onViewProfile(activeSelectedUser)} title="View profile">
                 {activeSelectedUser.username || "User"}
               </h3>
+              {isDndActive?.(activeSelectedUser) && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 text-[10px] font-semibold select-none"
+                  title="Do Not Disturb mode is active"
+                >
+                  <i className="fa-solid fa-moon text-[8px]" />
+                  <span>DND</span>
+                </span>
+              )}
+
+
               <span
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
                   getUserPresenceStatus(selectedUser.id) === "active"
