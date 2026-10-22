@@ -14,6 +14,7 @@ import {
   resetPassword,
   updateProfile,
   updatePresenceStatus,
+  getUserProfile,
 } from "../controllers/authController.js";
 import {
   initiateGoogleOAuth,
@@ -28,6 +29,7 @@ router.get("/google", initiateGoogleOAuth);
 router.get("/google/callback", googleOAuthCallback);
 router.get("/me", authenticateToken, getMe);
 router.put("/profile", authenticateToken, updateProfile);
+router.get("/users/:userId/profile", authenticateToken, getUserProfile);
 router.patch("/status", authenticateToken, updatePresenceStatus);
 
 router.post("/register", register);

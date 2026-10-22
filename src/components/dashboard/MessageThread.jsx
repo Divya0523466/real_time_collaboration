@@ -82,6 +82,7 @@ const MessageThread = ({
   isBlocked = false,
   onToggleBlock,
   onClearError,
+  onViewProfile,
 }) => {
   const { isUserOnline, workspaceData, user, getUserPresenceStatus } =
     useWorkspace();
@@ -336,7 +337,7 @@ const MessageThread = ({
             <i className="fa-solid fa-bars text-sm" />
           </button>
 
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 cursor-pointer" onClick={() => onViewProfile && onViewProfile(activeSelectedUser)} title="View profile">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white shadow-xs overflow-hidden">
               {activeSelectedUser.avatar ||
               activeSelectedUser.avatarUrl ||
@@ -362,7 +363,7 @@ const MessageThread = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-base text-[#2C3333] dark:text-white">
+              <h3 className="font-bold text-base text-[#2C3333] dark:text-white cursor-pointer hover:underline" onClick={() => onViewProfile && onViewProfile(activeSelectedUser)} title="View profile">
                 {activeSelectedUser.username || "User"}
               </h3>
               <span
@@ -511,7 +512,7 @@ const MessageThread = ({
                 >
                   {/* Receiver Avatar (left side) */}
                   {!isSender && (
-                    <div className="flex-shrink-0 mb-0.5">
+                    <div className="flex-shrink-0 mb-0.5 cursor-pointer" onClick={() => onViewProfile && onViewProfile(activeSelectedUser)} title="View profile">
                       <Avatar
                         username={activeSelectedUser?.username}
                         avatar={
@@ -927,7 +928,7 @@ const MessageThread = ({
 
                   {/* Sender Avatar (right side) */}
                   {isSender && (
-                    <div className="flex-shrink-0 mb-0.5">
+                    <div className="flex-shrink-0 mb-0.5 cursor-pointer" onClick={() => onViewProfile && onViewProfile(activeSelectedUser)} title="View profile">
                       <Avatar
                         username={user?.username || "You"}
                         avatar={

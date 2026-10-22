@@ -48,6 +48,8 @@ export const getMe = async (req, res) => {
         status: user.status || "active",
         presenceStatus: user.presenceStatus || "active",
         twoFactorEnabled: Boolean(user.twoFactorEnabled),
+        bio: user.bio || "",
+        customStatus: user.customStatus || { text: "", emoji: "" },
         blockedUsers: (user.blockedUsers || []).map((id) => id.toString()),
       },
       workspaces,

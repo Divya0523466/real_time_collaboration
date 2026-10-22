@@ -11,7 +11,7 @@ const formatGroupDate = (dateString) => {
   });
 };
 
-const GroupInfoModal = ({ isOpen = true, onClose, group, currentUserId }) => {
+const GroupInfoModal = ({ isOpen = true, onClose, group, currentUserId, onViewProfile }) => {
   const [groupDetails, setGroupDetails] = useState(group);
   const [searchMember, setSearchMember] = useState("");
   const [loading, setLoading] = useState(false);
@@ -162,7 +162,8 @@ const GroupInfoModal = ({ isOpen = true, onClose, group, currentUserId }) => {
                   return (
                     <div
                       key={mId || Math.random()}
-                      className="flex items-center justify-between p-2.5 hover:bg-gray-50 dark:hover:bg-[#2C3333] transition"
+                      className="flex items-center justify-between p-2.5 hover:bg-gray-50 dark:hover:bg-[#2C3333] transition cursor-pointer"
+                      onClick={() => onViewProfile && onViewProfile(member)}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64] text-xs font-bold text-gray-700 dark:text-white overflow-hidden shrink-0">

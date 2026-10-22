@@ -34,6 +34,7 @@ import GroupMessageThread from "./GroupMessageThread";
 import StatusBadge from "../common/StatusBadge";
 import StatusSelector from "../common/StatusSelector";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
+import UserProfileCardModal from "../common/UserProfileCardModal";
 import { fetchPinnedMessagesApi, togglePinMessageApi } from "../../services/messageService";
 import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { fetchGroupsApi } from "../../services/groupService";
@@ -174,6 +175,7 @@ const SlackShell = () => {
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null);
   const [showChannelPinnedDrawer, setShowChannelPinnedDrawer] = useState(false);
   const [channelPinnedMessages, setChannelPinnedMessages] = useState([]);
+  const [viewingProfileUser, setViewingProfileUser] = useState(null);
 
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
   const [isDMsCollapsed, setIsDMsCollapsed] = useState(false);
@@ -4865,9 +4867,11 @@ const SlackShell = () => {
                 (selectedDMUser?.id || selectedDMUser?._id)?.toString(),
               )}
               onToggleBlock={(e) => handleToggleBlockUser(selectedDMUser, e)}
+              onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
             />
           ) : selectedSpace ? (
             <SpaceMessageThread
+              onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               space={selectedSpace}
               currentUserId={user?.id || user?._id}
               currentUser={user}
@@ -4890,6 +4894,7 @@ const SlackShell = () => {
             />
           ) : selectedGroup ? (
             <GroupMessageThread
+              onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               group={selectedGroup}
               currentUserId={user?.id || user?._id}
               currentUser={user}
@@ -4897,6 +4902,7 @@ const SlackShell = () => {
             />
           ) : (
             <ChannelMessageThread
+              onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               channel={activeChannel || currentChannel}
               currentUserId={user?.id || user?._id}
               onForwardMessage={handleOpenForwardModal}
@@ -5103,7 +5109,8 @@ const SlackShell = () => {
                       {activeChannel?.members?.map((m) => (
                         <div
                           key={m.id}
-                          className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D]"
+                          onClick={() => setViewingProfileUser(m)}
+                          className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D] cursor-pointer"
                         >
                           <div className="relative flex-shrink-0">
                             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#395B64] text-[10px] font-bold text-white">
@@ -5153,6 +5160,24 @@ const SlackShell = () => {
         conversationTitle={currentChannel?.name || "channel"}
         conversationType="channel"
       />
+
+      {/* Slack-style User Profile Card Modal */}
+      {viewingProfileUser && (
+        <UserProfileCardModal
+          user={viewingProfileUser}
+          currentUserId={user?.id || user?._id}
+          onClose={() => setViewingProfileUser(null)}
+          onNavigateDM={(targetUser) => {
+            setViewingProfileUser(null);
+            handleSelectDM(targetUser);
+          }}
+          onOpenEditProfile={() => {
+            setViewingProfileUser(null);
+            setShowProfileModal(true);
+          }}
+          getUserPresenceStatus={getUserPresenceStatus}
+        />
+      )}
 
       {/* Create Workspace Modal */}
       {showCreateWorkspaceModal && (
@@ -5439,7 +5464,8 @@ const SlackShell = () => {
                 return (
                   <div
                     key={member.id}
-                    className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#242D2D] p-3 hover:border-[#A5C9CA] dark:hover:border-[#395B64] transition shadow-xs"
+                    className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#242D2D] p-3 hover:border-[#A5C9CA] dark:hover:border-[#395B64] transition shadow-xs cursor-pointer"
+                    onClick={() => setViewingProfileUser(member)}
                   >
                     <div className="relative flex-shrink-0">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
@@ -5491,7 +5517,7 @@ const SlackShell = () => {
 
                       {/* Owner controls: Change role or remove member */}
                       {selectedRole === "OWNER" && !isSelf && !isOwner && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => {

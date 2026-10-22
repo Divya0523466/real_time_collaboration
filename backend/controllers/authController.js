@@ -545,7 +545,7 @@ const logout = (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { username, avatar } = req.body;
+    const { username, avatar, bio, customStatus } = req.body;
     const userId = req.userId;
 
     const updates = {};
@@ -563,11 +563,34 @@ const updateProfile = async (req, res) => {
       updates.avatar = typeof avatar === "string" ? avatar.trim() : "";
     }
 
+    if (bio !== undefined) {
+      updates.bio = typeof bio === "string" ? bio.trim().slice(0, 250) : "";
+    }
+
+    if (customStatus !== undefined) {
+      updates.customStatus = {
+        text: typeof customStatus?.text === "string" ? customStatus.text.trim().slice(0, 100) : "",
+        emoji: typeof customStatus?.emoji === "string" ? customStatus.emoji.trim() : "",
+        updatedAt: new Date(),
+      };
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updates },
       { new: true },
     ).select("-password");
+
+    const io = req.app.get("io");
+    if (io && updatedUser) {
+      io.emit("user-profile-updated", {
+        userId: updatedUser._id,
+        username: updatedUser.username,
+        avatar: updatedUser.avatar,
+        bio: updatedUser.bio || "",
+        customStatus: updatedUser.customStatus || { text: "", emoji: "" },
+      });
+    }
 
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
@@ -580,6 +603,8 @@ const updateProfile = async (req, res) => {
         username: updatedUser.username,
         email: updatedUser.email,
         avatar: updatedUser.avatar,
+        bio: updatedUser.bio || "",
+        customStatus: updatedUser.customStatus || { text: "", emoji: "" },
         twoFactorEnabled: Boolean(updatedUser.twoFactorEnabled),
       },
     });
@@ -960,6 +985,32 @@ const updatePresenceStatus = async (req, res) => {
   }
 };
 
+const getUserProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).select("username email avatar bio customStatus presenceStatus status role createdAt");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        bio: user.bio || "",
+        customStatus: user.customStatus || { text: "", emoji: "" },
+        presenceStatus: user.presenceStatus || "active",
+        status: user.status || "active",
+        role: user.role || "user",
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to fetch user profile", error: error.message });
+  }
+};
+
 export {
   register,
   login,
@@ -975,4 +1026,5 @@ export {
   resetPassword,
   updateProfile,
   updatePresenceStatus,
+  getUserProfile,
 };

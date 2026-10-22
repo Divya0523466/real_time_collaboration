@@ -1131,7 +1131,7 @@ export const WorkspaceProvider = ({ children }) => {
   );
 
   const updateUserProfile = useCallback(
-    async ({ username, avatar }) => {
+    async ({ username, avatar, bio, customStatus }) => {
       setLoading(true);
       setError(null);
       try {
@@ -1141,7 +1141,7 @@ export const WorkspaceProvider = ({ children }) => {
           headers: getAuthHeaders({
             "Content-Type": "application/json",
           }),
-          body: JSON.stringify({ username, avatar }),
+          body: JSON.stringify({ username, avatar, bio, customStatus }),
         });
 
         const data = await response.json();
@@ -1164,6 +1164,8 @@ export const WorkspaceProvider = ({ children }) => {
                 username: updatedUser.username,
                 avatar: updatedUser.avatar,
                 avatarUrl: updatedUser.avatar,
+                bio: updatedUser.bio,
+                customStatus: updatedUser.customStatus,
                 ...(m.user
                   ? {
                       user: {
@@ -1171,6 +1173,8 @@ export const WorkspaceProvider = ({ children }) => {
                         username: updatedUser.username,
                         avatar: updatedUser.avatar,
                         avatarUrl: updatedUser.avatar,
+                bio: updatedUser.bio,
+                customStatus: updatedUser.customStatus,
                       },
                     }
                   : {}),

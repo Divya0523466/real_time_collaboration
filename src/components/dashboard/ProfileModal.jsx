@@ -18,6 +18,9 @@ const ProfileModal = ({ onClose }) => {
   const { user, setUser, updateUserProfile } = useWorkspace();
   const [username, setUsername] = useState(user?.username || "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [statusText, setStatusText] = useState(user?.customStatus?.text || "");
+  const [statusEmoji, setStatusEmoji] = useState(user?.customStatus?.emoji || "");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -282,6 +285,11 @@ const ProfileModal = ({ onClose }) => {
       await updateUserProfile({
         username: trimmedUsername,
         avatar: avatarUrl,
+        bio: bio.trim().slice(0, 250),
+        customStatus: {
+          text: statusText.trim().slice(0, 100),
+          emoji: statusEmoji.trim(),
+        },
       });
       onClose();
     } catch (err) {
@@ -421,6 +429,116 @@ const ProfileModal = ({ onClose }) => {
                 <i className="fa-solid fa-lock" />
               </span>
             </div>
+          </div>
+
+          {/* Custom Status Field (Slack Style) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
+                Custom Status
+              </label>
+              {(statusEmoji || statusText) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusEmoji("");
+                    setStatusText("");
+                  }}
+                  className="text-[10px] text-gray-500 hover:text-rose-500 dark:text-gray-400 dark:hover:text-rose-400 transition cursor-pointer"
+                >
+                  Clear status
+                </button>
+              )}
+            </div>
+
+            {/* Unified Input Container */}
+            <div className="relative flex items-center rounded-xl border border-[#A5C9CA]/80 dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#242D2D] focus-within:bg-white dark:focus-within:bg-[#202727] focus-within:border-[#007A5A] dark:focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-[#007A5A]/15 transition-all shadow-2xs">
+              <div className="flex items-center pl-2.5 pr-1">
+                <input
+                  type="text"
+                  value={statusEmoji}
+                  onChange={(e) => setStatusEmoji(e.target.value)}
+                  placeholder="💬"
+                  maxLength={4}
+                  className="w-8 text-center bg-transparent text-sm focus:outline-none cursor-pointer select-none"
+                  title="Emoji"
+                />
+                <div className="h-4 w-px bg-gray-200 dark:bg-[#395B64]/60 mx-1" />
+              </div>
+              <input
+                type="text"
+                value={statusText}
+                onChange={(e) => setStatusText(e.target.value)}
+                placeholder="What's your status? (e.g. In a meeting)"
+                maxLength={100}
+                className="flex-1 bg-transparent py-2 pr-2 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:outline-none"
+              />
+              {(statusEmoji || statusText) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusEmoji("");
+                    setStatusText("");
+                  }}
+                  className="pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs transition cursor-pointer"
+                  title="Clear"
+                >
+                  <i className="fa-solid fa-xmark text-[11px]" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Slack-style presets */}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {[
+                { emoji: "📅", text: "In a meeting" },
+                { emoji: "🚗", text: "Commuting" },
+                { emoji: "🤒", text: "Out sick" },
+                { emoji: "🌴", text: "On vacation" },
+                { emoji: "🎯", text: "Focusing" },
+              ].map((preset) => {
+                const isSelected =
+                  statusEmoji === preset.emoji && statusText === preset.text;
+                return (
+                  <button
+                    key={preset.text}
+                    type="button"
+                    onClick={() => {
+                      setStatusEmoji(preset.emoji);
+                      setStatusText(preset.text);
+                    }}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-normal transition-all cursor-pointer ${
+                      isSelected
+                        ? "border border-[#007A5A] dark:border-teal-400 bg-teal-50 dark:bg-teal-950/40 text-[#007A5A] dark:text-teal-300 font-medium"
+                        : "border border-gray-200/80 dark:border-[#354141] bg-white dark:bg-[#1E2525] text-gray-600 dark:text-[#A5C9CA] hover:border-gray-300 dark:hover:border-[#4A5757] hover:bg-gray-50 dark:hover:bg-[#263030]"
+                    }`}
+                  >
+                    <span className="text-xs">{preset.emoji}</span>
+                    <span>{preset.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bio ("About Me") */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
+                About Me / Bio
+              </label>
+              <span className="text-[10px] font-mono text-gray-400 dark:text-[#A5C9CA]/60">
+                {bio.length}/250
+              </span>
+            </div>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value.slice(0, 250))}
+              placeholder="Tell your team a little about yourself (role, interests)..."
+              rows={2}
+              maxLength={250}
+              className="w-full resize-none rounded-xl border border-[#A5C9CA]/80 dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#242D2D] px-3.5 py-2.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:bg-white dark:focus:bg-[#202727] focus:border-[#007A5A] dark:focus:border-teal-400 focus:ring-2 focus:ring-[#007A5A]/15 outline-none transition-all shadow-2xs leading-relaxed"
+            />
           </div>
 
           {/* Two-Factor Authentication Section */}

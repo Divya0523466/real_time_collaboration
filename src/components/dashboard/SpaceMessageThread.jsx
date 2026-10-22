@@ -123,6 +123,7 @@ const SpaceMessageThread = ({
   onNavigateSource,
   onMobileMenuClick,
   onOpenSidebar,
+  onViewProfile,
 }) => {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
@@ -687,7 +688,8 @@ const SpaceMessageThread = ({
                 >
                   {!isSender && (
                     <div className="flex-shrink-0 mb-0.5">
-                      <Avatar username={username} avatar={avatar} />
+                      <button type="button" onClick={() => onViewProfile && onViewProfile(message.sender || { _id: senderId, id: senderId, username, avatar })} className="hover:opacity-85 transition-opacity cursor-pointer focus:outline-none"><Avatar username={username} avatar={avatar} /></button>
+
                     </div>
                   )}
 
@@ -781,7 +783,7 @@ const SpaceMessageThread = ({
 
                       {!isImageOrFile && (
                         <>
-                          <div className="w-px h-3.5 bg-[#E0E7E6] dark:bg-[#395B64]/40 mx-0.5" />
+                          <button className="w-px h-3.5 bg-[#E0E7E6] dark:bg-[#395B64]/40 mx-0.5" />
                           <div className="group/tip relative">
                             <button
                               type="button"
@@ -829,9 +831,10 @@ const SpaceMessageThread = ({
                       </p>
                     </div>
                   ) : (
-                    <div className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[78%] sm:max-w-[65%]`}>
+                    <div className={`flex flex-col ${isSender ? "items-end" : "items-start"} max-w-[78%] sm:max-w-[65%]`}>{/*
 
-                      <div
+                      <button
+*/} <div
                         className={`w-fit max-w-full text-sm ${
                           isPureAttachment
                             ? "bg-transparent border-0 shadow-none px-0 py-0"
@@ -843,9 +846,11 @@ const SpaceMessageThread = ({
                         }`}
                       >
                         {!isSender && username && (
-                          <p className="text-xs font-bold text-[#00897b] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
+                          <button type="button" onClick={() => onViewProfile && onViewProfile(message.sender || { _id: senderId, id: senderId, username, avatar })} className="text-xs font-bold text-[#00897b] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none hover:underline cursor-pointer text-left focus:outline-none">
                             {username}
-                          </p>
+                          </button>
+
+
                         )}
 
                         {message.replyToMessage && (
@@ -1016,7 +1021,7 @@ const SpaceMessageThread = ({
                       {/* Super Admin can delete any message in the space */}
                       {isSuperAdmin && (
                         <>
-                          <div className="w-px h-3.5 bg-[#E0E7E6] dark:bg-[#395B64]/40 mx-0.5" />
+                          <button className="w-px h-3.5 bg-[#E0E7E6] dark:bg-[#395B64]/40 mx-0.5" />
                           <div className="group/tip relative">
                             <button
                               type="button"

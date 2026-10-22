@@ -38,6 +38,7 @@ const GroupMessageThread = ({
   currentUserId,
   currentUser,
   onOpenSidebar,
+  onViewProfile,
 }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -445,7 +446,7 @@ const GroupMessageThread = ({
                 }`}
               >
                 {!isMe && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64] text-xs font-bold text-gray-700 dark:text-white overflow-hidden shrink-0 mt-0.5">
+                  <button type="button" onClick={() => onViewProfile && onViewProfile(msg.sender || { _id: msg.senderId?._id || msg.senderId, id: msg.senderId?._id || msg.senderId, username: senderName, avatar: msg.sender?.avatar })} className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64] text-xs font-bold text-gray-700 dark:text-white overflow-hidden shrink-0 mt-0.5 hover:opacity-80 transition cursor-pointer focus:outline-none">
                     {msg.sender?.avatar ? (
                       <img
                         src={msg.sender.avatar}
@@ -455,7 +456,8 @@ const GroupMessageThread = ({
                     ) : (
                       senderName.charAt(0).toUpperCase()
                     )}
-                  </div>
+                  </button>
+
                 )}
 
                 {isMe && (
@@ -494,9 +496,13 @@ const GroupMessageThread = ({
                   >
                     {!isMe && (
                       <div className="mb-1 flex items-center gap-2">
-                        <span className="font-bold text-teal-600 dark:text-teal-300">
+                        <button
+                          type="button"
+                          onClick={() => onViewProfile && onViewProfile(msg.sender || { _id: msg.senderId?._id || msg.senderId, id: msg.senderId?._id || msg.senderId, username: senderName, avatar: msg.sender?.avatar })}
+                          className="font-bold text-teal-600 dark:text-teal-300 hover:underline cursor-pointer text-left focus:outline-none"
+                        >
                           {senderName}
-                        </span>
+                        </button>
                         <span className="text-[10px] text-gray-400 dark:text-[#A5C9CA]/60 font-normal">
                           {formatMessageTime(msg.createdAt)}
                         </span>
@@ -628,6 +634,10 @@ const GroupMessageThread = ({
           onClose={() => setShowInfoModal(false)}
           group={group}
           currentUserId={currentUserId}
+          onViewProfile={(targetUser) => {
+            setShowInfoModal(false);
+            if (onViewProfile) onViewProfile(targetUser);
+          }}
         />
       )}
 

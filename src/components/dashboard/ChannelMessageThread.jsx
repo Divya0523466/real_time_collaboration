@@ -303,6 +303,7 @@ const MessageRow = ({
   onToggleReaction,
   onForwardMessage,
   onNavigateSource = null,
+  onViewProfile,
   isReply = false,
 }) => {
   const activeUserId = (
@@ -357,7 +358,7 @@ const MessageRow = ({
     >
       {/* Receiver Avatar (left side) */}
       {!isSender && (
-        <div className="flex-shrink-0 mb-0.5">
+        <div className="flex-shrink-0 mb-0.5 cursor-pointer" onClick={() => onViewProfile && onViewProfile(senderMember || message.sender || { username, avatar })} title="View profile">
           <Avatar username={username} avatar={avatar} small={isReply} />
         </div>
       )}
@@ -567,7 +568,7 @@ const MessageRow = ({
           >
             {/* Sender username in Channels (for other users) */}
             {!isSender && username && (
-              <p className="text-xs sm:text-[13px] font-bold text-[#395B64] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none">
+              <p onClick={() => onViewProfile && onViewProfile(senderMember || message.sender || { username, avatar })} className="text-xs sm:text-[13px] font-bold text-[#395B64] dark:text-[#A5C9CA] leading-tight mb-0.5 select-none cursor-pointer hover:underline" title="View profile">
                 {username}
               </p>
             )}
@@ -754,7 +755,7 @@ const MessageRow = ({
 
       {/* Sender Avatar (right side) */}
       {isSender && (
-        <div className="flex-shrink-0 mb-0.5">
+        <div className="flex-shrink-0 mb-0.5 cursor-pointer" onClick={() => onViewProfile && onViewProfile(senderMember || message.sender || { username, avatar })} title="View profile">
           <Avatar username={username} avatar={avatar} small={isReply} />
         </div>
       )}
@@ -783,6 +784,7 @@ const ChannelMessageThread = ({
   currentUserId = null,
   onForwardMessage = () => {},
   onNavigateSource = () => {},
+  onViewProfile,
 }) => {
   const { workspaceData, user } = useWorkspace();
   const resolvedCurrentUserId = (
@@ -1340,6 +1342,7 @@ const ChannelMessageThread = ({
     onToggleReaction: handleToggleReaction,
     onForwardMessage,
     onNavigateSource,
+    onViewProfile,
   };
 
   if (!channel) {

@@ -42,6 +42,7 @@ const DirectMessaging = ({
   onNavigateSource = () => {},
   isBlocked = false,
   onToggleBlock,
+  onViewProfile,
 }) => {
   const { workspaceData, user } = useWorkspace();
   const [selectedUser, setSelectedUser] = useState(externalSelectedUser);
@@ -414,6 +415,7 @@ const DirectMessaging = ({
       isBlocked={isBlocked}
       onToggleBlock={onToggleBlock}
       onClearError={() => setError(null)}
+      onViewProfile={onViewProfile}
     />
   );
 };

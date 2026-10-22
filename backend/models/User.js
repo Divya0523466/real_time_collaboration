@@ -56,6 +56,29 @@ const userSchema = new mongoose.Schema(
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
     },
+    bio: {
+      type: String,
+      maxlength: 250,
+      default: "",
+      trim: true,
+    },
+    customStatus: {
+      text: {
+        type: String,
+        maxlength: 100,
+        default: "",
+        trim: true,
+      },
+      emoji: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      updatedAt: {
+        type: Date,
+        default: null,
+      },
+    },
     resetOtp: {
       type: String,
       default: null,
