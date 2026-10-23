@@ -27,6 +27,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
 import TypingIndicator from "../common/TypingIndicator";
 import useTypingIndicator from "../../hooks/useTypingIndicator";
+import useMessageDraft from "../../hooks/useMessageDraft";
 import StatusSelector from "../common/StatusSelector";
 
 const formatMessageTime = (dateInput) => {
@@ -100,6 +101,13 @@ const GroupMessageThread = ({
       targetId: groupId,
       currentUserId: activeUserId,
     });
+
+  const { saveDraft, clearDraft } = useMessageDraft({
+    conversationType: "group",
+    conversationId: groupId,
+    currentUserId: activeUserId,
+    onDraftLoaded: (saved) => setInputText(saved),
+  });
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -304,6 +312,7 @@ const GroupMessageThread = ({
       setSending(true);
       handleStopTypingNow();
       setInputText("");
+      clearDraft();
 
       // Try sending via Socket first for instant real-time delivery
       if (socket.connected) {
@@ -636,6 +645,7 @@ const GroupMessageThread = ({
             onChange={(e) => {
               setInputText(e.target.value);
               handleKeystroke(e.target.value);
+              saveDraft(e.target.value);
             }}
             onBlur={handleStopTypingNow}
             placeholder={`Message ${group?.name || "group"}...`}

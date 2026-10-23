@@ -35,6 +35,7 @@ import StatusBadge from "../common/StatusBadge";
 import StatusSelector from "../common/StatusSelector";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
 import SharedFilesGallery from "../common/SharedFilesGallery";
+import { useDraftIndicators } from "../../hooks/useMessageDraft";
 import { getMessageAttachments } from "../../utils/fileUtils";
 import UserProfileCardModal from "../common/UserProfileCardModal";
 import { fetchPinnedMessagesApi, togglePinMessageApi } from "../../services/messageService";
@@ -128,6 +129,7 @@ const SlackShell = () => {
     error,
   } = useWorkspace();
   const { theme, toggleTheme, isDark } = useTheme();
+  const { hasDraft } = useDraftIndicators();
 
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
@@ -359,7 +361,10 @@ const SlackShell = () => {
   }, [channelId]);
 
   const activeChannel =
-    channelDetails?.id === currentChannel?.id ? channelDetails : currentChannel;
+    (channelDetails?.id || channelDetails?._id)?.toString() ===
+    (currentChannel?.id || currentChannel?._id)?.toString()
+      ? channelDetails
+      : currentChannel;
   useEffect(() => {
     if (
       workspaceId &&
@@ -681,17 +686,19 @@ const SlackShell = () => {
     setSelectedDMUser(null);
     setSelectedSpace(null);
     setSelectedGroup(null);
+    const targetChanId = (chan.id || chan._id)?.toString();
+    if (!targetChanId) return;
     setUnreadChannelCounts((counts) => {
       const nextCounts = { ...counts };
-      delete nextCounts[chan.id.toString()];
+      delete nextCounts[targetChanId];
       return nextCounts;
     });
-    markChannelAsRead(chan.id).catch(() => {});
+    markChannelAsRead(targetChanId).catch(() => {});
     setActiveChannelMenuId(null);
     setActiveDMMenuId(null);
     setActivePinnedMenuKey(null);
     setIsMobileSidebarOpen(false);
-    navigate(`/app/workspace/${workspaceId}/channel/${chan.id}`);
+    navigate(`/app/workspace/${workspaceId}/channel/${targetChanId}`);
   };
 
   const handleToggleChannelRead = async (chan, e) => {
@@ -2516,9 +2523,11 @@ const SlackShell = () => {
                       No channels yet
                     </div>
                   ) : (
-                    channels.map((chan, idx) => {
+                    channels.map((chanItem, idx) => {
+                      const chanId = (chanItem.id || chanItem._id)?.toString();
+                      const chan = { ...chanItem, id: chanId, _id: chanId };
                       const isActive =
-                        currentChannel?.id === chan.id &&
+                        (currentChannel?.id || currentChannel?._id)?.toString() === chanId &&
                         !selectedDMUser &&
                         !isStarredView &&
                         !isMentionsView &&
@@ -2561,6 +2570,15 @@ const SlackShell = () => {
                               <span className="min-w-0 flex-1 truncate">
                                 {chan.name}
                               </span>
+                              {hasDraft("channel", chan.id || chan._id) && (
+                                <span
+                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                  title="Draft message"
+                                >
+                                  <i className="fa-solid fa-pen text-[8px]" />
+                                  <span>Draft</span>
+                                </span>
+                              )}
                               {isConversationMuted("channel", chan.id) && (
                                 <i
                                   className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
@@ -2794,7 +2812,16 @@ const SlackShell = () => {
                             <span className="min-w-0 flex-1 truncate">
                               {member.username}
                             </span>
-                            {isConversationMuted("dm", member.id) && (
+                            {hasDraft("dm", member.id || member._id) && (
+                                <span
+                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                  title="Draft message"
+                                >
+                                  <i className="fa-solid fa-pen text-[8px]" />
+                                  <span>Draft</span>
+                                </span>
+                              )}
+                              {isConversationMuted("dm", member.id) && (
                               <i
                                 className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
                                 title="Notifications muted"
@@ -3037,6 +3064,15 @@ const SlackShell = () => {
                                   {memberCount === 1 ? "member" : "members"}
                                 </div>
                               </div>
+                              {hasDraft("space", spId) && (
+                                <span
+                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                  title="Draft message"
+                                >
+                                  <i className="fa-solid fa-pen text-[8px]" />
+                                  <span>Draft</span>
+                                </span>
+                              )}
                               {isConversationMuted("space", spId) && (
                                 <i
                                   className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
@@ -3290,6 +3326,15 @@ const SlackShell = () => {
                                   {memberCount === 1 ? "member" : "members"}
                                 </div>
                               </div>
+                              {hasDraft("group", grpId) && (
+                                <span
+                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                  title="Draft message"
+                                >
+                                  <i className="fa-solid fa-pen text-[8px]" />
+                                  <span>Draft</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -3831,9 +3876,11 @@ const SlackShell = () => {
                     No channels yet
                   </div>
                 ) : (
-                  channels.map((chan, idx) => {
+                  channels.map((chanItem, idx) => {
+                    const chanId = (chanItem.id || chanItem._id)?.toString();
+                    const chan = { ...chanItem, id: chanId, _id: chanId };
                     const isActive =
-                      currentChannel?.id === chan.id &&
+                      (currentChannel?.id || currentChannel?._id)?.toString() === chanId &&
                       !selectedDMUser &&
                       !isStarredView &&
                       !isMentionsView &&
@@ -3876,6 +3923,15 @@ const SlackShell = () => {
                             <span className="min-w-0 flex-1 truncate">
                               {chan.name}
                             </span>
+                            {hasDraft("channel", chan.id || chan._id) && (
+                              <span
+                                className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                title="Draft message"
+                              >
+                                <i className="fa-solid fa-pen text-[8px]" />
+                                <span>Draft</span>
+                              </span>
+                            )}
                             {isConversationMuted("channel", chan.id) && (
                               <i
                                 className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
@@ -4132,6 +4188,15 @@ const SlackShell = () => {
                           <span className="min-w-0 flex-1 truncate">
                             {member.username}
                           </span>
+                          {hasDraft("dm", member.id || member._id) && (
+                            <span
+                              className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                              title="Draft message"
+                            >
+                              <i className="fa-solid fa-pen text-[8px]" />
+                              <span>Draft</span>
+                            </span>
+                          )}
                           {isConversationMuted("dm", member.id) && (
                             <i
                               className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
@@ -4382,6 +4447,15 @@ const SlackShell = () => {
                                 {memberCount === 1 ? "member" : "members"}
                               </div>
                             </div>
+                            {hasDraft("space", spId) && (
+                              <span
+                                className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                title="Draft message"
+                              >
+                                <i className="fa-solid fa-pen text-[8px]" />
+                                <span>Draft</span>
+                              </span>
+                            )}
                             {isConversationMuted("space", spId) && (
                               <i
                                 className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
@@ -4633,6 +4707,15 @@ const SlackShell = () => {
                                 {memberCount === 1 ? "member" : "members"}
                               </div>
                             </div>
+                            {hasDraft("group", grpId) && (
+                              <span
+                                className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                title="Draft message"
+                              >
+                                <i className="fa-solid fa-pen text-[8px]" />
+                                <span>Draft</span>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -4911,6 +4994,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
             />
           ) : selectedDMUser ? (
             <DirectMessaging
+              key={`dm-${(selectedDMUser?.id || selectedDMUser?._id)?.toString()}`}
               externalSelectedUser={selectedDMUser}
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
               onForwardMessage={handleOpenForwardModal}
@@ -4924,6 +5008,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
             />
           ) : selectedSpace ? (
             <SpaceMessageThread
+              key={`space-${(selectedSpace?.id || selectedSpace?._id)?.toString()}`}
               onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               space={selectedSpace}
               currentUserId={user?.id || user?._id}
@@ -4948,6 +5033,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
             />
           ) : selectedGroup ? (
             <GroupMessageThread
+              key={`group-${(selectedGroup?.id || selectedGroup?._id)?.toString()}`}
               onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               group={selectedGroup}
               currentUserId={user?.id || user?._id}
@@ -4956,6 +5042,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
             />
           ) : (
             <ChannelMessageThread
+              key={`channel-${(channelId || (activeChannel || currentChannel)?.id || (activeChannel || currentChannel)?._id)?.toString()}`}
               onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               channel={activeChannel || currentChannel}
               currentUserId={user?.id || user?._id}

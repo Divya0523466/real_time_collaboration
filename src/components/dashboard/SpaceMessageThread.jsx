@@ -38,6 +38,7 @@ import SharedFilesGallery from "../common/SharedFilesGallery"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
 import TypingIndicator from "../common/TypingIndicator"
 import useTypingIndicator from "../../hooks/useTypingIndicator"
+import useMessageDraft from "../../hooks/useMessageDraft"
 import StatusSelector from "../common/StatusSelector"
 
 const AVATAR_COLORS = [
@@ -185,6 +186,13 @@ const SpaceMessageThread = ({
     type: "space",
     targetId: sId,
     currentUserId: activeUserId,
+  })
+
+  const { saveDraft, clearDraft } = useMessageDraft({
+    conversationType: "space",
+    conversationId: sId,
+    currentUserId: activeUserId,
+    onDraftLoaded: (saved) => mention.setValue(saved),
   })
 
   const textareaRef = useRef(null)
@@ -359,6 +367,7 @@ const SpaceMessageThread = ({
     mention.reset()
     setAttachedFiles([])
     setReplyingTo(null)
+    clearDraft()
   }
 
   const handleKeyDown = (e) => {
@@ -1191,6 +1200,7 @@ const SpaceMessageThread = ({
             onChange={(e) => {
               mention.handleChange(e.target.value, e.target.selectionStart)
               handleKeystroke(e.target.value)
+              saveDraft(e.target.value)
             }}
             onKeyDown={handleKeyDown}
             onBlur={handleStopTypingNow}

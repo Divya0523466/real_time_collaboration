@@ -44,6 +44,7 @@ import EmojiPickerButton from "../common/EmojiPickerButton";
 import ForwardedMessageCard from "../common/ForwardedMessageCard";
 import TypingIndicator from "../common/TypingIndicator";
 import useTypingIndicator from "../../hooks/useTypingIndicator";
+import useMessageDraft from "../../hooks/useMessageDraft";
 
 const AVATAR_COLORS = [
   "#395B64",
@@ -807,6 +808,12 @@ const ChannelMessageThread = ({
     onMessagesChange?.(messages);
   }, [messages, onMessagesChange]);
 
+  useEffect(() => {
+    setAttachedFile(null);
+    setReplyingToId(null);
+    setEditingState(null);
+  }, [channel?.id, channel?._id]);
+
   const channelMembers = useMemo(() => {
     const allWorkspaceMembers = (workspaceData?.members || [])
       .map((m) => {
@@ -860,6 +867,13 @@ const ChannelMessageThread = ({
     type: "channel",
     targetId: channel?.id || channel?._id,
     currentUserId: resolvedCurrentUserId,
+  });
+
+  const { saveDraft, clearDraft } = useMessageDraft({
+    conversationType: "channel",
+    conversationId: channel?.id || channel?._id,
+    currentUserId: resolvedCurrentUserId,
+    onDraftLoaded: (saved) => mention.setValue(saved),
   });
 
   const [expandedThreads, setExpandedThreads] = useState(new Set());
@@ -1124,6 +1138,7 @@ const ChannelMessageThread = ({
     sendChannelMessage(channel.id, text, null, attachments, mentionIds);
     mention.reset();
     setAttachedFile(null);
+    clearDraft();
   };
 
   const handleKeyDown = (e) => {
@@ -1593,6 +1608,7 @@ const ChannelMessageThread = ({
             onChange={(e) => {
               mention.handleChange(e.target.value, e.target.selectionStart);
               handleKeystroke(e.target.value);
+              saveDraft(e.target.value);
             }}
             onKeyDown={handleKeyDown}
             onBlur={handleStopTypingNow}

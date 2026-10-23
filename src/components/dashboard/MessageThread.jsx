@@ -22,6 +22,7 @@ import EmojiPickerButton from "../common/EmojiPickerButton";
 import ForwardedMessageCard from "../common/ForwardedMessageCard";
 import TypingIndicator from "../common/TypingIndicator";
 import useTypingIndicator from "../../hooks/useTypingIndicator";
+import useMessageDraft from "../../hooks/useMessageDraft";
 import StatusBadge from "../common/StatusBadge";
 import StatusSelector from "../common/StatusSelector";
 import MessageReactionPicker from "../common/MessageReactionPicker";
@@ -206,9 +207,16 @@ const MessageThread = ({
       currentUserId: resolvedCurrentUserId,
     });
 
+  const { saveDraft, clearDraft } = useMessageDraft({
+    conversationType: "dm",
+    conversationId: targetUserId,
+    onDraftLoaded: (saved) => setInputValue(saved),
+  });
+
   const handleInputChange = (e) => {
     mention.handleInputChange(e);
     handleKeystroke(e.target.value);
+    saveDraft(e.target.value);
   };
 
   // Auto-scroll to bottom only when new messages arrive or when switching conversation,
@@ -259,6 +267,7 @@ const MessageThread = ({
     onSendMessage(text, attachments, mentions);
     setInputValue("");
     setAttachedFile(null);
+    clearDraft();
   };
 
   const handleKeyDown = (e) => {
