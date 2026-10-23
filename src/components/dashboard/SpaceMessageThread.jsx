@@ -34,6 +34,7 @@ import { useMentionInput } from "../../hooks/useMentionInput"
 import AttachmentRenderer from "../common/AttachmentRenderer"
 import EmojiPickerButton from "../common/EmojiPickerButton"
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer"
+import SharedFilesGallery from "../common/SharedFilesGallery"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
 import TypingIndicator from "../common/TypingIndicator"
 import useTypingIndicator from "../../hooks/useTypingIndicator"
@@ -150,7 +151,15 @@ const SpaceMessageThread = ({
   const handleOpenSidebar = onOpenSidebar || onMobileMenuClick
   const spaceMembers = useMemo(() => space?.members || [], [space?.members])
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false)
+  const [showFilesGallery, setShowFilesGallery] = useState(false)
   const pinnedMessages = useMemo(() => messages.filter((m) => m.isPinned && !m.isDeleted), [messages])
+  const filesCount = useMemo(() => {
+    return messages.reduce((acc, msg) => {
+      if (msg.isDeleted) return acc;
+      const atts = getMessageAttachments(msg);
+      return acc + (atts?.length || 0);
+    }, 0);
+  }, [messages])
 
   const handleJumpToMessage = (messageId) => {
     const el = document.getElementById(`msg-${messageId}`)
@@ -578,6 +587,26 @@ const SpaceMessageThread = ({
             {pinnedMessages.length > 0 && (
               <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64]/50 text-gray-700 dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {pinnedMessages.length}
+              </span>
+            )}
+          </button>
+
+          {/* Shared Files Gallery Button */}
+          <button
+            type="button"
+            onClick={() => setShowFilesGallery((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showFilesGallery
+                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Shared files in this Space"
+          >
+            <i className="fa-solid fa-folder-open text-xs text-[#00897b] dark:text-[#A5C9CA]" />
+            <span className="hidden sm:inline">Files</span>
+            {filesCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-teal-100 dark:bg-[#395B64]/60 text-[#00897b] dark:text-teal-200 px-1 text-[10px] font-bold">
+                {filesCount}
               </span>
             )}
           </button>
@@ -1019,7 +1048,27 @@ const SpaceMessageThread = ({
                       </div>
 
                       {/* Super Admin can delete any message in the space */}
-                      {isSuperAdmin && (
+                      {/* Shared Files Gallery Button */}
+          <button
+            type="button"
+            onClick={() => setShowFilesGallery((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showFilesGallery
+                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Shared files in this Space"
+          >
+            <i className="fa-solid fa-folder-open text-xs text-[#00897b] dark:text-[#A5C9CA]" />
+            <span className="hidden sm:inline">Files</span>
+            {filesCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-teal-100 dark:bg-[#395B64]/60 text-[#00897b] dark:text-teal-200 px-1 text-[10px] font-bold">
+                {filesCount}
+              </span>
+            )}
+          </button>
+
+          {isSuperAdmin && (
                         <>
                           <button className="w-px h-3.5 bg-[#E0E7E6] dark:bg-[#395B64]/40 mx-0.5" />
                           <div className="group/tip relative">
@@ -1163,6 +1212,16 @@ const SpaceMessageThread = ({
             onJumpToMessage={handleJumpToMessage}
             conversationTitle={space?.name || "Space"}
             conversationType="space"
+          />
+
+          {/* Shared Files Gallery Drawer for Space */}
+          <SharedFilesGallery
+            isOpen={showFilesGallery}
+            onClose={() => setShowFilesGallery(false)}
+            messages={messages}
+            conversationTitle={space?.name || "Space"}
+            conversationType="space"
+            onJumpToMessage={handleJumpToMessage}
           />
 
           <button

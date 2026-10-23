@@ -281,5 +281,9 @@ export const fetchPinnedMessagesApi = async (params = {}) => {
   if (!response.ok) {
     throw new Error(data.message || "Failed to fetch pinned messages");
   }
-  return data;
+  return Array.isArray(data.pinnedMessages)
+    ? data.pinnedMessages
+    : Array.isArray(data)
+      ? data
+      : [];
 };

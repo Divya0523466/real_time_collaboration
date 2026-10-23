@@ -784,7 +784,9 @@ const ChannelMessageThread = ({
   currentUserId = null,
   onForwardMessage = () => {},
   onNavigateSource = () => {},
+  onMessagesChange = () => {},
   onViewProfile,
+
 }) => {
   const { workspaceData, user } = useWorkspace();
   const resolvedCurrentUserId = (
@@ -800,6 +802,10 @@ const ChannelMessageThread = ({
   const [error, setError] = useState(null);
 
   const [replyingToId, setReplyingToId] = useState(null);
+
+  useEffect(() => {
+    onMessagesChange?.(messages);
+  }, [messages, onMessagesChange]);
 
   const channelMembers = useMemo(() => {
     const allWorkspaceMembers = (workspaceData?.members || [])
@@ -1343,6 +1349,7 @@ const ChannelMessageThread = ({
     onForwardMessage,
     onNavigateSource,
     onViewProfile,
+
   };
 
   if (!channel) {

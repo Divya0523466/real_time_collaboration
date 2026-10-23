@@ -34,6 +34,8 @@ import GroupMessageThread from "./GroupMessageThread";
 import StatusBadge from "../common/StatusBadge";
 import StatusSelector from "../common/StatusSelector";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
+import SharedFilesGallery from "../common/SharedFilesGallery";
+import { getMessageAttachments } from "../../utils/fileUtils";
 import UserProfileCardModal from "../common/UserProfileCardModal";
 import { fetchPinnedMessagesApi, togglePinMessageApi } from "../../services/messageService";
 import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
@@ -175,7 +177,19 @@ const SlackShell = () => {
   const [isHomeView, setIsHomeView] = useState(!channelId && !spaceId);
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null);
   const [showChannelPinnedDrawer, setShowChannelPinnedDrawer] = useState(false);
+  const [showChannelFilesGallery, setShowChannelFilesGallery] = useState(false);
+  const [channelMessages, setChannelMessages] = useState([]);
+  const channelFilesCount = useMemo(() => {
+    return channelMessages.reduce((acc, msg) => {
+      if (msg.isDeleted) return acc;
+      const atts = getMessageAttachments(msg);
+      return acc + (atts?.length || 0);
+    }, 0);
+  }, [channelMessages]);
   const [channelPinnedMessages, setChannelPinnedMessages] = useState([]);
+  const safeChannelPinned = useMemo(() => {
+    return Array.isArray(channelPinnedMessages) ? channelPinnedMessages : [];
+  }, [channelPinnedMessages]);
   const [viewingProfileUser, setViewingProfileUser] = useState(null);
 
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
@@ -436,18 +450,32 @@ const SlackShell = () => {
     }
 
     fetchPinnedMessagesApi({ channelId: cId })
-      .then((data) => setChannelPinnedMessages(data || []))
+      .then((data) => {
+        const list = Array.isArray(data?.pinnedMessages)
+          ? data.pinnedMessages
+          : Array.isArray(data)
+            ? data
+            : [];
+        setChannelPinnedMessages(list);
+      })
       .catch(() => setChannelPinnedMessages([]));
 
     const handlePinnedUpdated = (payload) => {
       if (payload.conversationType !== "channel" || payload.channelId?.toString() !== cId) return;
       if (payload.isPinned) {
         fetchPinnedMessagesApi({ channelId: cId })
-          .then((data) => setChannelPinnedMessages(data || []))
+          .then((data) => {
+            const list = Array.isArray(data?.pinnedMessages)
+              ? data.pinnedMessages
+              : Array.isArray(data)
+                ? data
+                : [];
+            setChannelPinnedMessages(list);
+          })
           .catch(() => {});
       } else {
         setChannelPinnedMessages((prev) =>
-          prev.filter((m) => (m.id || m._id)?.toString() !== payload.messageId?.toString())
+          (Array.isArray(prev) ? prev : []).filter((m) => (m.id || m._id)?.toString() !== payload.messageId?.toString())
         );
       }
     };
@@ -4680,6 +4708,26 @@ const SlackShell = () => {
                   <span>{workspaceMembers.length}</span>
                 </button>
 
+                {/* Channel Files Gallery Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowChannelFilesGallery((prev) => !prev)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                    showChannelFilesGallery
+                      ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                      : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+                  }`}
+                  title="Shared files in this channel"
+                >
+                  <i className="fa-solid fa-folder-open text-xs" />
+                  <span className="hidden sm:inline">Files</span>
+                  {channelFilesCount > 0 && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                      {channelFilesCount}
+                    </span>
+                  )}
+                </button>
+
                 {/* Pinned Messages Header Button */}
                 <button
                   type="button"
@@ -4693,16 +4741,16 @@ const SlackShell = () => {
                 >
                   <i className="fa-solid fa-thumbtack text-xs" />
                   <span className="hidden sm:inline">Pinned</span>
-                  {channelPinnedMessages.length > 0 && (
+                  {safeChannelPinned.length > 0 && (
                     <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
-                      {channelPinnedMessages.length}
+                      {safeChannelPinned.length}
                     </span>
                   )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setShowDetailsPane((prev) => !prev)}
+onClick={() => setShowDetailsPane((prev) => !prev)}
                   className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
                     showDetailsPane
                       ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
@@ -4814,6 +4862,7 @@ const SlackShell = () => {
               }}
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
+              onMessagesChange={setChannelMessages}
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
             />
           ) : isMentionsView ? (
@@ -4866,6 +4915,7 @@ const SlackShell = () => {
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
+              onMessagesChange={setChannelMessages}
               isBlocked={blockedUserIds.has(
                 (selectedDMUser?.id || selectedDMUser?._id)?.toString(),
               )}
@@ -4894,6 +4944,7 @@ const SlackShell = () => {
               }}
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
+              onMessagesChange={setChannelMessages}
             />
           ) : selectedGroup ? (
             <GroupMessageThread
@@ -4910,6 +4961,7 @@ const SlackShell = () => {
               currentUserId={user?.id || user?._id}
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
+              onMessagesChange={setChannelMessages}
             />
           )}
 
@@ -5029,9 +5081,9 @@ const SlackShell = () => {
                     <div className="flex items-center justify-between mb-2.5">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA] flex items-center gap-1.5">
                         <i className="fa-solid fa-thumbtack text-[11px]" />
-                        <span>Pinned Messages ({channelPinnedMessages.length})</span>
+                        <span>Pinned Messages ({safeChannelPinned.length})</span>
                       </h4>
-                      {channelPinnedMessages.length > 0 && (
+                      {safeChannelPinned.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setShowChannelPinnedDrawer(true)}
@@ -5041,13 +5093,13 @@ const SlackShell = () => {
                         </button>
                       )}
                     </div>
-                    {channelPinnedMessages.length === 0 ? (
+                    {safeChannelPinned.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-[#E0E7E6] dark:border-[#2C3333] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]/70">
                         No pinned messages in this channel
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {channelPinnedMessages.slice(0, 3).map((pm) => (
+                        {safeChannelPinned.slice(0, 3).map((pm) => (
                           <div
                             key={pm.id || pm._id}
                             onClick={() => handleJumpToMessage(pm.id || pm._id)}
@@ -5157,11 +5209,21 @@ const SlackShell = () => {
       <ConversationPinnedDrawer
         isOpen={showChannelPinnedDrawer}
         onClose={() => setShowChannelPinnedDrawer(false)}
-        pinnedMessages={channelPinnedMessages}
+        pinnedMessages={safeChannelPinned}
         onTogglePin={handleToggleChannelMessagePin}
         onJumpToMessage={handleJumpToMessage}
         conversationTitle={currentChannel?.name || "channel"}
         conversationType="channel"
+      />
+
+      {/* Channel Shared Files Gallery Drawer */}
+      <SharedFilesGallery
+        isOpen={showChannelFilesGallery}
+        onClose={() => setShowChannelFilesGallery(false)}
+        messages={channelMessages}
+        conversationTitle={currentChannel?.name || "channel"}
+        conversationType="channel"
+        onJumpToMessage={handleJumpToMessage}
       />
 
       {/* Slack-style User Profile Card Modal */}

@@ -32,7 +32,11 @@ const PinnedMessagesView = ({
     setError(null);
     try {
       const data = await fetchPinnedMessagesApi({ workspaceId });
-      const list = Array.isArray(data?.pinnedMessages) ? data.pinnedMessages : [];
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.pinnedMessages)
+          ? data.pinnedMessages
+          : [];
       setMessages(list);
     } catch (err) {
       setError(err.message || "Failed to load pinned messages");

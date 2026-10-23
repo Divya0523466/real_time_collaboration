@@ -21,6 +21,8 @@ import MessageReactions from "../common/MessageReactions";
 import SeenAvatars from "../common/SeenAvatars";
 import GroupInfoModal from "./GroupInfoModal";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
+import SharedFilesGallery from "../common/SharedFilesGallery";
+import { getMessageAttachments } from "../../utils/fileUtils";
 import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
 import TypingIndicator from "../common/TypingIndicator";
@@ -46,6 +48,14 @@ const GroupMessageThread = ({
   const [sending, setSending] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false);
+  const [showFilesGallery, setShowFilesGallery] = useState(false);
+  const filesCount = useMemo(() => {
+    return messages.reduce((acc, msg) => {
+      if (msg.isDeleted) return acc;
+      const atts = getMessageAttachments(msg);
+      return acc + (atts?.length || 0);
+    }, 0);
+  }, [messages]);
   const { isDark, toggleTheme } = useTheme();
   const messagesEndRef = useRef(null);
   const groupId = (group?._id || group?.id)?.toString();
@@ -377,6 +387,26 @@ const GroupMessageThread = ({
               </span>
             )}
           </button>
+
+          {/* Files Gallery Button */}
+          <button
+            type="button"
+            onClick={() => setShowFilesGallery((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showFilesGallery
+                ? "border-teal-600 bg-teal-50 dark:bg-[#395B64]/40 text-teal-700 dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Shared files in this Group"
+          >
+            <i className="fa-solid fa-folder-open text-xs text-teal-600 dark:text-teal-400" />
+            <span className="hidden sm:inline">Files</span>
+            {filesCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-teal-100 dark:bg-[#395B64]/60 text-teal-700 dark:text-teal-200 px-1 text-[10px] font-bold">
+                {filesCount}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             onClick={() => setShowInfoModal(true)}
@@ -649,6 +679,16 @@ const GroupMessageThread = ({
         onJumpToMessage={handleJumpToMessage}
         conversationTitle={group?.name || "Group Chat"}
         conversationType="group"
+      />
+
+      {/* Shared Files Gallery Drawer for Group */}
+      <SharedFilesGallery
+        isOpen={showFilesGallery}
+        onClose={() => setShowFilesGallery(false)}
+        messages={messages}
+        conversationTitle={group?.name || "Group Chat"}
+        conversationType="group"
+        onJumpToMessage={handleJumpToMessage}
       />
     </div>
   );

@@ -28,6 +28,7 @@ import MessageReactionPicker from "../common/MessageReactionPicker";
 import MessageReactions from "../common/MessageReactions";
 import { SeenAvatarItem } from "../common/SeenAvatars";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
+import SharedFilesGallery from "../common/SharedFilesGallery";
 
 const AVATAR_COLORS = [
   "#395B64",
@@ -98,6 +99,14 @@ const MessageThread = ({
   const [attachedFile, setAttachedFile] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false);
+  const [showFilesGallery, setShowFilesGallery] = useState(false);
+  const filesCount = useMemo(() => {
+    return messages.reduce((acc, msg) => {
+      if (msg.isDeleted) return acc;
+      const atts = getMessageAttachments(msg);
+      return acc + (atts?.length || 0);
+    }, 0);
+  }, [messages]);
   // editingState: { messageId: string, draftContent: string } | null
   const [editingState, setEditingState] = useState(null);
   const messagesContainerRef = useRef(null);
@@ -418,6 +427,26 @@ const MessageThread = ({
             {pinnedMessages.length > 0 && (
               <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {pinnedMessages.length}
+              </span>
+            )}
+          </button>
+
+          {/* Files Gallery Button */}
+          <button
+            type="button"
+            onClick={() => setShowFilesGallery((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              showFilesGallery
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+            }`}
+            title="Shared files in this conversation"
+          >
+            <i className="fa-solid fa-folder-open text-xs" />
+            <span className="hidden sm:inline">Files</span>
+            {filesCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                {filesCount}
               </span>
             )}
           </button>
@@ -967,6 +996,16 @@ const MessageThread = ({
         onJumpToMessage={handleJumpToMessage}
         conversationTitle={activeSelectedUser?.username || "User"}
         conversationType="dm"
+      />
+
+      {/* Shared Files Gallery Drawer for DM */}
+      <SharedFilesGallery
+        isOpen={showFilesGallery}
+        onClose={() => setShowFilesGallery(false)}
+        messages={messages}
+        conversationTitle={activeSelectedUser?.username || "User"}
+        conversationType="dm"
+        onJumpToMessage={handleJumpToMessage}
       />
 
       {/* Input Area */}
