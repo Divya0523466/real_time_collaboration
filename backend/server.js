@@ -24,6 +24,7 @@ import groupRoutes from "./routes/groupRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import searchRoutes from "./routes/searchRoutes.js";
 import Group from "./models/Group.js";
 import { formatGroupMessage } from "./controllers/groupController.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
@@ -75,6 +76,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/search", searchRoutes);
 
 //socket io authentication middleware
 io.use((socket, next) => {

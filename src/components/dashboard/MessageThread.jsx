@@ -30,6 +30,7 @@ import MessageReactions from "../common/MessageReactions";
 import { SeenAvatarItem } from "../common/SeenAvatars";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
 import SharedFilesGallery from "../common/SharedFilesGallery";
+import InConversationSearch from "../common/InConversationSearch";
 
 const AVATAR_COLORS = [
   "#395B64",
@@ -101,6 +102,7 @@ const MessageThread = ({
   const [uploadError, setUploadError] = useState(null);
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false);
   const [showFilesGallery, setShowFilesGallery] = useState(false);
+  const [showInChatSearch, setShowInChatSearch] = useState(false);
   const filesCount = useMemo(() => {
     return messages.reduce((acc, msg) => {
       if (msg.isDeleted) return acc;
@@ -115,6 +117,15 @@ const MessageThread = ({
   const mainTextareaRef = useRef(null);
   const prevCountRef = useRef(0);
   const prevUserIdRef = useRef(null);
+
+  const handleJumpToMsg = (msgId) => {
+    const el = document.getElementById(`msg-${msgId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-amber-400/80");
+      setTimeout(() => el.classList.remove("ring-2", "ring-amber-400/80"), 2000);
+    }
+  };
 
   const scrollToBottom = (behavior = "auto") => {
     if (messagesContainerRef.current) {
@@ -440,6 +451,21 @@ const MessageThread = ({
             )}
           </button>
 
+          {/* In-Chat Search Button */}
+          <button
+            type="button"
+            onClick={() => setShowInChatSearch((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              showInChatSearch
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+            }`}
+            title="Find in this conversation"
+          >
+            <i className="fa-solid fa-magnifying-glass text-xs" />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+
           {/* Files Gallery Button */}
           <button
             type="button"
@@ -476,6 +502,13 @@ const MessageThread = ({
           </button>
         </div>
       </div>
+
+      <InConversationSearch
+        isOpen={showInChatSearch}
+        onClose={() => setShowInChatSearch(false)}
+        messages={messages}
+        onJumpToMessage={handleJumpToMessage}
+      />
 
       {/* Messages Area */}
       <div

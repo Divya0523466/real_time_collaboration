@@ -22,6 +22,7 @@ import SeenAvatars from "../common/SeenAvatars";
 import GroupInfoModal from "./GroupInfoModal";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
 import SharedFilesGallery from "../common/SharedFilesGallery";
+import InConversationSearch from "../common/InConversationSearch";
 import { getMessageAttachments } from "../../utils/fileUtils";
 import { useTheme } from "../../context/ThemeContext";
 import { FiSun, FiMoon } from "react-icons/fi";
@@ -50,6 +51,7 @@ const GroupMessageThread = ({
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false);
   const [showFilesGallery, setShowFilesGallery] = useState(false);
+  const [showGroupSearch, setShowGroupSearch] = useState(false);
   const filesCount = useMemo(() => {
     return messages.reduce((acc, msg) => {
       if (msg.isDeleted) return acc;
@@ -396,6 +398,28 @@ const GroupMessageThread = ({
               </span>
             )}
           </button>
+
+          {/* Group In-Chat Search Button */}
+          <button
+            type="button"
+            onClick={() => setShowGroupSearch((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showGroupSearch
+                ? "border-teal-600 bg-teal-50 dark:bg-[#395B64]/40 text-teal-700 dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Find in this Group"
+          >
+            <i className="fa-solid fa-magnifying-glass text-xs text-teal-600 dark:text-teal-400" />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+
+      <InConversationSearch
+        isOpen={showGroupSearch}
+        onClose={() => setShowGroupSearch(false)}
+        messages={messages}
+        onJumpToMessage={handleJumpToMessage}
+      />
 
           {/* Files Gallery Button */}
           <button

@@ -34,6 +34,7 @@ import GroupMessageThread from "./GroupMessageThread";
 import StatusBadge from "../common/StatusBadge";
 import StatusSelector from "../common/StatusSelector";
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer";
+import InConversationSearch from "../common/InConversationSearch";
 import SharedFilesGallery from "../common/SharedFilesGallery";
 import { useDraftIndicators } from "../../hooks/useMessageDraft";
 import { getMessageAttachments } from "../../utils/fileUtils";
@@ -41,6 +42,7 @@ import UserProfileCardModal from "../common/UserProfileCardModal";
 import { fetchPinnedMessagesApi, togglePinMessageApi } from "../../services/messageService";
 import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { fetchGroupsApi } from "../../services/groupService";
+import GlobalSearchModal from "./GlobalSearchModal";
 import {
   fetchSpaces,
   fetchSpace,
@@ -133,6 +135,7 @@ const SlackShell = () => {
 
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showEditWorkspaceModal, setShowEditWorkspaceModal] = useState(false);
   const [showDeleteWorkspaceModal, setShowDeleteWorkspaceModal] =
     useState(false);
@@ -180,6 +183,7 @@ const SlackShell = () => {
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null);
   const [showChannelPinnedDrawer, setShowChannelPinnedDrawer] = useState(false);
   const [showChannelFilesGallery, setShowChannelFilesGallery] = useState(false);
+  const [showChannelSearch, setShowChannelSearch] = useState(false);
   const [channelMessages, setChannelMessages] = useState([]);
   const channelFilesCount = useMemo(() => {
     return channelMessages.reduce((acc, msg) => {
@@ -495,6 +499,43 @@ const SlackShell = () => {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
 
 
+    }
+  };
+
+  // Global search Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setShowGlobalSearch((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const handleJumpToResult = (result) => {
+    setShowGlobalSearch(false);
+    switch (result.sourceType) {
+      case "channel":
+        navigate(`/app/workspace/${workspaceId}/channel/${result.sourceId}`);
+        break;
+      case "space":
+        navigate(`/app/workspace/${workspaceId}/space/${result.sourceId}`);
+        break;
+      case "group": {
+        const grp = groups.find((g) => (g._id || g.id)?.toString() === result.sourceId);
+        if (grp) handleSelectGroup(grp);
+        break;
+      }
+      case "dm": {
+        const member = workspaceData?.members?.find(
+          (m) => (m.id || m._id)?.toString() === result.sourceId
+        );
+        if (member) handleSelectDM(member);
+        break;
+      }
+      default: break;
     }
   };
 
@@ -2134,7 +2175,62 @@ const SlackShell = () => {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
+      {/* Top Global Slack/Google-style Header */}
+      <header className="h-13 sm:h-14 w-full bg-[#1A2121] border-b border-[#2C3333] flex items-center justify-between px-4 sm:px-6 z-30 select-none flex-shrink-0 shadow-xs">
+        <div className="flex items-center gap-3 w-64">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64] text-sm font-bold text-white shadow-sm">
+              <i className="fa-solid fa-layer-group text-sm" />
+            </span>
+            <span className="font-bold text-sm tracking-wide text-white truncate">
+              {workspaceData?.name || "WorkNest"}
+            </span>
+          </div>
+        </div>
+
+        {/* Center Search Pill */}
+        <div className="flex-1 max-w-2xl mx-4 sm:mx-6">
+          <button
+            type="button"
+            onClick={() => setShowGlobalSearch(true)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-2 sm:py-2.5 rounded-xl bg-[#242D2D] hover:bg-[#2C3333] border border-[#395B64]/50 hover:border-[#A5C9CA]/50 text-[#A5C9CA]/85 hover:text-white transition shadow-inner group cursor-pointer"
+            title="Search workspace (Ctrl+K)"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <i className="fa-solid fa-magnifying-glass text-sm text-[#A5C9CA]/75 group-hover:text-white transition" />
+              <span className="text-sm truncate">
+                Search {workspaceData?.name ? `${workspaceData.name}` : "messages, files, channels..."}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <kbd className="hidden sm:inline-flex items-center rounded-md border border-[#395B64]/80 bg-[#1E2525] px-2 py-0.5 text-xs font-mono text-[#A5C9CA]/80">Ctrl K</kbd>
+            </div>
+          </button>
+        </div>
+
+        {/* Right Help / Quick Actions */}
+        <div className="flex items-center justify-end gap-2.5 w-64">
+          <button
+            type="button"
+            onClick={() => setShowActivityPanel(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition cursor-pointer"
+            title="Notifications"
+          >
+            <i className="fa-solid fa-bell text-sm" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition cursor-pointer"
+            title="Toggle theme"
+          >
+            {isDark ? <FiSun className="text-sm text-amber-400" /> : <FiMoon className="text-sm text-[#A5C9CA]" />}
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 w-full overflow-hidden relative">
       {/* ── Mobile sidebar backdrop ─────────────────────────────────────────── */}
       {isMobileSidebarOpen && (
         <div
@@ -3699,7 +3795,8 @@ const SlackShell = () => {
           <StatusSelector align="right" />
         </div>
 
-        <div className="px-3 pt-3 pb-1">
+
+        <div className="px-3 pt-1 pb-1">
           <button
             type="button"
             onClick={() => {
@@ -4791,6 +4888,21 @@ const SlackShell = () => {
                   <span>{workspaceMembers.length}</span>
                 </button>
 
+                {/* Channel Search Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowChannelSearch((prev) => !prev)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                    showChannelSearch
+                      ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                      : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+                  }`}
+                  title="Find in this channel"
+                >
+                  <i className="fa-solid fa-magnifying-glass text-xs" />
+                  <span className="hidden sm:inline">Search</span>
+                </button>
+
                 {/* Channel Files Gallery Button */}
                 <button
                   type="button"
@@ -4862,6 +4974,12 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
           )}
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          <InConversationSearch
+            isOpen={showChannelSearch}
+            onClose={() => setShowChannelSearch(false)}
+            messages={channelMessages}
+            onJumpToMessage={handleJumpToMessage}
+          />
           {isHomeView ? (
             <HomeView onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
           ) : false ? (
@@ -5416,6 +5534,14 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
       )}
 
       {/* Forward Message Modal */}
+      {showGlobalSearch && (
+        <GlobalSearchModal
+          workspaceId={workspaceId}
+          onClose={() => setShowGlobalSearch(false)}
+          onJumpToResult={handleJumpToResult}
+        />
+      )}
+
       {forwardModalData.isOpen && (
         <ForwardMessageModal
           isOpen={forwardModalData.isOpen}
@@ -6173,6 +6299,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

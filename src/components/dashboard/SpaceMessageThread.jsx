@@ -35,6 +35,7 @@ import AttachmentRenderer from "../common/AttachmentRenderer"
 import EmojiPickerButton from "../common/EmojiPickerButton"
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer"
 import SharedFilesGallery from "../common/SharedFilesGallery"
+import InConversationSearch from "../common/InConversationSearch"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
 import TypingIndicator from "../common/TypingIndicator"
 import useTypingIndicator from "../../hooks/useTypingIndicator"
@@ -153,6 +154,7 @@ const SpaceMessageThread = ({
   const spaceMembers = useMemo(() => space?.members || [], [space?.members])
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false)
   const [showFilesGallery, setShowFilesGallery] = useState(false)
+  const [showSpaceSearch, setShowSpaceSearch] = useState(false)
   const pinnedMessages = useMemo(() => messages.filter((m) => m.isPinned && !m.isDeleted), [messages])
   const filesCount = useMemo(() => {
     return messages.reduce((acc, msg) => {
@@ -600,6 +602,21 @@ const SpaceMessageThread = ({
             )}
           </button>
 
+          {/* Space In-Chat Search Button */}
+          <button
+            type="button"
+            onClick={() => setShowSpaceSearch((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showSpaceSearch
+                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Find in this Space"
+          >
+            <i className="fa-solid fa-magnifying-glass text-xs text-[#00897b] dark:text-[#A5C9CA]" />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+
           {/* Shared Files Gallery Button */}
           <button
             type="button"
@@ -679,6 +696,13 @@ const SpaceMessageThread = ({
           )}
         </div>
       </div>
+
+      <InConversationSearch
+        isOpen={showSpaceSearch}
+        onClose={() => setShowSpaceSearch(false)}
+        messages={messages}
+        onJumpToMessage={handleJumpToMessage}
+      />
 
       {/* ── Message Thread Area ───────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
@@ -1057,7 +1081,22 @@ const SpaceMessageThread = ({
                       </div>
 
                       {/* Super Admin can delete any message in the space */}
-                      {/* Shared Files Gallery Button */}
+                      {/* Space In-Chat Search Button */}
+          <button
+            type="button"
+            onClick={() => setShowSpaceSearch((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+              showSpaceSearch
+                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
+            }`}
+            title="Find in this Space"
+          >
+            <i className="fa-solid fa-magnifying-glass text-xs text-[#00897b] dark:text-[#A5C9CA]" />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+
+          {/* Shared Files Gallery Button */}
           <button
             type="button"
             onClick={() => setShowFilesGallery((prev) => !prev)}
