@@ -539,7 +539,7 @@ const SpaceMessageThread = ({
               <i className="fa-solid fa-bars text-sm" />
             </button>
           )}
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00897b]/10 dark:bg-[#395B64] text-[#00897b] dark:text-white flex-shrink-0 shadow-xs">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#395B64]/10 dark:bg-[#395B64] text-[#395B64] dark:text-[#E7F6F2] flex-shrink-0 shadow-xs">
             <i className="fa-solid fa-table-cells-large text-sm" />
           </span>
           <div className="min-w-0">
@@ -547,9 +547,6 @@ const SpaceMessageThread = ({
               <h1 className="truncate text-sm sm:text-base font-bold text-gray-900 dark:text-white">
                 #{space?.name || "Space"}
               </h1>
-              <span className="rounded-md bg-teal-50 dark:bg-[#395B64]/30 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:text-[#A5C9CA] border border-teal-200/50 dark:border-[#395B64]/50">
-                Space
-              </span>
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#A5C9CA]">
               <button
@@ -563,7 +560,7 @@ const SpaceMessageThread = ({
               {space?.description && (
                 <>
                   <span>·</span>
-                  <span className="truncate max-w-[200px] sm:max-w-xs">{space.description}</span>
+                  <span className="truncate max-w-[150px] sm:max-w-xs">{space.description}</span>
                 </>
               )}
             </div>
@@ -571,30 +568,31 @@ const SpaceMessageThread = ({
         </div>
 
         {/* Space Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           <StatusSelector align="right" />
           <button
             type="button"
             onClick={handleManageMembers}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] px-2.5 py-1.5 text-xs font-semibold text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer"
+            title="Space members"
           >
-            <i className="fa-solid fa-users text-xs text-[#00897b] dark:text-[#A5C9CA]" />
-            <span className="hidden sm:inline">Members</span>
+            <i className="fa-solid fa-users text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Members</span>
           </button>
 
           {/* Pinned Messages Button */}
           <button
             type="button"
             onClick={() => setShowPinnedDrawer(true)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
               showPinnedDrawer
-                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
             }`}
             title="Pinned messages in this Space"
           >
-            <i className="fa-solid fa-thumbtack text-xs" />
-            <span className="hidden sm:inline">Pinned</span>
+            <i className="fa-solid fa-thumbtack text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Pinned</span>
             {pinnedMessages.length > 0 && (
               <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64]/50 text-gray-700 dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {pinnedMessages.length}
@@ -606,32 +604,32 @@ const SpaceMessageThread = ({
           <button
             type="button"
             onClick={() => setShowSpaceSearch((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
               showSpaceSearch
-                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
             }`}
             title="Find in this Space"
           >
-            <i className="fa-solid fa-magnifying-glass text-xs text-[#00897b] dark:text-[#A5C9CA]" />
-            <span className="hidden sm:inline">Search</span>
+            <i className="fa-solid fa-magnifying-glass text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Search</span>
           </button>
 
           {/* Shared Files Gallery Button */}
           <button
             type="button"
             onClick={() => setShowFilesGallery((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
               showFilesGallery
-                ? "border-[#00897b] bg-teal-50 dark:bg-[#395B64]/40 text-[#00897b] dark:text-[#A5C9CA]"
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
             }`}
             title="Shared files in this Space"
           >
-            <i className="fa-solid fa-folder-open text-xs text-[#00897b] dark:text-[#A5C9CA]" />
-            <span className="hidden sm:inline">Files</span>
+            <i className="fa-solid fa-folder-open text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Files</span>
             {filesCount > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-teal-100 dark:bg-[#395B64]/60 text-[#00897b] dark:text-teal-200 px-1 text-[10px] font-bold">
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64]/60 text-gray-700 dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {filesCount}
               </span>
             )}

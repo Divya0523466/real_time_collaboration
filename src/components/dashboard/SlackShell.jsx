@@ -43,6 +43,7 @@ import { fetchPinnedMessagesApi, togglePinMessageApi } from "../../services/mess
 import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { fetchGroupsApi } from "../../services/groupService";
 import GlobalSearchModal from "./GlobalSearchModal";
+import ArchivedChatsView from "./ArchivedChatsView";
 import {
   fetchSpaces,
   fetchSpace,
@@ -115,6 +116,7 @@ const SlackShell = () => {
     selectWorkspace,
     clearAuth,
     getChannel,
+    toggleArchiveChannel,
     addChannelMember,
     removeChannelMember,
     removeMember,
@@ -150,6 +152,7 @@ const SlackShell = () => {
   const [deletingChannel, setDeletingChannel] = useState(null);
   const [activeChannelMenuId, setActiveChannelMenuId] = useState(null);
   const [activeDMMenuId, setActiveDMMenuId] = useState(null);
+  const [activeGroupMenuId, setActiveGroupMenuId] = useState(null);
   const [channelDetails, setChannelDetails] = useState(null);
   const [memberToAdd, setMemberToAdd] = useState("");
   const [channelMemberActionLoading, setChannelMemberActionLoading] =
@@ -179,6 +182,7 @@ const SlackShell = () => {
   const [isStarredView, setIsStarredView] = useState(false);
   const [isPinnedView, setIsPinnedView] = useState(false);
   const [isMentionsView, setIsMentionsView] = useState(false);
+  const [isArchivedView, setIsArchivedView] = useState(false);
   const [isHomeView, setIsHomeView] = useState(!channelId && !spaceId);
   const [selectedMemberForRole, setSelectedMemberForRole] = useState(null);
   const [showChannelPinnedDrawer, setShowChannelPinnedDrawer] = useState(false);
@@ -221,6 +225,39 @@ const SlackShell = () => {
       const uId = user?.id || user?._id || "anon";
       const raw = localStorage.getItem(
         `worknest_hidden_dms_${uId}_${workspaceId}`,
+      );
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [archivedDMIds, setArchivedDMIds] = useState(() => {
+    try {
+      const uId = user?.id || user?._id || "anon";
+      const raw = localStorage.getItem(
+        `worknest_archived_dms_${uId}_${workspaceId}`,
+      );
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [archivedSpaceIds, setArchivedSpaceIds] = useState(() => {
+    try {
+      const uId = user?.id || user?._id || "anon";
+      const raw = localStorage.getItem(
+        `worknest_archived_spaces_${uId}_${workspaceId}`,
+      );
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [archivedGroupIds, setArchivedGroupIds] = useState(() => {
+    try {
+      const uId = user?.id || user?._id || "anon";
+      const raw = localStorage.getItem(
+        `worknest_archived_groups_${uId}_${workspaceId}`,
       );
       return raw ? new Set(JSON.parse(raw)) : new Set();
     } catch {
@@ -298,6 +335,161 @@ const SlackShell = () => {
     }
   }, [workspaceId, selectedWorkspace, selectWorkspace]);
 
+  const activeChannels = useMemo(() => {
+    return (channels || []).filter((c) => !c.isArchived);
+  }, [channels]);
+
+  const activeSpaces = useMemo(() => {
+    return (spaces || []).filter(
+      (s) => !archivedSpaceIds.has((s._id || s.id)?.toString())
+    );
+  }, [spaces, archivedSpaceIds]);
+
+  const activeGroups = useMemo(() => {
+    return (groups || []).filter(
+      (g) => !archivedGroupIds.has((g._id || g.id)?.toString())
+    );
+  }, [groups, archivedGroupIds]);
+
+  const archivedChannelsCount = useMemo(() => {
+    return (channels || []).filter((c) => c.isArchived).length;
+  }, [channels]);
+
+  const totalArchivedCount = useMemo(() => {
+    return (
+      archivedChannelsCount +
+      archivedDMIds.size +
+      archivedSpaceIds.size +
+      archivedGroupIds.size
+    );
+  }, [
+    archivedChannelsCount,
+    archivedDMIds.size,
+    archivedSpaceIds.size,
+    archivedGroupIds.size,
+  ]);
+
+  const handleToggleArchiveChannel = async (chan) => {
+    const targetChanId = (chan.id || chan._id)?.toString();
+    if (!targetChanId) return;
+    try {
+      const updated = await toggleArchiveChannel(targetChanId, workspaceId);
+      const isNowArchived = updated?.isArchived;
+      toast.success(
+        isNowArchived
+          ? `Channel "#${chan.name}" has been archived`
+          : `Channel "#${chan.name}" has been unarchived`,
+        { toastId: `archive-channel-${targetChanId}` }
+      );
+    } catch {
+      // toast shown in context
+    }
+  };
+
+  const handleToggleArchiveDM = (member, e) => {
+    e?.stopPropagation();
+    setActiveDMMenuId(null);
+    setActivePinnedMenuKey(null);
+    const mIdStr = (member?.id || member?._id)?.toString();
+    if (!mIdStr) return;
+    const uId = user?.id || user?._id || "anon";
+
+    const willArchive = !archivedDMIds.has(mIdStr);
+    setArchivedDMIds((prev) => {
+      const next = new Set(prev);
+      if (willArchive) {
+        next.add(mIdStr);
+      } else {
+        next.delete(mIdStr);
+      }
+      try {
+        localStorage.setItem(
+          `worknest_archived_dms_${uId}_${workspaceId}`,
+          JSON.stringify(Array.from(next)),
+        );
+      } catch (err) {
+        console.warn("Failed to save archived DMs:", err);
+      }
+      return next;
+    });
+
+    toast.success(
+      willArchive
+        ? `Chat with ${member.username || "user"} archived`
+        : `Chat with ${member.username || "user"} unarchived`,
+      { toastId: `archive-dm-${mIdStr}` }
+    );
+  };
+
+  const handleToggleArchiveSpace = (space, e) => {
+    e?.stopPropagation();
+    setActiveSpaceForAction(null);
+    setActivePinnedMenuKey(null);
+    const spIdStr = (space?._id || space?.id)?.toString();
+    if (!spIdStr) return;
+    const uId = user?.id || user?._id || "anon";
+
+    const willArchive = !archivedSpaceIds.has(spIdStr);
+    setArchivedSpaceIds((prev) => {
+      const next = new Set(prev);
+      if (willArchive) {
+        next.add(spIdStr);
+      } else {
+        next.delete(spIdStr);
+      }
+      try {
+        localStorage.setItem(
+          `worknest_archived_spaces_${uId}_${workspaceId}`,
+          JSON.stringify(Array.from(next)),
+        );
+      } catch (err) {
+        console.warn("Failed to save archived spaces:", err);
+      }
+      return next;
+    });
+
+    toast.success(
+      willArchive
+        ? `Space "${space.name || "Space"}" archived`
+        : `Space "${space.name || "Space"}" unarchived`,
+      { toastId: `archive-space-${spIdStr}` }
+    );
+  };
+
+  const handleToggleArchiveGroup = (group, e) => {
+    e?.stopPropagation();
+    setActivePinnedMenuKey(null);
+    const grpIdStr = (group?._id || group?.id)?.toString();
+    if (!grpIdStr) return;
+    const uId = user?.id || user?._id || "anon";
+
+    const willArchive = !archivedGroupIds.has(grpIdStr);
+    setArchivedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (willArchive) {
+        next.add(grpIdStr);
+      } else {
+        next.delete(grpIdStr);
+      }
+      try {
+        localStorage.setItem(
+          `worknest_archived_groups_${uId}_${workspaceId}`,
+          JSON.stringify(Array.from(next)),
+        );
+      } catch (err) {
+        console.warn("Failed to save archived groups:", err);
+      }
+      return next;
+    });
+
+    toast.success(
+      willArchive
+        ? `Group "${group.name || "Group"}" archived`
+        : `Group "${group.name || "Group"}" unarchived`,
+      { toastId: `archive-group-${grpIdStr}` }
+    );
+  };
+
   const currentChannel = useMemo(() => {
     if (selectedSpace || spaceId) return null;
     if (isHomeView && !channelId) return null;
@@ -309,7 +501,7 @@ const SlackShell = () => {
       return found || null;
     }
     if (isHomeView) return null;
-    return channels[0];
+    return channels.find((c) => !c.isArchived) || channels[0];
   }, [channels, channelId, isHomeView, selectedSpace, spaceId]);
 
   const refreshChannelDetails = async () => {
@@ -448,6 +640,33 @@ const SlackShell = () => {
     } catch {
       setHiddenDMIds(new Set());
     }
+
+    try {
+      const rawArchivedDMs = localStorage.getItem(
+        `worknest_archived_dms_${uId}_${workspaceId}`,
+      );
+      setArchivedDMIds(rawArchivedDMs ? new Set(JSON.parse(rawArchivedDMs)) : new Set());
+    } catch {
+      setArchivedDMIds(new Set());
+    }
+
+    try {
+      const rawArchivedSpaces = localStorage.getItem(
+        `worknest_archived_spaces_${uId}_${workspaceId}`,
+      );
+      setArchivedSpaceIds(rawArchivedSpaces ? new Set(JSON.parse(rawArchivedSpaces)) : new Set());
+    } catch {
+      setArchivedSpaceIds(new Set());
+    }
+
+    try {
+      const rawArchivedGroups = localStorage.getItem(
+        `worknest_archived_groups_${uId}_${workspaceId}`,
+      );
+      setArchivedGroupIds(rawArchivedGroups ? new Set(JSON.parse(rawArchivedGroups)) : new Set());
+    } catch {
+      setArchivedGroupIds(new Set());
+    }
   }, [workspaceId, user?.id, user?._id]);
 
   // Synchronize channel pinned messages in real-time
@@ -556,6 +775,7 @@ const SlackShell = () => {
   const visibleDirectMessageMembers = useMemo(() => {
     return directMessageMembers.filter((member) => {
       const mId = (member.id || member._id)?.toString();
+      if (archivedDMIds.has(mId)) return false;
       if ((unreadDMCounts[mId] || 0) > 0) return true;
       if (
         selectedDMUser &&
@@ -571,6 +791,7 @@ const SlackShell = () => {
     selectedDMUser,
     pinnedKeys,
     hiddenDMIds,
+    archivedDMIds,
   ]);
 
   const pinnedItems = useMemo(() => {
@@ -666,6 +887,7 @@ const SlackShell = () => {
     setIsHomeView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
+    setIsArchivedView(false);
     setShowDetailsPane(false);
     setActiveChannelMenuId(null);
     setActiveDMMenuId(null);
@@ -679,6 +901,7 @@ const SlackShell = () => {
     setIsHomeView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
+    setIsArchivedView(false);
     setSelectedDMUser(null);
     const spId = (sp._id || sp.id).toString();
     setUnreadSpaceCounts((prev) => {
@@ -724,6 +947,7 @@ const SlackShell = () => {
     setIsHomeView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
+    setIsArchivedView(false);
     setSelectedDMUser(null);
     setSelectedSpace(null);
     setSelectedGroup(null);
@@ -962,6 +1186,7 @@ const SlackShell = () => {
     setIsHomeView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
+    setIsArchivedView(false);
     setSelectedDMUser(member);
     setSelectedSpace(null);
     setSelectedGroup(null);
@@ -1352,6 +1577,21 @@ const SlackShell = () => {
                           {isConversationMuted(item.type, item.id)
                             ? "Unmute notifications"
                             : "Mute notifications"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePinnedMenuKey(null);
+                            if (item.type === "channel") handleToggleArchiveChannel(item.data);
+                            else if (item.type === "dm") handleToggleArchiveDM(item.data, e);
+                            else if (item.type === "space") handleToggleArchiveSpace(item.data, e);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                        >
+                          <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                          Archive chat
                         </button>
 
                         {item.type === "dm" && (
@@ -2466,6 +2706,7 @@ const SlackShell = () => {
                     setIsHomeView(true);
                     setIsStarredView(false);
                     setIsMentionsView(false);
+                    setIsArchivedView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
                     setSelectedGroup(null);
@@ -2476,6 +2717,7 @@ const SlackShell = () => {
                     isHomeView &&
                     !isStarredView &&
                     !isMentionsView &&
+                    !isArchivedView &&
                     !selectedDMUser &&
                     !selectedSpace &&
                     !selectedGroup
@@ -2518,6 +2760,7 @@ const SlackShell = () => {
                     setIsStarredView(true);
                     setIsPinnedView(false);
                     setIsMentionsView(false);
+                    setIsArchivedView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
                     setSelectedGroup(null);
@@ -2561,6 +2804,7 @@ const SlackShell = () => {
                     setIsHomeView(false);
                     setIsMentionsView(true);
                     setIsStarredView(false);
+                    setIsArchivedView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
                     setSelectedGroup(null);
@@ -2579,6 +2823,33 @@ const SlackShell = () => {
                       className="h-2 w-2 shrink-0 rounded-full bg-blue-500 shadow-xs ring-2 ring-blue-500/20"
                       title={`${unreadMentionsCount} unread mentions`}
                     />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHomeView(false);
+                    setIsArchivedView(true);
+                    setIsStarredView(false);
+                    setIsMentionsView(false);
+                    setSelectedDMUser(null);
+                    setSelectedSpace(null);
+                    setSelectedGroup(null);
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition cursor-pointer ${
+                    isArchivedView
+                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                  }`}
+                >
+                  <i className="fa-solid fa-box-archive w-4 text-center text-amber-400" />
+                  <span className="flex-1 text-left">Archived</span>
+                  {totalArchivedCount > 0 && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] font-bold text-amber-400 border border-amber-500/40">
+                      {totalArchivedCount}
+                    </span>
                   )}
                 </button>
               </div>
@@ -2614,12 +2885,12 @@ const SlackShell = () => {
               />
               {!isChannelsCollapsed && (
                 <div className="space-y-0.5 pt-1">
-                  {channels.length === 0 ? (
+                  {activeChannels.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                       No channels yet
                     </div>
                   ) : (
-                    channels.map((chanItem, idx) => {
+                    activeChannels.map((chanItem, idx) => {
                       const chanId = (chanItem.id || chanItem._id)?.toString();
                       const chan = { ...chanItem, id: chanId, _id: chanId };
                       const isActive =
@@ -2790,10 +3061,22 @@ const SlackShell = () => {
                                   <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
                                   Copy link
                                 </button>
+                                <div className="h-px bg-[#395B64]/50 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveChannelMenuId(null);
+                                    handleToggleArchiveChannel(chan);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                                >
+                                  <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                                  {chan.isArchived ? "Unarchive chat" : "Archive chat"}
+                                </button>
                                 {(selectedRole === "OWNER" ||
                                   selectedRole === "ADMIN") && (
                                   <>
-                                    <div className="h-px bg-[#395B64]/50 my-1" />
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -3004,6 +3287,14 @@ const SlackShell = () => {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={(e) => handleToggleArchiveDM(member, e)}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                                >
+                                  <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                                  {archivedDMIds.has((member.id || member._id)?.toString()) ? "Unarchive chat" : "Archive chat"}
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setActiveDMMenuId(null);
@@ -3094,7 +3385,7 @@ const SlackShell = () => {
 
               {!isSpacesCollapsed && (
                 <div className="space-y-0.5 pt-1">
-                  {spaces.length === 0 ? (
+                  {activeSpaces.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                       {isSuperAdmin ? (
                         <div className="flex flex-col items-center gap-1.5">
@@ -3115,7 +3406,7 @@ const SlackShell = () => {
                       )}
                     </div>
                   ) : (
-                    spaces.map((sp) => {
+                    activeSpaces.map((sp) => {
                       const spId = (sp._id || sp.id)?.toString();
                       const isActive =
                         selectedSpace &&
@@ -3368,7 +3659,7 @@ const SlackShell = () => {
 
               {!isGroupsCollapsed && (
                 <div className="space-y-0.5 pt-1">
-                  {groups.length === 0 ? (
+                  {activeGroups.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                       <div className="flex flex-col items-center gap-1.5">
                         <span>No Groups yet</span>
@@ -3385,12 +3676,13 @@ const SlackShell = () => {
                       </div>
                     </div>
                   ) : (
-                    groups.map((grp) => {
+                    activeGroups.map((grp) => {
                       const grpId = (grp._id || grp.id)?.toString();
                       const isActive =
                         selectedGroup &&
                         (selectedGroup._id || selectedGroup.id)?.toString() ===
                           grpId;
+                      const isMenuOpen = activeGroupMenuId === grpId;
                       const memberCount = grp.members?.length || 0;
 
                       return (
@@ -3432,7 +3724,44 @@ const SlackShell = () => {
                                 </span>
                               )}
                             </div>
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveGroupMenuId(isMenuOpen ? null : grpId);
+                                }}
+                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                  isMenuOpen ? "flex" : "hidden group-hover:flex"
+                                }`}
+                                title="Group options"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                              </button>
+                            </div>
                           </div>
+
+                          {isMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setActiveGroupMenuId(null)}
+                              />
+                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    setActiveGroupMenuId(null);
+                                    handleToggleArchiveGroup(grp, e);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                                >
+                                  <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                                  {archivedGroupIds.has(grpId) ? "Unarchive chat" : "Archive chat"}
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })
@@ -3826,6 +4155,7 @@ const SlackShell = () => {
                   setIsHomeView(true);
                   setIsStarredView(false);
                   setIsMentionsView(false);
+                  setIsArchivedView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
                   setSelectedGroup(null);
@@ -3836,6 +4166,7 @@ const SlackShell = () => {
                   isHomeView &&
                   !isStarredView &&
                   !isMentionsView &&
+                  !isArchivedView &&
                   !selectedDMUser &&
                   !selectedSpace &&
                   !selectedGroup
@@ -3875,6 +4206,7 @@ const SlackShell = () => {
                   setIsStarredView(true);
                   setIsPinnedView(false);
                   setIsMentionsView(false);
+                  setIsArchivedView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
                   setSelectedGroup(null);
@@ -3918,6 +4250,7 @@ const SlackShell = () => {
                   setIsHomeView(false);
                   setIsMentionsView(true);
                   setIsStarredView(false);
+                  setIsArchivedView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
                   setSelectedGroup(null);
@@ -3934,6 +4267,33 @@ const SlackShell = () => {
                 {unreadMentionsCount > 0 && (
                   <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
                     {unreadMentionsCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHomeView(false);
+                  setIsArchivedView(true);
+                  setIsStarredView(false);
+                  setIsMentionsView(false);
+                  setSelectedDMUser(null);
+                  setSelectedSpace(null);
+                  setSelectedGroup(null);
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition cursor-pointer ${
+                  isArchivedView
+                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
+                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                }`}
+              >
+                <i className="fa-solid fa-box-archive w-4 text-center text-amber-400" />
+                <span className="flex-1 text-left">Archived</span>
+                {totalArchivedCount > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] font-bold text-amber-400 border border-amber-500/40">
+                    {totalArchivedCount}
                   </span>
                 )}
               </button>
@@ -3968,12 +4328,12 @@ const SlackShell = () => {
 
             {!isChannelsCollapsed && (
               <div className="space-y-0.5 pt-1">
-                {channels.length === 0 ? (
+                {activeChannels.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                     No channels yet
                   </div>
                 ) : (
-                  channels.map((chanItem, idx) => {
+                  activeChannels.map((chanItem, idx) => {
                     const chanId = (chanItem.id || chanItem._id)?.toString();
                     const chan = { ...chanItem, id: chanId, _id: chanId };
                     const isActive =
@@ -4155,10 +4515,22 @@ const SlackShell = () => {
                                 Copy link
                               </button>
 
+                              <div className="h-px bg-[#395B64]/50 my-1" />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveChannelMenuId(null);
+                                  handleToggleArchiveChannel(chan);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                              >
+                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                                {chan.isArchived ? "Unarchive chat" : "Archive chat"}
+                              </button>
                               {(selectedRole === "OWNER" ||
                                 selectedRole === "ADMIN") && (
                                 <>
-                                  <div className="h-px bg-[#395B64]/50 my-1" />
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -4389,6 +4761,16 @@ const SlackShell = () => {
                                 Hide conversation
                               </button>
 
+                              {/* Archive chat */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleArchiveDM(member, e)}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                              >
+                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                                {archivedDMIds.has((member.id || member._id)?.toString()) ? "Unarchive chat" : "Archive chat"}
+                              </button>
+
                               {/* Mute */}
                               <button
                                 type="button"
@@ -4479,7 +4861,7 @@ const SlackShell = () => {
 
             {!isSpacesCollapsed && (
               <div className="space-y-0.5 pt-1">
-                {spaces.length === 0 ? (
+                {activeSpaces.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                     {isSuperAdmin ? (
                       <div className="flex flex-col items-center gap-1.5">
@@ -4497,7 +4879,7 @@ const SlackShell = () => {
                     )}
                   </div>
                 ) : (
-                  spaces.map((sp) => {
+                  activeSpaces.map((sp) => {
                     const spId = (sp._id || sp.id)?.toString();
                     const isActive =
                       selectedSpace &&
@@ -4662,6 +5044,14 @@ const SlackShell = () => {
                                 <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
                                 Copy link
                               </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleArchiveSpace(sp, e)}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                              >
+                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                                {archivedSpaceIds.has(spId) ? "Unarchive chat" : "Archive chat"}
+                              </button>
                               <div className="h-px bg-[#395B64]/50 my-1" />
                               <button
                                 type="button"
@@ -4750,7 +5140,7 @@ const SlackShell = () => {
 
             {!isGroupsCollapsed && (
               <div className="space-y-0.5 pt-1">
-                {groups.length === 0 ? (
+                {activeGroups.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
                     <div className="flex flex-col items-center gap-1.5">
                       <span>No Groups yet</span>
@@ -4767,12 +5157,13 @@ const SlackShell = () => {
                     </div>
                   </div>
                 ) : (
-                  groups.map((grp) => {
+                  activeGroups.map((grp) => {
                     const grpId = (grp._id || grp.id)?.toString();
                     const isActive =
                       selectedGroup &&
                       (selectedGroup._id || selectedGroup.id)?.toString() ===
                         grpId;
+                    const isMenuOpen = activeGroupMenuId === grpId;
                     const memberCount = grp.members?.length || 0;
 
                     return (
@@ -4814,7 +5205,44 @@ const SlackShell = () => {
                               </span>
                             )}
                           </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveGroupMenuId(isMenuOpen ? null : grpId);
+                              }}
+                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
+                                isMenuOpen ? "flex" : "hidden group-hover:flex"
+                              }`}
+                              title="Group options"
+                            >
+                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
+                            </button>
+                          </div>
                         </div>
+
+                        {isMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setActiveGroupMenuId(null)}
+                            />
+                            <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  setActiveGroupMenuId(null);
+                                  handleToggleArchiveGroup(grp, e);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
+                              >
+                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
+                                {archivedGroupIds.has(grpId) ? "Unarchive chat" : "Archive chat"}
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     );
                   })
@@ -4829,6 +5257,7 @@ const SlackShell = () => {
         {!selectedDMUser &&
           !isStarredView &&
           !isMentionsView &&
+          !isArchivedView &&
           !isHomeView &&
           !selectedSpace &&
           !selectedGroup && (
@@ -4868,6 +5297,36 @@ const SlackShell = () => {
                       <i className="fa-solid fa-pen" />
                     </button>
                   )}
+
+                {currentChannel && !currentChannel.isArchived && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleArchiveChannel(currentChannel)}
+                    className="flex-shrink-0 text-[#52656A] dark:text-[#A5C9CA] hover:text-amber-500 p-1 text-xs transition cursor-pointer"
+                    title="Archive this channel"
+                  >
+                    <i className="fa-solid fa-box-archive" />
+                  </button>
+                )}
+
+                {currentChannel?.isArchived && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                    <i className="fa-solid fa-box-archive text-[10px]" />
+                    <span>Archived</span>
+                  </span>
+                )}
+
+                {currentChannel?.isArchived && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleArchiveChannel(currentChannel)}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 border border-amber-500/40 transition cursor-pointer shrink-0"
+                    title="Unarchive this channel"
+                  >
+                    <i className="fa-solid fa-box-archive text-xs" />
+                    <span>Unarchive</span>
+                  </button>
+                )}
 
                 {currentChannel?.description && (
                   <span className="hidden sm:block truncate text-xs text-[#52656A] dark:text-[#A5C9CA]/80 max-w-xs lg:max-w-md border-l border-[#A5C9CA]/40 pl-2">
@@ -5110,6 +5569,29 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
               }}
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
             />
+          ) : isArchivedView ? (
+            <ArchivedChatsView
+              channels={channels}
+              directMessageMembers={directMessageMembers}
+              spaces={spaces}
+              groups={groups}
+              archivedDMIds={archivedDMIds}
+              archivedSpaceIds={archivedSpaceIds}
+              archivedGroupIds={archivedGroupIds}
+              onToggleArchiveChannel={handleToggleArchiveChannel}
+              onToggleArchiveDM={handleToggleArchiveDM}
+              onToggleArchiveSpace={handleToggleArchiveSpace}
+              onToggleArchiveGroup={handleToggleArchiveGroup}
+              canManageChannels={selectedRole === "OWNER" || selectedRole === "ADMIN"}
+              currentUserId={user?.id || user?._id}
+              currentUser={user}
+              isSuperAdmin={isSuperAdmin}
+              onForwardMessage={handleOpenForwardModal}
+              onNavigateSource={handleNavigateSource}
+              onMessagesChange={setChannelMessages}
+              onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
+              onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+            />
           ) : selectedDMUser ? (
             <DirectMessaging
               key={`dm-${(selectedDMUser?.id || selectedDMUser?._id)?.toString()}`}
@@ -5175,6 +5657,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
             !selectedDMUser &&
             !isStarredView &&
             !isMentionsView &&
+            !isArchivedView &&
             !isHomeView &&
             !selectedSpace &&
             !selectedGroup && (
@@ -5188,6 +5671,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
             !selectedDMUser &&
             !isStarredView &&
             !isMentionsView &&
+            !isArchivedView &&
             !isHomeView &&
             !selectedSpace &&
             !selectedGroup && (

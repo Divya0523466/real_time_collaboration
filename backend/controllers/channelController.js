@@ -69,6 +69,8 @@ const createChannel = async (req, res) => {
         name: channel.name,
         description: channel.description,
         type: channel.type,
+        isArchived: Boolean(channel.isArchived),
+        archivedAt: channel.archivedAt || null,
       },
     })
   } catch (error) {
@@ -138,6 +140,8 @@ const updateChannel = async (req, res) => {
         name: channel.name,
         description: channel.description,
         type: channel.type,
+        isArchived: Boolean(channel.isArchived),
+        archivedAt: channel.archivedAt || null,
       },
     })
   } catch (error) {
@@ -195,7 +199,7 @@ const getWorkspaceChannels = async (req, res) => {
       }
     }
 
-    const channels = await Channel.find(filter).select("_id name description type createdBy").lean()
+    const channels = await Channel.find(filter).select("_id name description type createdBy isArchived archivedAt").lean()
 
     return res.json({
       channels: channels.map((c) => ({
@@ -203,6 +207,8 @@ const getWorkspaceChannels = async (req, res) => {
         name: c.name,
         description: c.description,
         type: c.type,
+        isArchived: Boolean(c.isArchived),
+        archivedAt: c.archivedAt || null,
       })),
     })
   } catch (error) {
@@ -242,6 +248,8 @@ const getChannel = async (req, res) => {
         name: channel.name,
         description: channel.description,
         type: channel.type,
+        isArchived: Boolean(channel.isArchived),
+        archivedAt: channel.archivedAt || null,
         members: channel.members.map((m) => ({
           id: m._id,
           username: m.username,
@@ -402,7 +410,53 @@ const removeChannelMember = async (req, res) => {
 
 
 
+const toggleArchiveChannel = async (req, res) => {
+  try {
+    const { workspaceId, channelId } = req.params;
+    const userId = req.userId;
+
+    const membership = await WorkspaceMembership.findOne({ userId, workspaceId });
+    if (!membership) {
+      return res.status(403).json({ message: "You do not have permission to access this workspace" });
+    }
+
+    const channel = await Channel.findOne({ _id: channelId, workspaceId });
+    if (!channel) {
+      return res.status(404).json({ message: "Channel not found" });
+    }
+
+    const willArchive = !channel.isArchived;
+    channel.isArchived = willArchive;
+    channel.archivedAt = willArchive ? new Date() : null;
+    channel.archivedBy = willArchive ? userId : null;
+    await channel.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("channel-archive-toggled", {
+        channelId: channel._id.toString(),
+        workspaceId,
+        isArchived: willArchive,
+        channelName: channel.name,
+      });
+    }
+
+    return res.json({
+      message: willArchive ? "Channel archived successfully" : "Channel unarchived successfully",
+      channel: {
+        id: channel._id,
+        name: channel.name,
+        isArchived: channel.isArchived,
+        archivedAt: channel.archivedAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export {
+  toggleArchiveChannel,
   createChannel,
   getWorkspaceChannels,
   getChannel,

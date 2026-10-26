@@ -349,7 +349,7 @@ const GroupMessageThread = ({
             </button>
           )}
 
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-200/60 dark:border-teal-500/30 shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#395B64]/10 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] border border-[#395B64]/20 dark:border-[#395B64]/40 shrink-0">
             <i className="fa-solid fa-user-group text-sm" />
           </div>
 
@@ -361,7 +361,7 @@ const GroupMessageThread = ({
               <button
                 type="button"
                 onClick={() => setShowInfoModal(true)}
-                className="flex items-center gap-1 rounded-full bg-teal-50 hover:bg-teal-100 dark:bg-[#395B64]/50 dark:hover:bg-[#395B64]/80 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:text-[#A5C9CA] border border-teal-200/50 dark:border-[#395B64]/50 transition cursor-pointer"
+                className="flex items-center gap-1 rounded-full bg-[#E7F6F2] hover:bg-[#E7F6F2]/80 dark:bg-[#395B64]/40 dark:hover:bg-[#395B64]/60 px-2 py-0.5 text-[10px] font-semibold text-[#395B64] dark:text-[#A5C9CA] border border-[#395B64]/20 dark:border-[#395B64]/40 transition cursor-pointer"
                 title="View group members"
               >
                 <i className="fa-solid fa-users text-[9px]" />
@@ -377,23 +377,23 @@ const GroupMessageThread = ({
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           <StatusSelector align="right" />
           {/* Pinned Messages Button */}
           <button
             type="button"
             onClick={() => setShowPinnedDrawer(true)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer flex-shrink-0 ${
               showPinnedDrawer
-                ? "border-teal-600 bg-teal-50 dark:bg-[#395B64]/40 text-teal-700 dark:text-[#A5C9CA]"
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
             }`}
             title="Pinned messages in this Group"
           >
             <i className="fa-solid fa-thumbtack text-xs" />
-            <span className="hidden sm:inline">Pinned</span>
+            <span className="hidden xl:inline">Pinned</span>
             {pinnedMessages.length > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-200 dark:bg-[#395B64]/50 text-gray-700 dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {pinnedMessages.length}
               </span>
             )}
@@ -403,15 +403,15 @@ const GroupMessageThread = ({
           <button
             type="button"
             onClick={() => setShowGroupSearch((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer flex-shrink-0 ${
               showGroupSearch
-                ? "border-teal-600 bg-teal-50 dark:bg-[#395B64]/40 text-teal-700 dark:text-[#A5C9CA]"
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
             }`}
             title="Find in this Group"
           >
-            <i className="fa-solid fa-magnifying-glass text-xs text-teal-600 dark:text-teal-400" />
-            <span className="hidden sm:inline">Search</span>
+            <i className="fa-solid fa-magnifying-glass text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Search</span>
           </button>
 
       <InConversationSearch
@@ -425,17 +425,17 @@ const GroupMessageThread = ({
           <button
             type="button"
             onClick={() => setShowFilesGallery((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer flex-shrink-0 ${
               showFilesGallery
-                ? "border-teal-600 bg-teal-50 dark:bg-[#395B64]/40 text-teal-700 dark:text-[#A5C9CA]"
+                ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
             }`}
             title="Shared files in this Group"
           >
-            <i className="fa-solid fa-folder-open text-xs text-teal-600 dark:text-teal-400" />
-            <span className="hidden sm:inline">Files</span>
+            <i className="fa-solid fa-folder-open text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Files</span>
             {filesCount > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-teal-100 dark:bg-[#395B64]/60 text-teal-700 dark:text-teal-200 px-1 text-[10px] font-bold">
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {filesCount}
               </span>
             )}
@@ -443,11 +443,11 @@ const GroupMessageThread = ({
           <button
             type="button"
             onClick={() => setShowInfoModal(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] px-2.5 py-1.5 text-xs font-semibold text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer flex-shrink-0"
             title="Group Info & Members"
           >
-            <i className="fa-solid fa-circle-info text-xs text-teal-600 dark:text-teal-400" />
-            <span className="hidden sm:inline">Group Info</span>
+            <i className="fa-solid fa-circle-info text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Group Info</span>
           </button>
 
           <button

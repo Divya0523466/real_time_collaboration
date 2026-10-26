@@ -431,11 +431,11 @@ const MessageThread = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
             onClick={() => setShowPinnedDrawer(true)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer flex-shrink-0 ${
               showPinnedDrawer
                 ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
@@ -443,7 +443,7 @@ const MessageThread = ({
             title="Pinned messages in this conversation"
           >
             <i className="fa-solid fa-thumbtack text-xs" />
-            <span className="hidden sm:inline">Pinned</span>
+            <span className="hidden xl:inline">Pinned</span>
             {pinnedMessages.length > 0 && (
               <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {pinnedMessages.length}
@@ -455,7 +455,7 @@ const MessageThread = ({
           <button
             type="button"
             onClick={() => setShowInChatSearch((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer flex-shrink-0 ${
               showInChatSearch
                 ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
@@ -463,14 +463,14 @@ const MessageThread = ({
             title="Find in this conversation"
           >
             <i className="fa-solid fa-magnifying-glass text-xs" />
-            <span className="hidden sm:inline">Search</span>
+            <span className="hidden xl:inline">Search</span>
           </button>
 
           {/* Files Gallery Button */}
           <button
             type="button"
             onClick={() => setShowFilesGallery((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer flex-shrink-0 ${
               showFilesGallery
                 ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
@@ -478,7 +478,7 @@ const MessageThread = ({
             title="Shared files in this conversation"
           >
             <i className="fa-solid fa-folder-open text-xs" />
-            <span className="hidden sm:inline">Files</span>
+            <span className="hidden xl:inline">Files</span>
             {filesCount > 0 && (
               <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                 {filesCount}

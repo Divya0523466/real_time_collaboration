@@ -8,6 +8,7 @@ import {
   deleteChannel,
   addChannelMember,
   removeChannelMember,
+  toggleArchiveChannel,
 } from "../controllers/channelController.js"
 
 const router = express.Router()
@@ -19,6 +20,7 @@ router.get("/:workspaceId/channels", getWorkspaceChannels)
 router.get("/:workspaceId/channels/:channelId", getChannel)
 router.patch("/:workspaceId/channels/:channelId", updateChannel)
 router.delete("/:workspaceId/channels/:channelId", deleteChannel)
+router.post("/:workspaceId/channels/:channelId/archive", toggleArchiveChannel)
 router.post("/:workspaceId/channels/:channelId/members", addChannelMember)
 router.delete("/:workspaceId/channels/:channelId/members/:memberId", removeChannelMember)
 

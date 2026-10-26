@@ -489,10 +489,21 @@ export const WorkspaceProvider = ({ children }) => {
       requestOnlineUsers();
     };
 
+    const handleChannelArchiveToggled = ({ channelId, isArchived, archivedAt }) => {
+      setChannels((prev) =>
+        prev.map((c) =>
+          (c._id || c.id)?.toString() === channelId?.toString()
+            ? { ...c, isArchived, archivedAt }
+            : c
+        )
+      );
+    };
+
     socket.on("receive-notification", handleNotification);
     socket.on("user-dnd-updated", handleUserDndUpdated);
     socket.on("channel-member-removed", handleChannelMemberRemoved);
     socket.on("channel-member-added", handleChannelMemberAdded);
+    socket.on("channel-archive-toggled", handleChannelArchiveToggled);
     socket.on("connect", handleSocketConnect);
     onOnlineUsers(handleOnlineUsers);
     onUserOnline(handleUserOnline);
@@ -508,6 +519,7 @@ export const WorkspaceProvider = ({ children }) => {
       socket.off("user-dnd-updated", handleUserDndUpdated);
       socket.off("channel-member-removed", handleChannelMemberRemoved);
       socket.off("channel-member-added", handleChannelMemberAdded);
+      socket.off("channel-archive-toggled", handleChannelArchiveToggled);
       socket.off("connect", handleSocketConnect);
       offOnlineUsers(handleOnlineUsers);
       offUserOnline(handleUserOnline);
@@ -791,6 +803,29 @@ export const WorkspaceProvider = ({ children }) => {
     [selectedWorkspace, API_URL],
   );
 
+  const toggleArchiveChannel = useCallback(
+    async (channelId, workspaceIdToUse = null) => {
+      const activeWs = workspaceIdToUse || selectedWorkspace;
+      if (!activeWs || !channelId) return null;
+      try {
+        const response = await fetch(`${API_URL}/workspaces/${activeWs}/channels/${channelId}/archive`, {
+          method: "POST",
+          credentials: "include",
+          headers: getAuthHeaders(),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to toggle channel archive status");
+        }
+        await refreshChannels(activeWs);
+        return data.channel;
+      } catch (err) {
+        toast.error(err.message || "Failed to update archive status");
+        throw err;
+      }
+    },
+    [API_URL, selectedWorkspace, refreshChannels],
+  );
   const getChannel = useCallback(
     async (channelId, targetWorkspaceId = null) => {
       const activeWorkspace = targetWorkspaceId || selectedWorkspace;
@@ -1368,7 +1403,7 @@ export const WorkspaceProvider = ({ children }) => {
     updateMemberRole,
     removeMember,
     addChannelMember,
-    removeChannelMember,
+    removeChannelMember, toggleArchiveChannel,
     refreshChannels,
     acceptInvitation,
     declineInvitation,

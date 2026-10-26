@@ -275,6 +275,13 @@ io.on("connection", async (socket) => {
           return;
         }
 
+        if (access.channel.isArchived) {
+          socket.emit("send-channel-message-error", {
+            message: "This channel is archived. No new messages can be posted.",
+          });
+          return;
+        }
+
         const mentionValidation = await validateChannelMentions(
           mentions,
           access.channel,
