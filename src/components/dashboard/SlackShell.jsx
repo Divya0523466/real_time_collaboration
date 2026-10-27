@@ -2451,6 +2451,16 @@ const SlackShell = () => {
 
         {/* Right Help / Quick Actions */}
         <div className="flex items-center justify-end gap-2.5 w-64">
+          {permissions.canManageChannelMembers && (
+            <button
+              type="button"
+              onClick={() => navigate(`/app/workspace/${workspaceId}/channels-manage`)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition cursor-pointer"
+              title="Channel Management Dashboard"
+            >
+              <i className="fa-solid fa-users-gear text-sm" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowActivityPanel(true)}
@@ -6017,7 +6027,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
         <ProfileModal onClose={() => setShowEditProfileModal(false)} />
       )}
 
-      {/* Forward Message Modal */}
+      {/* Global Search Modal */}
       {showGlobalSearch && (
         <GlobalSearchModal
           workspaceId={workspaceId}

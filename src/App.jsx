@@ -21,6 +21,9 @@ const GlobalDashboard = lazy(
   () => import("./components/dashboard/GlobalDashboard"),
 );
 const SlackShell = lazy(() => import("./components/dashboard/SlackShell"));
+const ChannelManagementPage = lazy(
+  () => import("./components/dashboard/ChannelManagementPage"),
+);
 const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
 const OTP = lazy(() => import("./components/OTP"));
 const SetPassword = lazy(() => import("./components/SetPassword"));
@@ -169,6 +172,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <GlobalDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/app/workspace/:workspaceId/channels-manage"
+          element={
+            <ProtectedRoute>
+              <ChannelManagementPage />
             </ProtectedRoute>
           }
         />
