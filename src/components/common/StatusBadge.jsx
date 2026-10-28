@@ -21,7 +21,7 @@ const StatusBadge = ({
 
     const dndBadge = (
       <span
-        className={`inline-flex items-center justify-center rounded-full bg-rose-500 text-white font-bold ring-2 ring-white dark:ring-[#1E2525] shrink-0 ${
+        className={`inline-flex items-center justify-center rounded-full bg-[#395B64] text-[#E7F6F2] font-bold ring-2 ring-white dark:ring-[#1E2525] shrink-0 ${
           dndSizeClasses[size] || dndSizeClasses.sm
         } ${className}`}
         title="Do Not Disturb — notifications are paused"
@@ -36,7 +36,7 @@ const StatusBadge = ({
     }
 
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 select-none">
+      <span className="inline-flex items-center gap-1.5 text-xs text-[#395B64] dark:text-[#A5C9CA] select-none">
         {dndBadge}
         <span>Do Not Disturb</span>
       </span>

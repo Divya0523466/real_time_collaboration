@@ -485,7 +485,6 @@ const MessageThread = ({
               </span>
             )}
           </button>
-          <StatusSelector align="right" />
 
           <button
             type="button"

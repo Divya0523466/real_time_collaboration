@@ -82,26 +82,22 @@ export const SidebarSectionHeader = ({
   countBadgeClass = "bg-emerald-600/90",
   actionButton = null,
 }) => (
-  <div className="flex items-center justify-between px-2 pb-1.5">
+  <div className="group/section flex items-center justify-between px-2 pb-1">
     <button
       type="button"
       onClick={onToggle}
-      className="group flex items-center gap-2 text-sm font-semibold text-[#A5C9CA]/80 hover:text-white transition cursor-pointer select-none"
+      className="group flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#52656A] dark:text-[#A5C9CA]/70 hover:text-[#2C3333] dark:hover:text-[#A5C9CA] transition-colors cursor-pointer select-none"
     >
       <i
-        className={`fa-solid fa-chevron-${isCollapsed ? "right" : "down"} text-[10px] w-3 text-[#A5C9CA]/60 group-hover:text-white transition`}
+        className={`fa-solid fa-chevron-${isCollapsed ? "right" : "down"} text-[9px] w-2.5 text-[#52656A]/60 dark:text-[#A5C9CA]/60 transition-transform`}
       />
-      {icon}
       <span>{title}</span>
-      {count > 0 && (
-        <span
-          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-bold text-white ${countBadgeClass} rounded-full shadow-xs`}
-        >
-          {count}
-        </span>
-      )}
     </button>
-    {actionButton}
+    {actionButton && (
+      <div className="opacity-0 group-hover/section:opacity-100 transition-opacity flex items-center">
+        {actionButton}
+      </div>
+    )}
   </div>
 );
 
@@ -211,6 +207,14 @@ const SlackShell = () => {
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [selectedDMUser, setSelectedDMUser] = useState(null);
   const [unreadDMCounts, setUnreadDMCounts] = useState({});
+  const [activeSecondaryPanel, setActiveSecondaryPanel] = useState(() => {
+    // If a channel or space is open, default to that category, otherwise 'home'
+    if (channelId) return "channels";
+    if (spaceId) return "spaces";
+    return "home";
+  });
+  const [panelSearchQuery, setPanelSearchQuery] = useState("");
+  const [panelUnreadOnly, setPanelUnreadOnly] = useState(false);
   const [unreadChannelCounts, setUnreadChannelCounts] = useState({});
   const [pinnedKeys, setPinnedKeys] = useState(() => {
     try {
@@ -881,7 +885,10 @@ const SlackShell = () => {
     );
   }, [unreadSpaceCounts]);
 
-  const handleSelectGroup = (grp) => {
+  const handleSelectGroup = (grp, keepPanel = false) => {
+    if (!keepPanel) {
+      setActiveSecondaryPanel("groups");
+    }
     setSelectedGroup(grp);
     setSelectedSpace(null);
     setSelectedDMUser(null);
@@ -896,7 +903,10 @@ const SlackShell = () => {
     setIsMobileSidebarOpen(false);
   };
 
-  const handleSelectSpace = (sp) => {
+  const handleSelectSpace = (sp, keepPanel = false) => {
+    if (!keepPanel) {
+      setActiveSecondaryPanel("spaces");
+    }
     setSelectedSpace(sp);
     setSelectedGroup(null);
     setIsHomeView(false);
@@ -944,7 +954,10 @@ const SlackShell = () => {
     }
   };
 
-  const handleSelectChannel = (chan) => {
+  const handleSelectChannel = (chan, keepPanel = false) => {
+    if (!keepPanel) {
+      setActiveSecondaryPanel("channels");
+    }
     setIsHomeView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
@@ -1181,7 +1194,10 @@ const SlackShell = () => {
     }
   };
 
-  const handleSelectDM = (member) => {
+  const handleSelectDM = (member, keepPanel = false) => {
+    if (!keepPanel) {
+      setActiveSecondaryPanel("dms");
+    }
     const mId = (member.id || member._id)?.toString();
     if (mId) handleUnhideDM(mId);
     setIsHomeView(false);
@@ -1361,16 +1377,16 @@ const SlackShell = () => {
     if (pinnedItems.length === 0) return null;
 
     return (
-      <div className="border-b border-[#2C3333] pb-3 mb-2">
+      <div className="pb-1">
         <SidebarSectionHeader
           title="Pinned"
           isCollapsed={isPinnedCollapsed}
           onToggle={() => setIsPinnedCollapsed((prev) => !prev)}
           icon={
-            <i className="fa-solid fa-thumbtack text-[11px] text-amber-400 w-3 text-center shrink-0" />
+            <i className="fa-solid fa-thumbtack text-[11px] text-[#52656A] dark:text-[#A5C9CA] w-3 text-center shrink-0" />
           }
           count={pinnedItems.length}
-          countBadgeClass="bg-amber-500/80"
+          countBadgeClass="bg-[#395B64] text-white"
         />
 
         {!isPinnedCollapsed && (
@@ -1421,20 +1437,20 @@ const SlackShell = () => {
                           handleSelectSpace(item.data);
                       }
                     }}
-                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm transition cursor-pointer ${
+                    className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
                       isActive
-                        ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                        ? "bg-[#395B64] text-white font-semibold"
                         : isUnread
-                          ? "text-white font-semibold hover:bg-[#2C3333]"
-                          : "text-[#A5C9CA]/90 font-medium hover:bg-[#2C3333] hover:text-white"
+                          ? "text-[#1A2525] dark:text-white font-semibold hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333]"
+                          : "text-[#455252] dark:text-[#A5C9CA]/90 font-medium hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       {item.type === "channel" ? (
                         item.isPrivate ? (
-                          <i className="fa-solid fa-lock text-xs text-[#A5C9CA] w-3.5 text-center shrink-0" />
+                          <i className={`fa-solid fa-lock text-xs w-3.5 text-center shrink-0 ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
                         ) : (
-                          <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center shrink-0">
+                          <span className={`text-sm font-bold w-3.5 text-center shrink-0 ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`}>
                             #
                           </span>
                         )
@@ -1452,250 +1468,38 @@ const SlackShell = () => {
                             )}
                           </span>
                           <span
-                            className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-1 ring-[#1E2525] ${
+                            className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-1 ring-white dark:ring-[#1E2525] ${
                               item.isOnline ? "bg-emerald-500" : "bg-gray-500"
                             }`}
                           />
                         </span>
                       ) : (
-                        <span className="text-amber-400 text-xs w-3.5 text-center flex-shrink-0">
-                          ✦
-                        </span>
+                        <i className="fa-solid fa-table-cells-large text-xs w-3.5 text-center flex-shrink-0 text-[#52656A] dark:text-[#A5C9CA]" />
                       )}
 
                       <span className="min-w-0 flex-1 truncate">
                         {item.name}
                       </span>
                       <i
-                        className="fa-solid fa-thumbtack text-[9px] text-amber-400/70 shrink-0"
+                        className="fa-solid fa-thumbtack text-[9px] text-[#52656A] dark:text-[#A5C9CA] shrink-0"
                         title="Pinned"
                       />
                       {isConversationMuted(item.type, item.id) && (
                         <i
-                          className="fa-solid fa-bell-slash text-[9px] text-[#A5C9CA]/60 shrink-0"
+                          className="fa-solid fa-bell-slash text-[9px] text-[#52656A]/60 dark:text-[#A5C9CA]/60 shrink-0"
                           title="Notifications muted"
                         />
                       )}
 
                       {isUnread && (
                         <span
-                          className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
+                          className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
                           title="Unread messages"
                         />
                       )}
                     </div>
 
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          if (item.type === "channel")
-                            handleToggleChannelRead(item.data, e);
-                          else if (item.type === "dm")
-                            handleToggleDMRead(item.data, e);
-                          else if (item.type === "space")
-                            handleToggleSpaceRead(item.data, e);
-                        }}
-                        className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                          isMenuOpen ? "flex" : "hidden group-hover:flex"
-                        }`}
-                        title={isUnread ? "Mark as read" : "Mark as unread"}
-                      >
-                        <i
-                          className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`}
-                        />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActivePinnedMenuKey(isMenuOpen ? null : item.key);
-                        }}
-                        className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                          isMenuOpen ? "flex" : "hidden group-hover:flex"
-                        }`}
-                        title="Conversation options"
-                      >
-                        <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                      </button>
                     </div>
-                  </div>
-
-                  {isMenuOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-30"
-                        onClick={() => setActivePinnedMenuKey(null)}
-                      />
-                      <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            if (item.type === "channel")
-                              handleToggleChannelRead(item.data, e);
-                            else if (item.type === "dm")
-                              handleToggleDMRead(item.data, e);
-                            else if (item.type === "space")
-                              handleToggleSpaceRead(item.data, e);
-                            setActivePinnedMenuKey(null);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                        >
-                          <i
-                            className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`}
-                          />
-                          {isUnread ? "Mark as read" : "Mark as unread"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) =>
-                            handleTogglePin(item.type, item.id, e)
-                          }
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                        >
-                          <i className="fa-solid fa-thumbtack text-amber-400 w-3.5" />
-                          Unpin conversation
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActivePinnedMenuKey(null);
-                            toggleMuteConversation(item.type, item.id);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                        >
-                          <i
-                            className={`fa-solid ${
-                              isConversationMuted(item.type, item.id)
-                                ? "fa-bell text-amber-400"
-                                : "fa-bell-slash text-[#A5C9CA]"
-                            } w-3.5`}
-                          />
-                          {isConversationMuted(item.type, item.id)
-                            ? "Unmute notifications"
-                            : "Mute notifications"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActivePinnedMenuKey(null);
-                            if (item.type === "channel") handleToggleArchiveChannel(item.data);
-                            else if (item.type === "dm") handleToggleArchiveDM(item.data, e);
-                            else if (item.type === "space") handleToggleArchiveSpace(item.data, e);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                        >
-                          <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                          Archive chat
-                        </button>
-
-                        {item.type === "dm" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={(e) => handleHideDM(item.id, e)}
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                            >
-                              <i className="fa-regular fa-eye-slash text-[#A5C9CA] w-3.5" />
-                              Hide conversation
-                            </button>
-                            <div className="h-px bg-[#395B64]/50 my-1" />
-                            <button
-                              type="button"
-                              onClick={(e) =>
-                                handleToggleBlockUser(
-                                  item.data || {
-                                    id: item.id,
-                                    username: item.name,
-                                  },
-                                  e,
-                                )
-                              }
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-400 hover:bg-[#395B64] transition"
-                            >
-                              <i
-                                className={`fa-solid ${blockedUserIds.has(item.id?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
-                              />
-                              {blockedUserIds.has(item.id?.toString())
-                                ? "Unblock user"
-                                : "Block user"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) =>
-                                handleDeleteDMClick(
-                                  { id: item.id, username: item.name },
-                                  e,
-                                )
-                              }
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                            >
-                              <i className="fa-solid fa-trash-can w-3.5" />
-                              Delete conversation
-                            </button>
-                          </>
-                        )}
-
-                        {item.type === "channel" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={(e) =>
-                                handleCopyConversationLink(
-                                  "channel",
-                                  item.id,
-                                  e,
-                                )
-                              }
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                            >
-                              <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
-                              Copy link
-                            </button>
-                            <div className="h-px bg-[#395B64]/50 my-1" />
-                            <button
-                              type="button"
-                              onClick={(e) => handleLeaveChannel(item.data, e)}
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                            >
-                              <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
-                              Leave channel
-                            </button>
-                          </>
-                        )}
-
-                        {item.type === "space" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={(e) =>
-                                handleCopyConversationLink("space", item.id, e)
-                              }
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                            >
-                              <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
-                              Copy link
-                            </button>
-                            <div className="h-px bg-[#395B64]/50 my-1" />
-                            <button
-                              type="button"
-                              onClick={(e) => handleLeaveSpace(item.data, e)}
-                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                            >
-                              <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
-                              Leave space
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )}
                 </div>
               );
             })}
@@ -2380,6 +2184,1517 @@ const SlackShell = () => {
     }
   };
 
+  // ── COLUMN 2: Secondary List Panel (Middle Column) ───────────────────────
+  const renderSecondaryPanel = () => {
+    if (isArchivedView || isStarredView || isMentionsView) {
+      return null;
+    }
+
+    const effectivePanel = activeSecondaryPanel === "home"
+      ? "home"
+      : selectedDMUser
+      ? "dms"
+      : selectedSpace
+      ? "spaces"
+      : selectedGroup
+      ? "groups"
+      : (activeChannel || currentChannel) && !isHomeView
+      ? "channels"
+      : activeSecondaryPanel;
+
+    // Filtered lists for the secondary panel
+    const searchLower = panelSearchQuery.trim().toLowerCase();
+
+    const filteredDMs = visibleDirectMessageMembers.filter((m) => {
+      const matchSearch = !searchLower || m.username?.toLowerCase().includes(searchLower) || m.email?.toLowerCase().includes(searchLower);
+      const isUnread = (unreadDMCounts[m.id?.toString()] || 0) > 0;
+      return matchSearch && (!panelUnreadOnly || isUnread);
+    });
+
+    const filteredChannels = activeChannels.filter((c) => {
+      const matchSearch = !searchLower || c.name?.toLowerCase().includes(searchLower);
+      const isUnread = (unreadChannelCounts[c.id?.toString()] || 0) > 0;
+      return matchSearch && (!panelUnreadOnly || isUnread);
+    });
+
+    const filteredSpaces = activeSpaces.filter((s) => {
+      const matchSearch = !searchLower || s.name?.toLowerCase().includes(searchLower);
+      const isUnread = (unreadSpaceCounts[(s._id || s.id)?.toString()] || 0) > 0;
+      return matchSearch && (!panelUnreadOnly || isUnread);
+    });
+
+    const filteredGroups = activeGroups.filter((g) => {
+      const matchSearch = !searchLower || g.name?.toLowerCase().includes(searchLower);
+      return matchSearch && !panelUnreadOnly;
+    });
+
+    const homeConversations = [
+      ...filteredChannels.map((c) => ({ type: "channel", data: c })),
+      ...filteredSpaces.map((s) => ({ type: "space", data: s })),
+      ...filteredDMs.map((m) => ({ type: "dm", data: m })),
+      ...filteredGroups.map((g) => ({ type: "group", data: g })),
+    ];
+
+    const getPanelTitle = () => {
+      if (effectivePanel === "dms") return "Direct Messages";
+      if (effectivePanel === "channels") return "Channels";
+      if (effectivePanel === "spaces") return "Spaces";
+      if (effectivePanel === "groups") return "Groups";
+      return "Home";
+    };
+
+    return (
+      <aside className="w-72 lg:w-80 flex-shrink-0 flex flex-col border-r border-[#D8E2E1] dark:border-[#1A2121] bg-white dark:bg-[#1E2525] select-none z-10 transition-colors h-full">
+        {/* Panel Header */}
+        <div className="px-3.5 py-3 border-b border-[#D8E2E1] dark:border-[#1A2121] flex items-center justify-between gap-2 flex-shrink-0">
+          <h2 className="text-sm font-bold text-[#2C3333] dark:text-[#E7F6F2] truncate">
+            {getPanelTitle()}
+          </h2>
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="flex items-center gap-1.5 text-xs text-[#52656A] dark:text-[#A5C9CA] cursor-pointer">
+              <span className="text-[11px] font-medium">Unread</span>
+              <input
+                type="checkbox"
+                checked={panelUnreadOnly}
+                onChange={(e) => setPanelUnreadOnly(e.target.checked)}
+                className="rounded text-[#395B64] focus:ring-0 cursor-pointer h-3.5 w-3.5 accent-[#395B64]"
+              />
+            </label>
+            {effectivePanel === "dms" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewChatModal(true);
+                  setNewChatSearch("");
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+                title="New chat"
+              >
+                <i className="fa-solid fa-plus text-xs" />
+              </button>
+            )}
+            {effectivePanel === "channels" && permissions.canCreateChannels && (
+              <button
+                type="button"
+                onClick={() => setShowCreateChannelModal(true)}
+                className="flex h-6 w-6 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+                title="Create channel"
+              >
+                <i className="fa-solid fa-plus text-xs" />
+              </button>
+            )}
+            {effectivePanel === "spaces" && isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowCreateSpaceModal(true)}
+                className="flex h-6 w-6 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+                title="Create space"
+              >
+                <i className="fa-solid fa-plus text-xs" />
+              </button>
+            )}
+            {effectivePanel === "groups" && (
+              <button
+                type="button"
+                onClick={() => setShowCreateGroupModal(true)}
+                className="flex h-6 w-6 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+                title="Create group"
+              >
+                <i className="fa-solid fa-plus text-xs" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Search input in column 2 */}
+        <div className="p-2.5 border-b border-[#D8E2E1] dark:border-[#1A2121] flex-shrink-0">
+          <div className="flex items-center gap-2 rounded bg-[#F4F7F7] dark:bg-[#252E2E] px-2.5 py-1.5 border border-[#D8E2E1] dark:border-[#395B64]/40">
+            <i className="fa-solid fa-magnifying-glass text-[11px] text-[#52656A] dark:text-[#A5C9CA]" />
+            <input
+              type="text"
+              placeholder="Search chat or people..."
+              value={panelSearchQuery}
+              onChange={(e) => setPanelSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#52656A]/60 dark:placeholder-[#A5C9CA]/60 outline-none"
+            />
+            {panelSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setPanelSearchQuery("")}
+                className="text-[#52656A] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:text-white"
+              >
+                <i className="fa-solid fa-xmark text-xs" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Scrollable List for Column 2 */}
+        <div className="flex-1 overflow-y-auto divide-y divide-[#E0E7E6]/50 dark:divide-[#252E2E]">
+          {effectivePanel === "dms" ? (
+            filteredDMs.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]/70 px-4">
+                No direct messages found
+              </div>
+            ) : (
+              filteredDMs.map((member, idx) => {
+                const isSelected = selectedDMUser?.id === member.id;
+                const isMenuOpen = activeDMMenuId === member.id;
+                const isUnread = (unreadDMCounts[member.id?.toString()] || 0) > 0;
+                const openUpward = idx >= 4;
+
+                return (
+                  <div
+                    key={member.id}
+                    onClick={() => handleSelectDM(member)}
+                    className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                      isSelected
+                        ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                        : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <span className="relative flex-shrink-0">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
+                          {member.avatar || member.avatarUrl ? (
+                            <img
+                              src={member.avatar || member.avatarUrl}
+                              alt={member.username}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            member.username?.charAt(0)?.toUpperCase() || "U"
+                          )}
+                        </span>
+                        <StatusBadge
+                          status={getUserPresenceStatus(member.id)}
+                          isDnd={isDndActive?.(member)}
+                          size="xs"
+                          className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#1E2525]"
+                        />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4
+                            className={`truncate text-xs font-semibold ${
+                              isSelected
+                                ? "text-[#395B64] dark:text-white"
+                                : isUnread
+                                ? "text-[#2C3333] dark:text-white font-bold"
+                                : "text-[#2C3333] dark:text-[#E7F6F2]"
+                            }`}
+                          >
+                            {member.username}
+                          </h4>
+                          {isUnread && (
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                          )}
+                        </div>
+                        <p className="truncate text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                          {member.email || "Direct message"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Action buttons (toggle read/unread + three dots) */}
+                    <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleDMRead(member, e)}
+                        className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                          isMenuOpen ? "flex" : "hidden group-hover:flex"
+                        }`}
+                        title={isUnread ? "Mark as read" : "Mark as unread"}
+                      >
+                        <i
+                          className={`fa-regular ${
+                            isUnread ? "fa-envelope-open" : "fa-envelope"
+                          } text-xs`}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveDMMenuId(isMenuOpen ? null : member.id);
+                        }}
+                        className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                          isMenuOpen ? "flex" : "hidden group-hover:flex"
+                        }`}
+                        title="Options"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                      </button>
+                    </div>
+
+                    {/* Context menu */}
+                    {isMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={() => setActiveDMMenuId(null)}
+                        />
+                        <div
+                          className={`absolute right-2 ${
+                            openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                          } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleDMRead(member, e)}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i
+                              className={`fa-regular ${
+                                (unreadDMCounts[member.id?.toString()] || 0) > 0
+                                  ? "fa-envelope-open"
+                                  : "fa-envelope"
+                              } text-[#52656A] dark:text-[#A5C9CA] w-3.5`}
+                            />
+                            {(unreadDMCounts[member.id?.toString()] || 0) > 0
+                              ? "Mark as read"
+                              : "Mark as unread"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleTogglePin("dm", member.id, e)}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-thumbtack text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {pinnedKeys.has(`dm:${member.id}`) ? "Unpin conversation" : "Pin conversation"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDMMenuId(null);
+                              handleToggleArchiveDM(member, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-box-archive text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {archivedDMIds.has(member.id?.toString()) ? "Unarchive chat" : "Archive chat"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveDMMenuId(null);
+                              handleHideDM(member.id, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-regular fa-eye-slash text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            Hide conversation
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDMMenuId(null);
+                              toggleMuteConversation("dm", member.id);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i
+                              className={`fa-solid ${
+                                isConversationMuted("dm", member.id)
+                                  ? "fa-bell text-[#395B64] dark:text-[#A5C9CA]"
+                                  : "fa-bell-slash text-[#52656A] dark:text-[#A5C9CA]"
+                              } w-3.5`}
+                            />
+                            {isConversationMuted("dm", member.id)
+                              ? "Unmute notifications"
+                              : "Mute notifications"}
+                          </button>
+                          <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveDMMenuId(null);
+                              handleToggleBlockUser(member, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition cursor-pointer"
+                          >
+                            <i
+                              className={`fa-solid ${blockedUserIds.has((member.id || member._id)?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
+                            />
+                            {blockedUserIds.has((member.id || member._id)?.toString())
+                              ? "Unblock user"
+                              : "Block user"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveDMMenuId(null);
+                              handleDeleteDMClick(member, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-trash-can w-3.5" />
+                            Delete conversation
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            )
+          ) : effectivePanel === "channels" ? (
+            filteredChannels.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]/70 px-4">
+                No channels found
+              </div>
+            ) : (
+              filteredChannels.map((chan, idx) => {
+                const isActive = (currentChannel?.id || currentChannel?._id)?.toString() === (chan.id || chan._id)?.toString() && !selectedDMUser && !selectedSpace && !selectedGroup && !isHomeView;
+                const isMenuOpen = activeChannelMenuId === chan.id;
+                const isUnread = (unreadChannelCounts[chan.id?.toString()] || 0) > 0;
+                const openUpward = idx >= 4;
+
+                return (
+                  <div
+                    key={chan.id}
+                    onClick={() => handleSelectChannel(chan)}
+                    className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                      isActive
+                        ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                        : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] text-sm font-bold">
+                        {chan.type === "PRIVATE" ? <i className="fa-solid fa-lock text-xs" /> : "#"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4
+                            className={`truncate text-xs font-semibold ${
+                              isActive
+                                ? "text-[#395B64] dark:text-white"
+                                : isUnread
+                                ? "text-[#2C3333] dark:text-white font-bold"
+                                : "text-[#2C3333] dark:text-[#E7F6F2]"
+                            }`}
+                          >
+                            {chan.name}
+                          </h4>
+                          {isUnread && (
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                          )}
+                        </div>
+                        <p className="truncate text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                          {chan.description || (chan.type === "PRIVATE" ? "Private channel" : "Public channel")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleChannelRead(chan, e)}
+                        className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                          isMenuOpen ? "flex" : "hidden group-hover:flex"
+                        }`}
+                        title={isUnread ? "Mark as read" : "Mark as unread"}
+                      >
+                        <i
+                          className={`fa-regular ${
+                            isUnread ? "fa-envelope-open" : "fa-envelope"
+                          } text-xs`}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveChannelMenuId(isMenuOpen ? null : chan.id);
+                        }}
+                        className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                          isMenuOpen ? "flex" : "hidden group-hover:flex"
+                        }`}
+                        title="Options"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                      </button>
+                    </div>
+
+                    {isMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={() => setActiveChannelMenuId(null)}
+                        />
+                        <div
+                          className={`absolute right-2 ${
+                            openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                          } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleChannelRead(chan, e)}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i
+                              className={`fa-regular ${
+                                (unreadChannelCounts[chan.id?.toString()] || 0) > 0
+                                  ? "fa-envelope-open"
+                                  : "fa-envelope"
+                              } text-[#52656A] dark:text-[#A5C9CA] w-3.5`}
+                            />
+                            {(unreadChannelCounts[chan.id?.toString()] || 0) > 0
+                              ? "Mark as read"
+                              : "Mark as unread"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleTogglePin("channel", chan.id, e)}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-thumbtack text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {pinnedKeys.has(`channel:${chan.id}`) ? "Unpin conversation" : "Pin conversation"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveChannelMenuId(null);
+                              handleToggleArchiveChannel(chan);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-box-archive text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {chan.isArchived ? "Unarchive chat" : "Archive chat"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveChannelMenuId(null);
+                              toggleMuteConversation("channel", chan.id);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i
+                              className={`fa-solid ${
+                                isConversationMuted("channel", chan.id)
+                                  ? "fa-bell text-[#395B64] dark:text-[#A5C9CA]"
+                                  : "fa-bell-slash text-[#52656A] dark:text-[#A5C9CA]"
+                              } w-3.5`}
+                            />
+                            {isConversationMuted("channel", chan.id)
+                              ? "Unmute notifications"
+                              : "Mute notifications"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveChannelMenuId(null);
+                              handleCopyConversationLink("channel", chan.id, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-link text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            Copy link
+                          </button>
+                          <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveChannelMenuId(null);
+                              setActiveChannelForAction(chan);
+                              setShowManageChannelMembersModal(true);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-users text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {isSuperAdmin || canManageChannel(chan) ? "Manage Members" : "View Members"}
+                          </button>
+                          {(isSuperAdmin || canManageChannel(chan)) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChannelMenuId(null);
+                                setActiveChannelForAction(chan);
+                                setShowEditChannelModal(true);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-pen text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                              Edit channel
+                            </button>
+                          )}
+                          {(isSuperAdmin || canManageChannel(chan)) && chan.name !== "general" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChannelMenuId(null);
+                                setActiveChannelForAction(chan);
+                                setShowDeleteChannelModal(true);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                            >
+                              <i className="fa-solid fa-trash-can w-3.5" />
+                              Delete channel
+                            </button>
+                          )}
+                          {chan.name !== "general" && !isSuperAdmin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveChannelMenuId(null);
+                                handleLeaveChannel(chan, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
+                              Leave channel
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            )
+          ) : effectivePanel === "spaces" ? (
+            filteredSpaces.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]/70 px-4">
+                No spaces found
+              </div>
+            ) : (
+              filteredSpaces.map((sp, idx) => {
+                const spId = (sp._id || sp.id)?.toString();
+                const isActive = (selectedSpace?._id || selectedSpace?.id)?.toString() === spId;
+                const isUnread = (unreadSpaceCounts[spId] || 0) > 0;
+                const isMenuOpen = activeSpaceForAction?.type === "menu" && activeSpaceForAction?.id === spId;
+                const isPinned = pinnedKeys.has(`space:${spId}`);
+                const openUpward = idx >= 4;
+
+                return (
+                  <div
+                    key={spId}
+                    onClick={() => handleSelectSpace(sp)}
+                    className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                      isActive
+                        ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                        : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] text-sm font-bold">
+                        <i className="fa-solid fa-table-cells-large text-xs" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4
+                            className={`truncate text-xs font-semibold ${
+                              isActive
+                                ? "text-[#395B64] dark:text-white"
+                                : isUnread
+                                ? "text-[#2C3333] dark:text-white font-bold"
+                                : "text-[#2C3333] dark:text-[#E7F6F2]"
+                            }`}
+                          >
+                            {sp.name}
+                          </h4>
+                          {isUnread && (
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                          )}
+                        </div>
+                        <p className="truncate text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                          {sp.description || "Space conversation"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleSpaceRead(sp, e)}
+                        className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                          isMenuOpen ? "flex" : "hidden group-hover:flex"
+                        }`}
+                        title={isUnread ? "Mark as read" : "Mark as unread"}
+                      >
+                        <i
+                          className={`fa-regular ${
+                            isUnread ? "fa-envelope-open" : "fa-envelope"
+                          } text-xs`}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveSpaceForAction(
+                            isMenuOpen ? null : { type: "menu", id: spId, space: sp }
+                          );
+                        }}
+                        className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                          isMenuOpen ? "flex" : "hidden group-hover:flex"
+                        }`}
+                        title="Options"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                      </button>
+                    </div>
+
+                    {isMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveSpaceForAction(null);
+                          }}
+                        />
+                        <div
+                          className={`absolute right-2 ${
+                            openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                          } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              handleToggleSpaceRead(sp, e);
+                              setActiveSpaceForAction(null);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i
+                              className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#52656A] dark:text-[#A5C9CA] w-3.5`}
+                            />
+                            {isUnread ? "Mark as read" : "Mark as unread"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveSpaceForAction(null);
+                              handleTogglePin("space", spId, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-thumbtack text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {isPinned ? "Unpin conversation" : "Pin conversation"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveSpaceForAction(null);
+                              toggleMuteConversation("space", spId);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i
+                              className={`fa-solid ${
+                                isConversationMuted("space", spId)
+                                  ? "fa-bell text-[#395B64] dark:text-[#A5C9CA]"
+                                  : "fa-bell-slash text-[#52656A] dark:text-[#A5C9CA]"
+                              } w-3.5`}
+                            />
+                            {isConversationMuted("space", spId)
+                              ? "Unmute notifications"
+                              : "Mute notifications"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveSpaceForAction(null);
+                              handleCopyConversationLink("space", spId, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-link text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            Copy link
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveSpaceForAction(null);
+                              handleToggleArchiveSpace(sp, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition cursor-pointer"
+                          >
+                            <i className="fa-solid fa-box-archive text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {archivedSpaceIds.has(spId) ? "Unarchive chat" : "Archive chat"}
+                          </button>
+                          <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveSpaceForAction(sp);
+                              setShowManageSpaceMembersModal(true);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                          >
+                            <i className="fa-solid fa-users text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {isSuperAdmin ? "Manage Members" : "View Members"}
+                          </button>
+                          {isSuperAdmin ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveSpaceForAction(sp);
+                                  setShowEditSpaceModal(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-pen text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                                Edit Space
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveSpaceForAction(sp);
+                                  setShowDeleteSpaceModal(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition cursor-pointer"
+                              >
+                                <i className="fa-solid fa-trash text-rose-400 w-3.5" />
+                                Delete Space
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveSpaceForAction(null);
+                                handleLeaveSpace(sp, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
+                              Leave Space
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            )
+          ) : effectivePanel === "groups" ? (
+            filteredGroups.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]/70 px-4">
+                No groups found
+              </div>
+            ) : (
+              filteredGroups.map((grp, idx) => {
+                const grpId = (grp._id || grp.id)?.toString();
+                const isActive = (selectedGroup?._id || selectedGroup?.id)?.toString() === grpId;
+                const isMenuOpen = activeGroupMenuId === grpId;
+                const memberCount = grp.members?.length || 0;
+                const openUpward = idx >= 4;
+
+                return (
+                  <div
+                    key={grpId}
+                    onClick={() => handleSelectGroup(grp)}
+                    className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                      isActive
+                        ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                        : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] text-sm font-bold">
+                        <i className="fa-solid fa-user-group text-xs" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4
+                            className={`truncate text-xs font-semibold ${
+                              isActive
+                                ? "text-[#395B64] dark:text-white"
+                                : "text-[#2C3333] dark:text-[#E7F6F2]"
+                            }`}
+                          >
+                            {grp.name}
+                          </h4>
+                        </div>
+                        <p className="truncate text-[11px] text-[#4A5D61] dark:text-[#A5C9CA] font-medium">
+                          {memberCount} {memberCount === 1 ? "member" : "members"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveGroupMenuId(isMenuOpen ? null : grpId);
+                        }}
+                        className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                          isMenuOpen ? "flex" : "hidden group-hover:flex"
+                        }`}
+                        title="Options"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                      </button>
+                    </div>
+
+                    {isMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveGroupMenuId(null);
+                          }}
+                        />
+                        <div
+                          className={`absolute right-2 ${
+                            openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                          } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setActiveGroupMenuId(null);
+                              handleToggleArchiveGroup(grp, e);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition cursor-pointer"
+                          >
+                            <i className="fa-solid fa-box-archive text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                            {archivedGroupIds.has(grpId) ? "Unarchive chat" : "Archive chat"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            )
+          ) : (
+            // Unified flat Home list in column 2 (Channels, Spaces, DMs, Groups) without category headers or count badges
+            homeConversations.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]/70 px-4">
+                No conversations found
+              </div>
+            ) : (
+              homeConversations.map((item, idx) => {
+                const openUpward = idx >= 4;
+                if (item.type === "channel") {
+                  const chan = item.data;
+                  const chanId = (chan.id || chan._id)?.toString();
+                  const isActive = (currentChannel?.id || currentChannel?._id)?.toString() === chanId && !selectedDMUser && !selectedSpace && !selectedGroup && !isHomeView;
+                  const isMenuOpen = activeChannelMenuId === chan.id;
+                  const isUnread = (unreadChannelCounts[chanId] || 0) > 0;
+
+                  return (
+                    <div
+                      key={`home-chan-${chanId}`}
+                      onClick={() => handleSelectChannel(chan, true)}
+                      className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                        isActive
+                          ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                          : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] text-sm font-bold">
+                          {chan.type === "PRIVATE" ? <i className="fa-solid fa-lock text-xs" /> : "#"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4
+                              className={`truncate text-xs font-semibold ${
+                                isActive
+                                  ? "text-[#395B64] dark:text-white"
+                                  : isUnread
+                                  ? "text-[#2C3333] dark:text-white font-bold"
+                                  : "text-[#2C3333] dark:text-[#E7F6F2]"
+                              }`}
+                            >
+                              {chan.name}
+                            </h4>
+                            {isUnread && (
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                            )}
+                          </div>
+                          <p className="truncate text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                            {chan.description || (chan.type === "PRIVATE" ? "Private channel" : "Public channel")}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleChannelRead(chan, e)}
+                          className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                            isMenuOpen ? "flex" : "hidden group-hover:flex"
+                          }`}
+                          title={isUnread ? "Mark as read" : "Mark as unread"}
+                        >
+                          <i
+                            className={`fa-regular ${
+                              isUnread ? "fa-envelope-open" : "fa-envelope"
+                            } text-xs`}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveChannelMenuId(isMenuOpen ? null : chan.id);
+                          }}
+                          className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                            isMenuOpen ? "flex" : "hidden group-hover:flex"
+                          }`}
+                          title="Options"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                        </button>
+                      </div>
+
+                      {isMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveChannelMenuId(null);
+                            }}
+                          />
+                          <div
+                            className={`absolute right-2 ${
+                              openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                            } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                handleToggleChannelRead(chan, e);
+                                setActiveChannelMenuId(null);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i
+                                className={`fa-regular ${
+                                  isUnread ? "fa-envelope-open" : "fa-envelope"
+                                } text-[#52656A] dark:text-[#A5C9CA] w-3.5`}
+                              />
+                              {isUnread ? "Mark as read" : "Mark as unread"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveChannelMenuId(null);
+                                handleCopyChannelLink(chan, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-link text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                              Copy link
+                            </button>
+                            <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChannelMenuId(null);
+                                setActiveChannelForAction(chan);
+                                setShowManageChannelMembersModal(true);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-users text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                              {isSuperAdmin || canManageChannel(chan) ? "Manage Members" : "View Members"}
+                            </button>
+                            {(isSuperAdmin || canManageChannel(chan)) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveChannelMenuId(null);
+                                  setActiveChannelForAction(chan);
+                                  setShowEditChannelModal(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-pen text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                                Edit channel
+                              </button>
+                            )}
+                            {(isSuperAdmin || canManageChannel(chan)) && chan.name !== "general" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveChannelMenuId(null);
+                                  setActiveChannelForAction(chan);
+                                  setShowDeleteChannelModal(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                              >
+                                <i className="fa-solid fa-trash-can w-3.5" />
+                                Delete channel
+                              </button>
+                            )}
+                            {chan.name !== "general" && !isSuperAdmin && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  setActiveChannelMenuId(null);
+                                  handleLeaveChannel(chan, e);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
+                                Leave channel
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (item.type === "space") {
+                  const sp = item.data;
+                  const spId = (sp._id || sp.id)?.toString();
+                  const isActive = (selectedSpace?._id || selectedSpace?.id)?.toString() === spId;
+                  const isUnread = (unreadSpaceCounts[spId] || 0) > 0;
+                  const isMenuOpen = activeSpaceForAction?.type === "menu" && activeSpaceForAction?.id === spId;
+
+                  return (
+                    <div
+                      key={`home-space-${spId}`}
+                      onClick={() => handleSelectSpace(sp, true)}
+                      className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                        isActive
+                          ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                          : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] text-sm font-bold">
+                          <i className="fa-solid fa-table-cells-large text-xs" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4
+                              className={`truncate text-xs font-semibold ${
+                                isActive
+                                  ? "text-[#395B64] dark:text-white"
+                                  : isUnread
+                                  ? "text-[#2C3333] dark:text-white font-bold"
+                                  : "text-[#2C3333] dark:text-[#E7F6F2]"
+                              }`}
+                            >
+                              {sp.name}
+                            </h4>
+                            {isUnread && (
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                            )}
+                          </div>
+                          <p className="truncate text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                            {sp.description || "Space conversation"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleSpaceRead(sp, e)}
+                          className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                            isMenuOpen ? "flex" : "hidden group-hover:flex"
+                          }`}
+                          title={isUnread ? "Mark as read" : "Mark as unread"}
+                        >
+                          <i
+                            className={`fa-regular ${
+                              isUnread ? "fa-envelope-open" : "fa-envelope"
+                            } text-xs`}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveSpaceForAction(
+                              isMenuOpen ? null : { type: "menu", id: spId, space: sp }
+                            );
+                          }}
+                          className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                            isMenuOpen ? "flex" : "hidden group-hover:flex"
+                          }`}
+                          title="Options"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                        </button>
+                      </div>
+
+                      {isMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveSpaceForAction(null);
+                            }}
+                          />
+                          <div
+                            className={`absolute right-2 ${
+                              openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                            } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                handleToggleSpaceRead(sp, e);
+                                setActiveSpaceForAction(null);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i
+                                className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#52656A] dark:text-[#A5C9CA] w-3.5`}
+                              />
+                              {isUnread ? "Mark as read" : "Mark as unread"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveSpaceForAction(null);
+                                handleCopySpaceLink(sp, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-link text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                              Copy link
+                            </button>
+                            <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
+                            {isSuperAdmin ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSpaceForAction(null);
+                                    setEditingSpace(sp);
+                                    setNewSpaceName(sp.name || "");
+                                    setNewSpaceDescription(sp.description || "");
+                                    setShowEditSpaceModal(true);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                                >
+                                  <i className="fa-solid fa-pen text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                                  Edit Space
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSpaceForAction(null);
+                                    setManagingSpace(sp);
+                                    setShowManageMembersModal(true);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                                >
+                                  <i className="fa-solid fa-users text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                                  Manage Members
+                                </button>
+                                <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSpaceForAction(null);
+                                    setDeletingSpace(sp);
+                                    setShowDeleteSpaceModal(true);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                >
+                                  <i className="fa-solid fa-trash text-rose-400 w-3.5" />
+                                  Delete Space
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  setActiveSpaceForAction(null);
+                                  handleLeaveSpace(sp, e);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
+                                Leave Space
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (item.type === "dm") {
+                  const member = item.data;
+                  const isSelected = selectedDMUser?.id === member.id;
+                  const isMenuOpen = activeDMMenuId === member.id;
+                  const isUnread = (unreadDMCounts[member.id?.toString()] || 0) > 0;
+
+                  return (
+                    <div
+                      key={`home-dm-${member.id}`}
+                      onClick={() => handleSelectDM(member, true)}
+                      className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                        isSelected
+                          ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                          : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="relative flex-shrink-0">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
+                            {member.avatar || member.avatarUrl ? (
+                              <img
+                                src={member.avatar || member.avatarUrl}
+                                alt={member.username}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              member.username?.charAt(0)?.toUpperCase() || "U"
+                            )}
+                          </span>
+                          <StatusBadge
+                            status={getUserPresenceStatus(member.id)}
+                            isDnd={isDndActive?.(member)}
+                            size="xs"
+                            className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#1E2525]"
+                          />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4
+                              className={`truncate text-xs font-semibold ${
+                                isSelected
+                                  ? "text-[#395B64] dark:text-white"
+                                  : isUnread
+                                  ? "text-[#2C3333] dark:text-white font-bold"
+                                  : "text-[#2C3333] dark:text-[#E7F6F2]"
+                              }`}
+                            >
+                              {member.username}
+                            </h4>
+                            {isUnread && (
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                            )}
+                          </div>
+                          <p className="truncate text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70">
+                            {member.email || "Direct message"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleDMRead(member, e)}
+                          className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                            isMenuOpen ? "flex" : "hidden group-hover:flex"
+                          }`}
+                          title={isUnread ? "Mark as read" : "Mark as unread"}
+                        >
+                          <i
+                            className={`fa-regular ${
+                              isUnread ? "fa-envelope-open" : "fa-envelope"
+                            } text-xs`}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveDMMenuId(isMenuOpen ? null : member.id);
+                          }}
+                          className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                            isMenuOpen ? "flex" : "hidden group-hover:flex"
+                          }`}
+                          title="Options"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                        </button>
+                      </div>
+
+                      {isMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDMMenuId(null);
+                            }}
+                          />
+                          <div
+                            className={`absolute right-2 ${
+                              openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                            } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                handleToggleDMRead(member, e);
+                                setActiveDMMenuId(null);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i
+                                className={`fa-regular ${
+                                  isUnread ? "fa-envelope-open" : "fa-envelope"
+                                } text-[#52656A] dark:text-[#A5C9CA] w-3.5`}
+                              />
+                              {isUnread ? "Mark as read" : "Mark as unread"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveDMMenuId(null);
+                                handleToggleMuteDM(member.id, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition cursor-pointer"
+                            >
+                              <i
+                                className={`fa-solid ${mutedDMIds.has(member.id?.toString()) ? "fa-bell" : "fa-bell-slash"} text-[#52656A] dark:text-[#A5C9CA] w-3.5`}
+                              />
+                              {mutedDMIds.has(member.id?.toString())
+                                ? "Unmute notifications"
+                                : "Mute notifications"}
+                            </button>
+                            <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveDMMenuId(null);
+                                handleToggleBlockUser(member, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition cursor-pointer"
+                            >
+                              <i
+                                className={`fa-solid ${blockedUserIds.has((member.id || member._id)?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
+                              />
+                              {blockedUserIds.has((member.id || member._id)?.toString())
+                                ? "Unblock user"
+                                : "Block user"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveDMMenuId(null);
+                                handleDeleteDMClick(member, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-trash-can w-3.5" />
+                              Delete conversation
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (item.type === "group") {
+                  const grp = item.data;
+                  const grpId = (grp._id || grp.id)?.toString();
+                  const isActive = (selectedGroup?._id || selectedGroup?.id)?.toString() === grpId;
+                  const isMenuOpen = activeGroupMenuId === grpId;
+                  const memberCount = grp.members?.length || 0;
+
+                  return (
+                    <div
+                      key={`home-grp-${grpId}`}
+                      onClick={() => handleSelectGroup(grp, true)}
+                      className={`group relative flex items-center justify-between p-2.5 transition-colors cursor-pointer select-none ${
+                        isActive
+                          ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                          : "hover:bg-[#F8FAFB] dark:hover:bg-[#252E2E]/60 border-l-4 border-l-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] text-sm font-bold">
+                          <i className="fa-solid fa-user-group text-xs" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4
+                              className={`truncate text-xs font-semibold ${
+                                isActive
+                                  ? "text-[#395B64] dark:text-white"
+                                  : "text-[#2C3333] dark:text-[#E7F6F2]"
+                              }`}
+                            >
+                              {grp.name}
+                            </h4>
+                          </div>
+                          <p className="truncate text-[11px] text-[#4A5D61] dark:text-[#A5C9CA] font-medium">
+                            {memberCount} {memberCount === 1 ? "member" : "members"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 shrink-0 ml-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveGroupMenuId(isMenuOpen ? null : grpId);
+                          }}
+                          className={`h-6 w-6 shrink-0 items-center justify-center rounded transition-colors text-[#52656A] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] ${
+                            isMenuOpen ? "flex" : "hidden group-hover:flex"
+                          }`}
+                          title="Options"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical text-xs" />
+                        </button>
+                      </div>
+
+                      {isMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveGroupMenuId(null);
+                            }}
+                          />
+                          <div
+                            className={`absolute right-2 ${
+                              openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+                            } z-40 w-48 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] p-1.5 shadow-xl text-xs space-y-0.5 text-[#2C3333] dark:text-[#E7F6F2]`}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setActiveGroupMenuId(null);
+                                handleToggleArchiveGroup(grp, e);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition cursor-pointer"
+                            >
+                              <i className="fa-solid fa-box-archive text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                              {archivedGroupIds.has(grpId) ? "Unarchive chat" : "Archive chat"}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                }
+
+                return null;
+              })
+            )
+          )}
+        </div>
+      </aside>
+    );
+  };
+
   if (loading && !workspaceData) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2]">
@@ -2403,7 +3718,7 @@ const SlackShell = () => {
           <h2 className="mb-2 text-xl font-bold text-white">
             Workspace unavailable
           </h2>
-          <p className="mb-6 text-sm text-[#A5C9CA]">
+          <p className="mb-6 text-sm text-[#52656A] dark:text-[#A5C9CA]">
             {error || "Unable to load this workspace."}
           </p>
           <button
@@ -2420,67 +3735,201 @@ const SlackShell = () => {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
-      {/* Top Global Slack/Google-style Header */}
-      <header className="h-13 sm:h-14 w-full bg-[#1A2121] border-b border-[#2C3333] flex items-center justify-between px-4 sm:px-6 z-30 select-none flex-shrink-0 shadow-xs">
-        <div className="flex items-center gap-3 w-64">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64] text-sm font-bold text-white shadow-sm">
-              <i className="fa-solid fa-layer-group text-sm" />
-            </span>
-            <span className="font-bold text-sm tracking-wide text-white truncate">
-              {workspaceData?.name || "WorkNest"}
-            </span>
-          </div>
-        </div>
-
-        {/* Center Search Pill */}
-        <div className="flex-1 max-w-2xl mx-4 sm:mx-6">
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      <header className="h-14 w-full bg-white dark:bg-[#1A2121] border-b border-[#D8E2E1] dark:border-[#252E2E] flex items-center justify-between px-4 z-30 select-none flex-shrink-0 text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
+        {/* Left: Back to main */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             type="button"
-            onClick={() => setShowGlobalSearch(true)}
-            className="w-full flex items-center justify-between gap-3 px-4 py-2 sm:py-2.5 rounded-xl bg-[#242D2D] hover:bg-[#2C3333] border border-[#395B64]/50 hover:border-[#A5C9CA]/50 text-[#A5C9CA]/85 hover:text-white transition shadow-inner group cursor-pointer"
-            title="Search workspace (Ctrl+K)"
+            onClick={() => navigate("/app/dashboard")}
+            className="flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+            title="Back to Workspaces"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <i className="fa-solid fa-magnifying-glass text-sm text-[#A5C9CA]/75 group-hover:text-white transition" />
-              <span className="text-sm truncate">
-                Search {workspaceData?.name ? `${workspaceData.name}` : "messages, files, channels..."}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <kbd className="hidden sm:inline-flex items-center rounded-md border border-[#395B64]/80 bg-[#1E2525] px-2 py-0.5 text-xs font-mono text-[#A5C9CA]/80">Ctrl K</kbd>
-            </div>
+            <i className="fa-solid fa-arrow-left text-sm" />
           </button>
         </div>
 
-        {/* Right Help / Quick Actions */}
-        <div className="flex items-center justify-end gap-2.5 w-64">
+        {/* Center: search */}
+        <div className="flex-1 max-w-[480px] mx-4">
+          <button
+            type="button"
+            onClick={() => setShowGlobalSearch(true)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded bg-[#F4F7F7] dark:bg-[#242D2D] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] border border-[#D8E2E1] dark:border-[#395B64]/40 hover:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA]/70 hover:text-[#2C3333] dark:hover:text-[#A5C9CA] transition-colors cursor-pointer"
+            title="Search workspace (Ctrl+K)"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <i className="fa-solid fa-magnifying-glass text-xs flex-shrink-0" />
+              <span className="text-xs truncate">
+                Search {workspaceData?.name || "messages, channels, people..."}
+              </span>
+            </div>
+            <kbd className="hidden sm:inline-flex items-center rounded border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#1A2121] px-1.5 py-0.5 text-[10px] font-mono text-[#52656A] dark:text-[#A5C9CA]/60 flex-shrink-0">
+              Ctrl K
+            </kbd>
+          </button>
+        </div>
+
+        {/* Right: status + actions + user profile */}
+        <div className="flex items-center gap-2 justify-end flex-shrink-0">
+          {/* User Status pill directly in the navbar */}
+          <StatusSelector align="right" />
+
           {permissions.canManageChannelMembers && (
             <button
               type="button"
               onClick={() => navigate(`/app/workspace/${workspaceId}/channels-manage`)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition cursor-pointer"
-              title="Channel Management Dashboard"
+              className="flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors cursor-pointer"
+              title="Channel management"
             >
               <i className="fa-solid fa-users-gear text-sm" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowActivityPanel(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition cursor-pointer"
-            title="Notifications"
-          >
-            <i className="fa-solid fa-bell text-sm" />
-          </button>
+
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors cursor-pointer"
             title="Toggle theme"
           >
-            {isDark ? <FiSun className="text-sm text-amber-400" /> : <FiMoon className="text-sm text-[#A5C9CA]" />}
+            {isDark ? <FiSun className="text-sm" /> : <FiMoon className="text-sm" />}
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowActivityPanel(true)}
+            className="relative flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors cursor-pointer"
+            title="Notifications"
+          >
+            <i className="fa-solid fa-bell text-sm" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute top-1 right-1 flex h-[7px] w-[7px] rounded-full bg-[#395B64] dark:bg-[#A5C9CA]" />
+            )}
+          </button>
+
+          {/* Divider */}
+          <div className="w-px h-5 bg-[#D8E2E1] dark:bg-[#395B64]/50 mx-0.5 hidden sm:block" />
+
+          {/* User profile with avatar + name + role */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowProfileMenu((prev) => !prev)}
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer text-left select-none"
+              title="User profile"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-semibold text-white overflow-hidden flex-shrink-0 border border-[#395B64]">
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.username || "Profile"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  user?.username?.charAt(0)?.toUpperCase() || "U"
+                )}
+              </div>
+              <div className="hidden sm:flex flex-col min-w-0">
+                <span className="text-xs font-semibold text-[#2C3333] dark:text-white truncate max-w-[130px] leading-tight">
+                  {user?.username || "User"}
+                </span>
+                <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/80 truncate max-w-[130px] leading-tight capitalize">
+                  {getRoleDisplayName(selectedRole) || "Member"}
+                </span>
+              </div>
+            </button>
+
+            {/* Profile dropdown */}
+            {showProfileMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowProfileMenu(false)}
+                />
+                <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-60 rounded border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#1E2525] shadow-2xl text-[#2C3333] dark:text-[#E7F6F2] overflow-hidden">
+                  {/* User info header */}
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-[#D8E2E1] dark:border-[#2C3333]">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#395B64] text-sm font-semibold text-white overflow-hidden">
+                      {user?.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.username || "Profile"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        user?.username?.charAt(0)?.toUpperCase() || "U"
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-[#2C3333] dark:text-white leading-tight">
+                        {user?.username || "User"}
+                      </div>
+                      <div className="truncate text-xs text-[#52656A] dark:text-[#A5C9CA]/80 leading-tight">
+                        {user?.email || ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu items */}
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setShowEditProfileModal(true);
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] transition-colors-colors cursor-pointer"
+                    >
+                      <i className="fa-regular fa-user text-xs text-[#52656A] dark:text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                      <span>Edit profile</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleGlobalMute();
+                      }}
+                      className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm transition-colors cursor-pointer ${
+                        isMutedGlobal
+                          ? "text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3333]"
+                          : "text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3333]"
+                      }`}
+                    >
+                      <i
+                        className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-[#395B64] dark:text-[#A5C9CA]" : "fa-bell text-[#52656A] dark:text-[#A5C9CA]"} text-xs w-3.5`}
+                      />
+                      <span>{isMutedGlobal ? "Unmute notifications" : "Mute notifications"}</span>
+                    </button>
+
+                    {isSuperAdminUser(user) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          navigate("/admin");
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-emerald-600 dark:text-emerald-400 hover:bg-[#F0F4F4] dark:hover:bg-[#2C3333] transition-colors cursor-pointer"
+                      >
+                        <i className="fa-solid fa-shield-halved text-xs w-3.5" />
+                        <span>Super Admin</span>
+                      </button>
+                    )}
+
+                    <div className="h-px bg-[#D8E2E1] dark:bg-[#2C3333] mx-2 my-1" />
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                    >
+                      <i className="fa-solid fa-arrow-right-from-bracket text-xs w-3.5" />
+                      <span>Sign out</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -2502,195 +3951,32 @@ const SlackShell = () => {
           isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Icon rail — merged into mobile drawer */}
-        <div className="flex w-14 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] select-none">
-          <button
-            type="button"
-            onClick={() => {
-              navigate("/app/dashboard");
-              setIsMobileSidebarOpen(false);
-            }}
-            className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#395B64] text-base font-bold text-[#E7F6F2] shadow-md transition hover:bg-[#A5C9CA] hover:text-[#2C3333]"
-            title="WorkNest Dashboard"
-          >
-            <i className="fa-solid fa-layer-group text-lg" />
-          </button>
-          <div className="w-8 h-px bg-[#395B64]/50 mb-3" />
-          <div className="flex w-full flex-1 flex-col items-center gap-2.5 overflow-y-auto px-2">
-            {workspaces.map((ws) => {
-              const active = ws.id === workspaceId;
-              const initials = getWorkspaceInitials(ws.name);
-              return (
-                <button
-                  key={ws.id}
-                  type="button"
-                  onClick={() => {
-                    handleSelectWorkspace(ws.id);
-                    setIsMobileSidebarOpen(false);
-                  }}
-                  title={`${ws.name} (${ws.role || "Member"})`}
-                  className={`group relative flex h-11 w-11 items-center justify-center rounded-xl text-xs font-bold tracking-wider transition-all ${
-                    active
-                      ? "bg-[#395B64] text-white shadow-lg ring-2 ring-[#A5C9CA] ring-offset-2 ring-offset-[#2C3333]"
-                      : "bg-[#374242] text-[#E7F6F2] hover:bg-[#395B64] hover:text-white"
-                  }`}
-                >
-                  {initials}
-                  {active && (
-                    <span className="absolute -left-2 h-6 w-1 rounded-r-full bg-[#A5C9CA]" />
-                  )}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreateWorkspaceModal(true);
-                setIsMobileSidebarOpen(false);
-              }}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-[#52656A] text-lg text-[#A5C9CA] transition hover:border-[#E7F6F2] hover:bg-[#395B64]/40 hover:text-white"
-              title="Create new workspace"
-            >
-              <i className="fa-solid fa-plus text-xs" />
-            </button>
-          </div>
-          <div className="relative mt-auto w-full px-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="relative mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#52656A] bg-[#395B64] text-xs font-bold text-white shadow-sm transition hover:border-[#A5C9CA]"
-              title="Your Profile"
-            >
-              {user?.username?.charAt(0)?.toUpperCase() || "U"}
-              <StatusBadge
-                status={user?.presenceStatus || "active"}
-                size="xs"
-                className="absolute bottom-0.5 right-0.5 ring-1 ring-[#2C3333]"
-              />
-            </button>
-
-            {/* Profile Menu Popover (Mobile Icon Rail) */}
-            {showProfileMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowProfileMenu(false)}
-                />
-                <div className="absolute bottom-2 left-16 z-50 w-64 rounded-2xl border border-[#395B64] bg-[#1E2525] p-3 text-left text-[#E7F6F2] shadow-2xl max-h-[80vh] overflow-y-auto">
-                  <div className="mb-3 flex items-center gap-3 rounded-xl bg-[#2C3333] p-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-[#E7F6F2]">
-                      {user?.username?.charAt(0)?.toUpperCase() || "U"}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold text-white">
-                        {user?.username || "User"}
-                      </div>
-                      <div className="truncate text-xs text-[#A5C9CA] mb-1.5">
-                        {user?.email || ""}
-                      </div>
-                      <StatusSelector />
-                    </div>
-                  </div>
-
-                  <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[#A5C9CA]">
-                    Workspace Memberships
-                  </div>
-                  <div className="max-h-36 overflow-y-auto space-y-1 mb-3 px-1">
-                    {workspaces.map((ws) => (
-                      <div
-                        key={ws.id}
-                        className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs bg-[#2C3333]/50"
-                      >
-                        <span className="truncate font-medium text-[#E7F6F2]">
-                          {ws.name}
-                        </span>
-                        <span className="rounded bg-[#395B64] px-1.5 py-0.5 text-[10px] font-semibold text-[#A5C9CA]">
-                          {ws.role}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="h-px bg-[#395B64]/50 my-2" />
-
-                  {isSuperAdminUser(user) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowProfileMenu(false);
-                        navigate("/admin");
-                      }}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-400 hover:bg-[#395B64]/40 transition mb-1 cursor-pointer"
-                    >
-                      <i className="fa-solid fa-shield-halved text-xs text-emerald-400" />
-                      <span>Super Admin Dashboard</span>
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-400 hover:bg-rose-950/40 transition"
-                  >
-                    <i className="fa-solid fa-arrow-right-from-bracket text-xs" />
-                    Sign out of WorkNest
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
 
         {/* Workspace sidebar — inside mobile drawer */}
-        <div className="flex w-64 flex-col bg-[#1E2525] text-sm text-[#E7F6F2] border-r border-[#2C3333]/60 select-none">
-          {/* Close button */}
-          <div className="flex items-center justify-between px-3 pt-3">
-            <span className="text-xs font-bold text-[#A5C9CA] uppercase tracking-widest">
-              Menu
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsMobileSidebarOpen(false)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
-              aria-label="Close sidebar"
-            >
-              <i className="fa-solid fa-xmark text-sm" />
-            </button>
-          </div>
-          {/* Workspace Name & Role Header */}
-          <div className="relative border-b border-[#2C3333] px-3.5 py-3 bg-[#1E2525] mt-1">
+        <div className="flex w-64 flex-col bg-[#F8FAFB] dark:bg-[#1E2525] text-sm text-[#2C3333] dark:text-[#E7F6F2] border-r border-[#D8E2E1] dark:border-[#1A2121] select-none transition-colors">
+          {/* Close button & Workspace Header */}
+          <div className="flex items-center justify-between border-b border-[#D8E2E1] dark:border-[#1A2121] px-3 py-2.5">
             <button
               type="button"
               onClick={() => setShowWorkspaceMenu((prev) => !prev)}
-              className="flex w-full items-center justify-between rounded-xl p-1.5 text-left hover:bg-[#2C3333] transition"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] transition-colors"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64] text-xs font-bold tracking-wider text-white flex-shrink-0 shadow-xs">
-                  {getWorkspaceInitials(workspaceData.name)}
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-white">
-                    {workspaceData.name}
-                  </div>
-                  <div className="text-[10px] font-semibold tracking-wider text-[#A5C9CA]">
-                    {getRoleDisplayName(selectedRole)}
-                  </div>
+              <span className="flex h-6 w-6 items-center justify-center rounded bg-[#395B64] text-[10px] font-bold tracking-wider text-white flex-shrink-0">
+                {getWorkspaceInitials(workspaceData.name)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-[#2C3333] dark:text-white leading-tight">
+                  {workspaceData.name}
+                </div>
+                <div className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 leading-tight">
+                  {getRoleDisplayName(selectedRole)}
                 </div>
               </div>
               <i
-                className={`fa-solid fa-chevron-down text-xs text-[#A5C9CA] transition-transform ${showWorkspaceMenu ? "rotate-180" : ""}`}
+                className={`fa-solid fa-chevron-down text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 flex-shrink-0 transition-transform ${showWorkspaceMenu ? "rotate-180" : ""}`}
               />
             </button>
-          </div>
 
-          <div className="flex items-center justify-between border-b border-[#2C3333] px-3.5 py-2 bg-[#1A2121]/90">
-            <span className="text-[11px] font-semibold text-[#A5C9CA] tracking-wide uppercase">
-              Status
-            </span>
-            <StatusSelector align="right" />
-          </div>
-
-          <div className="px-3 pt-3 pb-1">
             <button
               type="button"
               onClick={() => {
@@ -2698,14 +3984,23 @@ const SlackShell = () => {
                 setNewChatSearch("");
                 setIsMobileSidebarOpen(false);
               }}
-              className="flex w-full items-center gap-2 rounded-xl border border-[#395B64]/60 bg-[#2C3333]/50 px-3 py-2 text-sm font-semibold text-[#E7F6F2] hover:bg-[#395B64]/60 transition"
+              className="ml-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+              title="New message"
             >
-              <i className="fa-regular fa-pen-to-square text-[#A5C9CA] text-xs" />
-              <span>New chat</span>
+              <i className="fa-solid fa-plus text-xs" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="ml-1 flex h-7 w-7 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E8EEED] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white transition-colors"
+              aria-label="Close sidebar"
+            >
+              <i className="fa-solid fa-xmark text-sm" />
             </button>
           </div>
 
-          <div className="border-b border-[#2C3333] px-3 pb-3 pt-2">
+          <div className="px-3 pb-2 pt-2">
             <SidebarSectionHeader
               title="Shortcuts"
               isCollapsed={isShortcutsCollapsed}
@@ -2713,7 +4008,7 @@ const SlackShell = () => {
             />
 
             {!isShortcutsCollapsed && (
-              <div className="space-y-0.5 pt-1">
+              <div className="space-y-px pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -2724,22 +4019,20 @@ const SlackShell = () => {
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
                     setSelectedGroup(null);
+                    setActiveSecondaryPanel("home");
                     setIsMobileSidebarOpen(false);
                     navigate(`/app/workspace/${workspaceId}`);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
-                    isHomeView &&
+                  className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
+                    activeSecondaryPanel === "home" &&
                     !isStarredView &&
                     !isMentionsView &&
-                    !isArchivedView &&
-                    !selectedDMUser &&
-                    !selectedSpace &&
-                    !selectedGroup
-                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                    !isArchivedView
+                      ? "bg-[#395B64] text-white font-semibold"
+                      : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                   }`}
                 >
-                  <i className="fa-solid fa-house w-4 text-center" />
+                  <i className="fa-solid fa-house w-4 text-center text-[11px]" />
                   <span className="flex-1 text-left">Home</span>
                 </button>
 
@@ -2749,19 +4042,19 @@ const SlackShell = () => {
                     setShowActivityPanel(true);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+                  className="flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm text-[#455252] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
                 >
                   <i
-                    className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`}
+                    className={`fa-solid ${isMutedGlobal ? "fa-bell-slash" : "fa-bell"} w-4 text-center text-[11px]`}
                   />
                   <span className="flex-1 text-left">Notifications</span>
                   {isMutedGlobal && (
-                    <span className="text-[10px] font-semibold text-amber-400/90 px-1">
+                    <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 px-1">
                       Muted
                     </span>
                   )}
                   {unreadNotificationsCount > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64] px-1 text-[10px] font-bold text-white">
                       {unreadNotificationsCount}
                     </span>
                   )}
@@ -2780,13 +4073,13 @@ const SlackShell = () => {
                     setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                  className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                     isStarredView
-                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                      ? "bg-[#395B64] text-white font-semibold"
+                      : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                   }`}
                 >
-                  <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
+                  <i className="fa-solid fa-star w-4 text-center text-[11px]" />
                   <span className="flex-1 text-left">Starred</span>
                 </button>
 
@@ -2802,10 +4095,10 @@ const SlackShell = () => {
                     setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                  className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                     isPinnedView
-                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                      ? "bg-[#395B64] text-white font-semibold"
+                      : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                   }`}
                 >
                   <style>{`button:has(> #pinned-hidden-mobile) { display: none !important; }`}</style><span id="pinned-hidden-mobile" className="hidden" />
@@ -2824,19 +4117,18 @@ const SlackShell = () => {
                     setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                  className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                     isMentionsView
-                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                      ? "bg-[#395B64] text-white font-semibold"
+                      : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                   }`}
                 >
-                  <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
+                  <i className="fa-solid fa-at w-4 text-center text-[11px]" />
                   <span className="flex-1 text-left">Mentions</span>
                   {unreadMentionsCount > 0 && (
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full bg-blue-500 shadow-xs ring-2 ring-blue-500/20"
-                      title={`${unreadMentionsCount} unread mentions`}
-                    />
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64] px-1 text-[10px] font-bold text-white">
+                      {unreadMentionsCount}
+                    </span>
                   )}
                 </button>
 
@@ -2852,16 +4144,16 @@ const SlackShell = () => {
                     setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition cursor-pointer ${
+                  className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors cursor-pointer ${
                     isArchivedView
-                      ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                      : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                      ? "bg-[#395B64] text-white font-semibold"
+                      : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                   }`}
                 >
-                  <i className="fa-solid fa-box-archive w-4 text-center text-amber-400" />
+                  <i className="fa-solid fa-box-archive w-4 text-center text-[11px]" />
                   <span className="flex-1 text-left">Archived</span>
                   {totalArchivedCount > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] font-bold text-amber-400 border border-amber-500/40">
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64]/20 dark:bg-[#395B64]/50 px-1 text-[10px] font-bold text-[#395B64] dark:text-[#A5C9CA]">
                       {totalArchivedCount}
                     </span>
                   )}
@@ -2869,7 +4161,7 @@ const SlackShell = () => {
               </div>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-4">
             {/* Pinned Conversations */}
             {renderPinnedSection()}
 
@@ -2879,8 +4171,6 @@ const SlackShell = () => {
                 title="Channels"
                 isCollapsed={isChannelsCollapsed}
                 onToggle={() => setIsChannelsCollapsed((prev) => !prev)}
-                count={totalUnreadChannelsCount}
-                countBadgeClass="bg-emerald-600/90"
                 actionButton={
                   permissions.canCreateChannels && (
                     <button
@@ -2889,7 +4179,7 @@ const SlackShell = () => {
                         setShowCreateChannelModal(true);
                         setIsMobileSidebarOpen(false);
                       }}
-                      className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
+                      className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64]/20 dark:hover:bg-[#395B64] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white text-xs transition"
                       title="Create channel"
                     >
                       <i className="fa-solid fa-plus" />
@@ -2900,7 +4190,7 @@ const SlackShell = () => {
               {!isChannelsCollapsed && (
                 <div className="space-y-0.5 pt-1">
                   {activeChannels.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                    <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
                       No channels yet
                     </div>
                   ) : (
@@ -2932,19 +4222,19 @@ const SlackShell = () => {
                                 handleSelectChannel(chan);
                               }
                             }}
-                            className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                            className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
                               isActive
-                                ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                                ? "bg-[#395B64] text-white font-semibold"
                                 : isUnread
-                                  ? "text-white font-semibold hover:bg-[#2C3333]"
-                                  : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                                  ? "text-[#1A2525] dark:text-white font-semibold hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333]"
+                                  : "text-[#52656A] dark:text-[#A5C9CA]/90 hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
                             }`}
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-2">
                               {chan.type === "PRIVATE" ? (
-                                <i className="fa-solid fa-lock text-xs text-[#A5C9CA] w-3.5" />
+                                <i className={`fa-solid fa-lock text-xs w-3.5 ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
                               ) : (
-                                <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center">
+                                <span className={`text-sm font-bold w-3.5 text-center ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`}>
                                   #
                                 </span>
                               )}
@@ -2953,7 +4243,7 @@ const SlackShell = () => {
                               </span>
                               {hasDraft("channel", chan.id || chan._id) && (
                                 <span
-                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                  className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
                                   title="Draft message"
                                 >
                                   <i className="fa-solid fa-pen text-[8px]" />
@@ -2962,681 +4252,18 @@ const SlackShell = () => {
                               )}
                               {isConversationMuted("channel", chan.id) && (
                                 <i
-                                  className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                  className="fa-solid fa-bell-slash text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 shrink-0"
                                   title="Notifications muted"
                                 />
                               )}
                               {isUnread && (
                                 <span
-                                  className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
+                                  className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
                                   title="Unread messages"
                                 />
                               )}
                             </div>
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleToggleChannelRead(chan, e)
-                                }
-                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                  isMenuOpen
-                                    ? "flex"
-                                    : "hidden group-hover:flex"
-                                }`}
-                                title={
-                                  isUnread ? "Mark as read" : "Mark as unread"
-                                }
-                              >
-                                <i
-                                  className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`}
-                                />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveChannelMenuId(
-                                    isMenuOpen ? null : chan.id,
-                                  );
-                                }}
-                                className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
-                                title="Channel options"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                              </button>
                             </div>
-                          </div>
-
-                          {isMenuOpen && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-30"
-                                onClick={() => setActiveChannelMenuId(null)}
-                              />
-                              <div
-                                className={`absolute right-2  ${openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5`}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleToggleChannelRead(chan, e)
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i
-                                    className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`}
-                                  />
-                                  {isUnread ? "Mark as read" : "Mark as unread"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleTogglePin("channel", chan.id, e)
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i className="fa-solid fa-thumbtack text-amber-400 w-3.5" />
-                                  {isPinned
-                                    ? "Unpin conversation"
-                                    : "Pin conversation"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveChannelMenuId(null);
-                                    toggleMuteConversation("channel", chan.id);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i
-                                    className={`fa-solid ${
-                                      isConversationMuted("channel", chan.id)
-                                        ? "fa-bell text-amber-400"
-                                        : "fa-bell-slash text-[#A5C9CA]"
-                                    } w-3.5`}
-                                  />
-                                  {isConversationMuted("channel", chan.id)
-                                    ? "Unmute notifications"
-                                    : "Mute notifications"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleCopyConversationLink(
-                                      "channel",
-                                      chan.id,
-                                      e,
-                                    )
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
-                                  Copy link
-                                </button>
-                                <div className="h-px bg-[#395B64]/50 my-1" />
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveChannelMenuId(null);
-                                    handleToggleArchiveChannel(chan);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                                >
-                                  <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                                  {chan.isArchived ? "Unarchive chat" : "Archive chat"}
-                                </button>
-                                {(selectedRole === "OWNER" ||
-                                  selectedRole === "ADMIN") && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingChannel(chan);
-                                        setActiveChannelMenuId(null);
-                                      }}
-                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                    >
-                                      <i className="fa-solid fa-pen-to-square text-[#A5C9CA] w-3.5" />
-                                      Edit channel
-                                    </button>
-                                    {channels.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setDeletingChannel(chan);
-                                          setActiveChannelMenuId(null);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                      >
-                                        <i className="fa-solid fa-trash-can w-3.5" />
-                                        Delete channel
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                                {channels.length > 1 &&
-                                  selectedRole === "MEMBER" && (
-                                    <>
-                                      <div className="h-px bg-[#395B64]/50 my-1" />
-                                      <button
-                                        type="button"
-                                        onClick={(e) =>
-                                          handleLeaveChannel(chan, e)
-                                        }
-                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                      >
-                                        <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
-                                        Leave channel
-                                      </button>
-                                    </>
-                                  )}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-            {/* Direct Messages */}
-            <div>
-              <SidebarSectionHeader
-                title="Direct Messages"
-                isCollapsed={isDMsCollapsed}
-                onToggle={() => setIsDMsCollapsed((prev) => !prev)}
-                count={totalUnreadDMsCount}
-                countBadgeClass="bg-emerald-600/90"
-              />
-              {!isDMsCollapsed && (
-                <div className="space-y-0.5 pt-1">
-                  {visibleDirectMessageMembers.length > 0 ? (
-                    visibleDirectMessageMembers.map((member, idx) => {
-                      const openUpward = idx >= 3;
-                      const isSelected = selectedDMUser?.id === member.id;
-                      const isMenuOpen = activeDMMenuId === member.id;
-                      const isUnread =
-                        (unreadDMCounts[member.id?.toString()] || 0) > 0;
-                      const isPinned = pinnedKeys.has(`dm:${member.id}`);
-                      return (
-                        <div key={member.id} className="relative group">
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => handleSelectDM(member)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                handleSelectDM(member);
-                              }
-                            }}
-                            className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm transition cursor-pointer ${
-                              isSelected
-                                ? "bg-[#395B64] text-white font-semibold"
-                                : isUnread
-                                  ? "text-white font-semibold hover:bg-[#2C3333]"
-                                  : "text-[#A5C9CA]/90 font-medium hover:bg-[#2C3333] hover:text-white"
-                            }`}
-                          >
-                            <span className="relative flex-shrink-0">
-                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
-                                {member.avatar || member.avatarUrl ? (
-                                  <img
-                                    src={member.avatar || member.avatarUrl}
-                                    alt={member.username}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  member.username?.charAt(0)?.toUpperCase() ||
-                                  "U"
-                                )}
-                              </span>
-                              <StatusBadge
-                                status={getUserPresenceStatus(member.id)}
-                        isDnd={isDndActive?.(member)}
-                                size="xs"
-                                className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
-                              />
-                            </span>
-                            <span className="min-w-0 flex-1 truncate">
-                              {member.username}
-                            </span>
-                            {hasDraft("dm", member.id || member._id) && (
-                                <span
-                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
-                                  title="Draft message"
-                                >
-                                  <i className="fa-solid fa-pen text-[8px]" />
-                                  <span>Draft</span>
-                                </span>
-                              )}
-                              {isConversationMuted("dm", member.id) && (
-                              <i
-                                className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
-                                title="Notifications muted"
-                              />
-                            )}
-                            {isUnread && (
-                              <span
-                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
-                                title="Unread messages"
-                              />
-                            )}
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleDMRead(member, e)}
-                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                  isMenuOpen
-                                    ? "flex"
-                                    : "hidden group-hover:flex"
-                                }`}
-                                title={
-                                  isUnread ? "Mark as read" : "Mark as unread"
-                                }
-                              >
-                                <i
-                                  className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`}
-                                />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveDMMenuId(
-                                    isMenuOpen ? null : member.id,
-                                  );
-                                }}
-                                className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
-                                title="DM options"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {isMenuOpen && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-30"
-                                onClick={() => setActiveDMMenuId(null)}
-                              />
-                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleToggleDMRead(member, e)}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i
-                                    className={`fa-regular ${(unreadDMCounts[member.id?.toString()] || 0) > 0 ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`}
-                                  />
-                                  {(unreadDMCounts[member.id?.toString()] ||
-                                    0) > 0
-                                    ? "Mark as read"
-                                    : "Mark as unread"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleTogglePin("dm", member.id, e)
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i className="fa-solid fa-thumbtack text-amber-400 w-3.5" />
-                                  {isPinned
-                                    ? "Unpin conversation"
-                                    : "Pin conversation"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleHideDM(member.id, e)}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i className="fa-regular fa-eye-slash text-[#A5C9CA] w-3.5" />
-                                  Hide conversation
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleToggleArchiveDM(member, e)}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                                >
-                                  <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                                  {archivedDMIds.has((member.id || member._id)?.toString()) ? "Unarchive chat" : "Archive chat"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveDMMenuId(null);
-                                    toggleMuteConversation("dm", member.id);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i
-                                    className={`fa-solid ${
-                                      isConversationMuted("dm", member.id)
-                                        ? "fa-bell text-amber-400"
-                                        : "fa-bell-slash text-[#A5C9CA]"
-                                    } w-3.5`}
-                                  />
-                                  {isConversationMuted("dm", member.id)
-                                    ? "Unmute notifications"
-                                    : "Mute notifications"}
-                                </button>
-                                <div className="h-px bg-[#395B64]/50 my-1" />
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleToggleBlockUser(member, e)
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-400 hover:bg-[#395B64] transition"
-                                >
-                                  <i
-                                    className={`fa-solid ${blockedUserIds.has((member.id || member._id)?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
-                                  />
-                                  {blockedUserIds.has(
-                                    (member.id || member._id)?.toString(),
-                                  )
-                                    ? "Unblock user"
-                                    : "Block user"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleDeleteDMClick(member, e)
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                >
-                                  <i className="fa-solid fa-trash-can w-3.5" />
-                                  Delete conversation
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
-                      No members yet
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Spaces */}
-            <div>
-              <SidebarSectionHeader
-                title="Spaces"
-                isCollapsed={isSpacesCollapsed}
-                onToggle={() => setIsSpacesCollapsed((prev) => !prev)}
-                icon={
-                  <i className="fa-solid fa-table-cells-large text-[11px] text-[#A5C9CA]/80 group-hover:text-white" />
-                }
-                count={totalUnreadSpacesCount}
-                countBadgeClass="bg-emerald-600/90"
-                actionButton={
-                  isSuperAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCreateSpaceModal(true);
-                        setIsMobileSidebarOpen(false);
-                      }}
-                      className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
-                      title="Create space"
-                    >
-                      <i className="fa-solid fa-plus" />
-                    </button>
-                  )
-                }
-              />
-
-              {!isSpacesCollapsed && (
-                <div className="space-y-0.5 pt-1">
-                  {activeSpaces.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
-                      {isSuperAdmin ? (
-                        <div className="flex flex-col items-center gap-1.5">
-                          <span>No Spaces yet</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCreateSpaceModal(true);
-                              setIsMobileSidebarOpen(false);
-                            }}
-                            className="text-[11px] font-semibold text-[#E7F6F2] hover:text-white underline underline-offset-2"
-                          >
-                            Create a Space
-                          </button>
-                        </div>
-                      ) : (
-                        <span>You haven't been added to any Spaces yet</span>
-                      )}
-                    </div>
-                  ) : (
-                    activeSpaces.map((sp) => {
-                      const spId = (sp._id || sp.id)?.toString();
-                      const isActive =
-                        selectedSpace &&
-                        (selectedSpace._id || selectedSpace.id)?.toString() ===
-                          spId;
-                      const isMenuOpen =
-                        activeSpaceForAction?.type === "menu" &&
-                        activeSpaceForAction?.id === spId;
-                      const isUnread = (unreadSpaceCounts[spId] || 0) > 0;
-                      const memberCount = sp.members?.length || 0;
-
-                      const isPinned = pinnedKeys.has(`space:${spId}`);
-
-                      return (
-                        <div key={spId} className="relative group">
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => handleSelectSpace(sp)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                handleSelectSpace(sp);
-                              }
-                            }}
-                            className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
-                              isActive
-                                ? "bg-[#395B64] text-white shadow-xs font-semibold"
-                                : isUnread
-                                  ? "text-white font-semibold hover:bg-[#2C3333]"
-                                  : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
-                            }`}
-                          >
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                              <i className="fa-solid fa-table-cells-large text-xs w-3.5 text-center flex-shrink-0 text-[#A5C9CA]" />
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm leading-tight">
-                                  {sp.name}
-                                </div>
-                                <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
-                                  {memberCount}{" "}
-                                  {memberCount === 1 ? "member" : "members"}
-                                </div>
-                              </div>
-                              {hasDraft("space", spId) && (
-                                <span
-                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
-                                  title="Draft message"
-                                >
-                                  <i className="fa-solid fa-pen text-[8px]" />
-                                  <span>Draft</span>
-                                </span>
-                              )}
-                              {isConversationMuted("space", spId) && (
-                                <i
-                                  className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
-                                  title="Notifications muted"
-                                />
-                              )}
-                              {isUnread && (
-                                <span
-                                  className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
-                                  title="Unread messages"
-                                />
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleSpaceRead(sp, e)}
-                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                  isMenuOpen
-                                    ? "flex"
-                                    : "hidden group-hover:flex"
-                                }`}
-                                title={
-                                  isUnread ? "Mark as read" : "Mark as unread"
-                                }
-                              >
-                                <i
-                                  className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`}
-                                />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveSpaceForAction(
-                                    isMenuOpen
-                                      ? null
-                                      : { type: "menu", id: spId, space: sp },
-                                  );
-                                }}
-                                className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
-                                title="Space options"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {isMenuOpen && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-30"
-                                onClick={() => setActiveSpaceForAction(null)}
-                              />
-                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    handleToggleSpaceRead(sp, e);
-                                    setActiveSpaceForAction(null);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i
-                                    className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`}
-                                  />
-                                  {isUnread ? "Mark as read" : "Mark as unread"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleTogglePin("space", spId, e)
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i className="fa-solid fa-thumbtack text-amber-400 w-3.5" />
-                                  {isPinned
-                                    ? "Unpin conversation"
-                                    : "Pin conversation"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveSpaceForAction(null);
-                                    toggleMuteConversation("space", spId);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i
-                                    className={`fa-solid ${
-                                      isConversationMuted("space", spId)
-                                        ? "fa-bell text-amber-400"
-                                        : "fa-bell-slash text-[#A5C9CA]"
-                                    } w-3.5`}
-                                  />
-                                  {isConversationMuted("space", spId)
-                                    ? "Unmute notifications"
-                                    : "Mute notifications"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) =>
-                                    handleCopyConversationLink("space", spId, e)
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
-                                  Copy link
-                                </button>
-                                <div className="h-px bg-[#395B64]/50 my-1" />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveSpaceForAction(sp);
-                                    setShowManageSpaceMembersModal(true);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                >
-                                  <i className="fa-solid fa-users text-[#A5C9CA] w-3.5" />
-                                  {isSuperAdmin
-                                    ? "Manage Members"
-                                    : "View Members"}
-                                </button>
-                                {isSuperAdmin ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveSpaceForAction(sp);
-                                        setShowEditSpaceModal(true);
-                                      }}
-                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                    >
-                                      <i className="fa-solid fa-pen text-[#A5C9CA] w-3.5" />
-                                      Edit Space
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveSpaceForAction(sp);
-                                        setShowDeleteSpaceModal(true);
-                                      }}
-                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
-                                    >
-                                      <i className="fa-solid fa-trash text-rose-400 w-3.5" />
-                                      Delete Space
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleLeaveSpace(sp, e)}
-                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                  >
-                                    <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
-                                    Leave Space
-                                  </button>
-                                )}
-                              </div>
-                            </>
-                          )}
                         </div>
                       );
                     })
@@ -3652,7 +4279,7 @@ const SlackShell = () => {
                 isCollapsed={isGroupsCollapsed}
                 onToggle={() => setIsGroupsCollapsed((prev) => !prev)}
                 icon={
-                  <i className="fa-solid fa-users text-[11px] text-[#A5C9CA]/80 group-hover:text-white" />
+                  <i className="fa-solid fa-users text-[11px] text-[#52656A] dark:text-[#A5C9CA]/80 group-hover:text-[#2C3333] dark:group-hover:text-white" />
                 }
                 count={0}
                 actionButton={
@@ -3663,7 +4290,7 @@ const SlackShell = () => {
                       setShowCreateGroupModal(true);
                       setIsMobileSidebarOpen(false);
                     }}
-                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition cursor-pointer"
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#52656A] dark:text-[#A5C9CA] hover:text-white text-xs transition cursor-pointer"
                     title="Create group"
                   >
                     <i className="fa-solid fa-plus pointer-events-none" />
@@ -3674,7 +4301,7 @@ const SlackShell = () => {
               {!isGroupsCollapsed && (
                 <div className="space-y-0.5 pt-1">
                   {activeGroups.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                    <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
                       <div className="flex flex-col items-center gap-1.5">
                         <span>No Groups yet</span>
                         <button
@@ -3711,26 +4338,26 @@ const SlackShell = () => {
                                 handleSelectGroup(grp);
                               }
                             }}
-                            className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                            className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
                               isActive
-                                ? "bg-[#395B64] text-white shadow-xs font-semibold"
-                                : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                                ? "bg-[#395B64] text-white font-semibold"
+                                : "text-[#52656A] dark:text-[#A5C9CA]/90 hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
                             }`}
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-2">
-                              <i className="fa-solid fa-user-group text-xs w-3.5 text-center flex-shrink-0 text-[#A5C9CA]" />
+                              <i className="fa-solid fa-user-group text-xs w-3.5 text-center flex-shrink-0 text-[#52656A] dark:text-[#A5C9CA]" />
                               <div className="min-w-0 flex-1">
                                 <div className="truncate text-sm leading-tight">
                                   {grp.name}
                                 </div>
-                                <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
+                                <div className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 font-normal leading-tight">
                                   {memberCount}{" "}
                                   {memberCount === 1 ? "member" : "members"}
                                 </div>
                               </div>
                               {hasDraft("group", grpId) && (
                                 <span
-                                  className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                  className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
                                   title="Draft message"
                                 >
                                   <i className="fa-solid fa-pen text-[8px]" />
@@ -3738,44 +4365,7 @@ const SlackShell = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveGroupMenuId(isMenuOpen ? null : grpId);
-                                }}
-                                className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                  isMenuOpen ? "flex" : "hidden group-hover:flex"
-                                }`}
-                                title="Group options"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                              </button>
                             </div>
-                          </div>
-
-                          {isMenuOpen && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-30"
-                                onClick={() => setActiveGroupMenuId(null)}
-                              />
-                              <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    setActiveGroupMenuId(null);
-                                    handleToggleArchiveGroup(grp, e);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                                >
-                                  <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                                  {archivedGroupIds.has(grpId) ? "Unarchive chat" : "Archive chat"}
-                                </button>
-                              </div>
-                            </>
-                          )}
                         </div>
                       );
                     })
@@ -3787,221 +4377,43 @@ const SlackShell = () => {
         </div>
       </div>
 
-      {/* ── Desktop: Icon rail aside (hidden on mobile) ─────────────────────── */}
-      <aside className="hidden md:flex w-17 flex-col items-center bg-[#2C3333] py-3.5 text-white shadow-[1px_0_0_rgba(0,0,0,0.15)] z-30 select-none">
-        <button
-          type="button"
-          onClick={() => navigate("/app/dashboard")}
-          className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#395B64] text-base font-bold text-[#E7F6F2] shadow-md transition hover:bg-[#A5C9CA] hover:text-[#2C3333]"
-          title="WorkNest Dashboard"
-        >
-          <i className="fa-solid fa-layer-group text-lg" />
-        </button>
 
-        <div className="w-8 h-px bg-[#395B64]/50 mb-3" />
-        <div className="flex w-full flex-1 flex-col items-center gap-2.5 overflow-y-auto px-2">
-          {workspaces.map((ws) => {
-            const active = ws.id === workspaceId;
-            const initials = getWorkspaceInitials(ws.name);
-            return (
-              <button
-                key={ws.id}
-                type="button"
-                onClick={() => handleSelectWorkspace(ws.id)}
-                title={`${ws.name} (${ws.role || "Member"})`}
-                className={`group relative flex h-11 w-11 items-center justify-center rounded-xl text-xs font-bold tracking-wider transition-all ${
-                  active
-                    ? "bg-[#395B64] text-white shadow-lg ring-2 ring-[#A5C9CA] ring-offset-2 ring-offset-[#2C3333]"
-                    : "bg-[#374242] text-[#E7F6F2] hover:bg-[#395B64] hover:text-white"
-                }`}
-              >
-                {initials}
-                {active && (
-                  <span className="absolute -left-2 h-6 w-1 rounded-r-full bg-[#A5C9CA]" />
-                )}
-              </button>
-            );
-          })}
-
-          <button
-            type="button"
-            onClick={() => setShowCreateWorkspaceModal(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-[#52656A] text-lg text-[#A5C9CA] transition hover:border-[#E7F6F2] hover:bg-[#395B64]/40 hover:text-white"
-            title="Create new workspace"
-          >
-            <i className="fa-solid fa-plus text-xs" />
-          </button>
-        </div>
-
-        {/* user profile at the bottom */}
-        <div className="relative mt-auto w-full px-2 pt-2">
-          <button
-            type="button"
-            onClick={() => setShowProfileMenu((prev) => !prev)}
-            className="relative mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#52656A] bg-[#395B64] text-xs font-bold text-white shadow-sm transition hover:border-[#A5C9CA]"
-            title="Your Profile"
-          >
-            {user?.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.username || "Profile"}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              user?.username?.charAt(0)?.toUpperCase() || "U"
-            )}
-            <StatusBadge
-              status={user?.presenceStatus || "active"}
-              size="xs"
-              className="absolute bottom-0.5 right-0.5 ring-1 ring-[#2C3333]"
-            />
-          </button>
-
-          {/* Profile Menu Popover */}
-          {showProfileMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setShowProfileMenu(false)}
-              />
-              <div className="absolute bottom-2 left-16 z-50 w-64 rounded-2xl border border-[#395B64] bg-[#1E2525] p-3 text-left text-[#E7F6F2] shadow-2xl max-h-[80vh] overflow-y-auto">
-                <div className="mb-3 flex items-center gap-3 rounded-xl bg-[#2C3333] p-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-[#E7F6F2] overflow-hidden flex-shrink-0">
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.username || "Profile"}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      user?.username?.charAt(0)?.toUpperCase() || "U"
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-bold text-white">
-                      {user?.username || "User"}
-                    </div>
-                    <div className="truncate text-xs text-[#A5C9CA] mb-1.5">
-                      {user?.email || ""}
-                    </div>
-                    <StatusSelector />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    setShowEditProfileModal(true);
-                  }}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#E7F6F2] hover:bg-[#395B64] transition mb-2 border border-[#395B64]/50 bg-[#2C3333]/60 hover:text-white cursor-pointer"
-                >
-                  <i className="fa-regular fa-user text-xs text-[#A5C9CA]" />
-                  <span>Edit Profile</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleGlobalMute();
-                  }}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-semibold transition mb-3 border cursor-pointer ${
-                    isMutedGlobal
-                      ? "bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
-                      : "bg-[#2C3333]/60 border-[#395B64]/50 text-[#E7F6F2] hover:bg-[#395B64] hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <i
-                      className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} text-xs`}
-                    />
-                    <span>
-                      {isMutedGlobal
-                        ? "Notifications Muted"
-                        : "Mute Notifications"}
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isMutedGlobal ? "bg-amber-500/20 text-amber-300" : "bg-[#395B64] text-[#A5C9CA]"}`}
-                  >
-                    {isMutedGlobal ? "ON" : "OFF"}
-                  </span>
-                </button>
-
-                <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-[#A5C9CA]">
-                  Workspace Memberships
-                </div>
-                <div className="max-h-36 overflow-y-auto space-y-1 mb-3 px-1">
-                  {workspaces.map((ws) => (
-                    <div
-                      key={ws.id}
-                      className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs bg-[#2C3333]/50"
-                    >
-                      <span className="truncate font-medium text-[#E7F6F2]">
-                        {ws.name}
-                      </span>
-                      <span className="rounded bg-[#395B64] px-1.5 py-0.5 text-[10px] font-semibold text-[#A5C9CA]">
-                        {ws.role}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="h-px bg-[#395B64]/50 my-2" />
-
-                {isSuperAdminUser(user) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate("/admin");
-                    }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-400 hover:bg-[#395B64]/40 transition mb-1 cursor-pointer"
-                  >
-                    <i className="fa-solid fa-shield-halved text-xs text-emerald-400" />
-                    <span>Super Admin Dashboard</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-400 hover:bg-rose-950/40 transition"
-                >
-                  <i className="fa-solid fa-arrow-right-from-bracket text-xs" />
-                  Sign out of WorkNest
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </aside>
-      {/* Workspace sidebar — desktop only, hidden on mobile */}
-      <aside className="hidden md:flex w-64 flex-col bg-[#1E2525] text-sm text-[#E7F6F2] border-r border-[#2C3333]/60 select-none z-20">
+      {/* ── Desktop: sidebar ─────────────────────────────────────────────── */}
+      <aside className="hidden md:flex w-64 flex-col bg-[#F8FAFB] dark:bg-[#1E2525] text-sm text-[#2C3333] dark:text-[#E7F6F2] border-r border-[#D8E2E1] dark:border-[#1A2121] select-none z-20 transition-colors">
         {/* Workspace Name & Role Header */}
-        <div className="relative border-b border-[#2C3333] px-3.5 py-3 bg-[#1E2525]">
+        <div className="relative border-b border-[#D8E2E1] dark:border-[#1A2121] px-3 py-2.5 flex items-center justify-between">
           <button
             type="button"
             onClick={() => setShowWorkspaceMenu((prev) => !prev)}
-            className="flex w-full items-center justify-between rounded-xl p-1.5 text-left hover:bg-[#2C3333] transition"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-left hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] transition-colors"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64] text-xs font-bold tracking-wider text-white flex-shrink-0 shadow-xs">
-                {getWorkspaceInitials(workspaceData.name)}
-              </span>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-bold text-white">
-                  {workspaceData.name}
-                </div>
-                <div className="text-[10px] font-semibold tracking-wider text-[#A5C9CA]">
-                  {getRoleDisplayName(selectedRole)}
-                </div>
+            <span className="flex h-6 w-6 items-center justify-center rounded bg-[#395B64] text-[10px] font-bold tracking-wider text-white flex-shrink-0">
+              {getWorkspaceInitials(workspaceData.name)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-[#2C3333] dark:text-white leading-tight">
+                {workspaceData.name}
+              </div>
+              <div className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 leading-tight">
+                {getRoleDisplayName(selectedRole)}
               </div>
             </div>
             <i
-              className={`fa-solid fa-chevron-down text-xs text-[#A5C9CA] transition-transform ${showWorkspaceMenu ? "rotate-180" : ""}`}
+              className={`fa-solid fa-chevron-down text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 flex-shrink-0 transition-transform ${showWorkspaceMenu ? "rotate-180" : ""}`}
             />
+          </button>
+
+          {/* Compose / new chat icon */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowNewChatModal(true);
+              setNewChatSearch("");
+            }}
+            className="ml-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+            title="New message"
+          >
+            <i className="fa-solid fa-plus text-xs" />
           </button>
 
           {showWorkspaceMenu && (
@@ -4010,20 +4422,17 @@ const SlackShell = () => {
                 className="fixed inset-0 z-30"
                 onClick={() => setShowWorkspaceMenu(false)}
               />
-              <div className="absolute left-3 right-3 top-[calc(100%+6px)] z-40 rounded-2xl border border-[#395B64] bg-[#2C3333] p-2 shadow-2xl text-xs">
-                <div className="px-3 py-2 border-b border-[#395B64]/50">
-                  <div className="font-bold text-white text-sm truncate">
+              <div className="absolute left-3 right-3 top-[calc(100%+4px)] z-40 rounded border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] shadow-xl text-xs overflow-hidden text-[#2C3333] dark:text-[#E7F6F2]">
+                <div className="px-3 py-2 border-b border-[#D8E2E1] dark:border-[#2C3333]">
+                  <div className="font-semibold text-[#2C3333] dark:text-white text-sm truncate">
                     {workspaceData.name}
                   </div>
-                  <div className="text-[11px] text-[#A5C9CA] mt-0.5 flex items-center gap-1.5">
-                    <span>Role:</span>
-                    <span className="font-semibold text-white">
-                      {getRoleDisplayName(selectedRole)}
-                    </span>
+                  <div className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 mt-0.5">
+                    {getRoleDisplayName(selectedRole)}
                   </div>
                 </div>
 
-                <div className="py-1 space-y-0.5">
+                <div className="py-1 space-y-px">
                   {selectedRole === "OWNER" && (
                     <>
                       <button
@@ -4032,9 +4441,9 @@ const SlackShell = () => {
                           setShowInviteModal(true);
                           setShowWorkspaceMenu(false);
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
                       >
-                        <i className="fa-solid fa-user-plus text-[#A5C9CA] w-4" />
+                        <i className="fa-solid fa-user-plus text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
                         Invite people
                       </button>
                       <button
@@ -4043,9 +4452,9 @@ const SlackShell = () => {
                           setShowMembersPanel(true);
                           setShowWorkspaceMenu(false);
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
                       >
-                        <i className="fa-solid fa-users-gear text-[#A5C9CA] w-4" />
+                        <i className="fa-solid fa-users-gear text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
                         Manage members
                       </button>
                       <button
@@ -4054,9 +4463,9 @@ const SlackShell = () => {
                           setShowCreateChannelModal(true);
                           setShowWorkspaceMenu(false);
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
                       >
-                        <i className="fa-solid fa-plus text-[#A5C9CA] w-4" />
+                        <i className="fa-solid fa-plus text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
                         Create channel
                       </button>
                       <button
@@ -4065,21 +4474,21 @@ const SlackShell = () => {
                           setShowEditWorkspaceModal(true);
                           setShowWorkspaceMenu(false);
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
                       >
-                        <i className="fa-solid fa-pen-to-square text-[#A5C9CA] w-4" />
+                        <i className="fa-solid fa-pen-to-square text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
                         Edit workspace
                       </button>
-                      <div className="h-px bg-[#395B64]/50 my-1" />
+                      <div className="h-px bg-[#2C3333] my-1" />
                       <button
                         type="button"
                         onClick={() => {
                           setShowDeleteWorkspaceModal(true);
                           setShowWorkspaceMenu(false);
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-rose-400 hover:bg-rose-950/30 transition-colors"
                       >
-                        <i className="fa-solid fa-trash-can w-4" />
+                        <i className="fa-solid fa-trash-can w-3.5 text-xs" />
                         Delete workspace
                       </button>
                     </>
@@ -4093,9 +4502,9 @@ const SlackShell = () => {
                           setShowCreateChannelModal(true);
                           setShowWorkspaceMenu(false);
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
                       >
-                        <i className="fa-solid fa-plus text-[#A5C9CA] w-4" />
+                        <i className="fa-solid fa-plus text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
                         Create channel
                       </button>
                       <button
@@ -4104,10 +4513,10 @@ const SlackShell = () => {
                           setShowMembersPanel(true);
                           setShowWorkspaceMenu(false);
                         }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
                       >
-                        <i className="fa-solid fa-hashtag text-[#A5C9CA] w-4" />
-                        Manage channels & members
+                        <i className="fa-solid fa-hashtag text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
+                        Manage channels &amp; members
                       </button>
                     </>
                   )}
@@ -4119,10 +4528,10 @@ const SlackShell = () => {
                         setShowMembersPanel(true);
                         setShowWorkspaceMenu(false);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
                     >
-                      <i className="fa-solid fa-users text-[#A5C9CA] w-4" />
-                      View workspace members
+                      <i className="fa-solid fa-users text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
+                      View members
                     </button>
                   )}
                 </div>
@@ -4131,29 +4540,7 @@ const SlackShell = () => {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-b border-[#2C3333] px-3.5 py-2 bg-[#1A2121]/90">
-          <span className="text-[11px] font-semibold text-[#A5C9CA] tracking-wide uppercase">
-            Status
-          </span>
-          <StatusSelector align="right" />
-        </div>
-
-
-        <div className="px-3 pt-1 pb-1">
-          <button
-            type="button"
-            onClick={() => {
-              setShowNewChatModal(true);
-              setNewChatSearch("");
-            }}
-            className="flex w-full items-center gap-2 rounded-xl border border-[#395B64]/60 bg-[#2C3333]/50 px-3 py-2 text-sm font-semibold text-[#E7F6F2] hover:bg-[#395B64]/60 hover:border-[#A5C9CA]/40 transition"
-          >
-            <i className="fa-regular fa-pen-to-square text-[#A5C9CA] text-xs" />
-            <span>New chat</span>
-          </button>
-        </div>
-
-        <div className="border-b border-[#2C3333] px-3 pb-3 pt-2">
+        <div className="px-3 pb-2 pt-2">
           {/* Shortcuts collapsible header */}
           <SidebarSectionHeader
             title="Shortcuts"
@@ -4162,7 +4549,7 @@ const SlackShell = () => {
           />
 
           {!isShortcutsCollapsed && (
-            <div className="space-y-0.5 pt-1">
+            <div className="space-y-px pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -4173,41 +4560,37 @@ const SlackShell = () => {
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
                   setSelectedGroup(null);
+                  setActiveSecondaryPanel("home");
                   setIsMobileSidebarOpen(false);
                   navigate(`/app/workspace/${workspaceId}`);
                 }}
-                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
-                  isHomeView &&
+                className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
+                  activeSecondaryPanel === "home" &&
                   !isStarredView &&
                   !isMentionsView &&
-                  !isArchivedView &&
-                  !selectedDMUser &&
-                  !selectedSpace &&
-                  !selectedGroup
-                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                  !isArchivedView
+                    ? "bg-[#395B64] text-white font-semibold"
+                    : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                 }`}
               >
-                <i className="fa-solid fa-house w-4 text-center" />
+                <i className="fa-solid fa-house w-4 text-center text-[11px]" />
                 <span className="flex-1 text-left">Home</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowActivityPanel(true)}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+                className="flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm text-[#455252] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
               >
                 <i
-                  className={`fa-solid ${isMutedGlobal ? "fa-bell-slash text-amber-400" : "fa-bell text-[#A5C9CA]"} w-4 text-center`}
+                  className={`fa-solid ${isMutedGlobal ? "fa-bell-slash" : "fa-bell"} w-4 text-center text-[11px]`}
                 />
                 <span className="flex-1 text-left">Notifications</span>
                 {isMutedGlobal && (
-                  <span className="text-[10px] font-semibold text-amber-400/90 px-1">
-                    Muted
-                  </span>
+                  <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 px-1">Muted</span>
                 )}
                 {unreadNotificationsCount > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64] px-1 text-[10px] font-bold text-white">
                     {unreadNotificationsCount}
                   </span>
                 )}
@@ -4226,13 +4609,13 @@ const SlackShell = () => {
                   setSelectedGroup(null);
                   setIsMobileSidebarOpen(false);
                 }}
-                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                   isStarredView
-                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                    ? "bg-[#395B64] text-white font-semibold"
+                    : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                 }`}
               >
-                <i className="fa-solid fa-star w-4 text-center text-emerald-400" />
+                <i className="fa-solid fa-star w-4 text-center" />
                 <span className="flex-1 text-left">Starred</span>
               </button>
 
@@ -4248,10 +4631,10 @@ const SlackShell = () => {
                   setSelectedGroup(null);
                   setIsMobileSidebarOpen(false);
                 }}
-                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                   isPinnedView
-                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                    ? "bg-[#395B64] text-white font-semibold"
+                    : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                 }`}
               >
                 <style>{`button:has(> #pinned-hidden-desktop) { display: none !important; }`}</style><span id="pinned-hidden-desktop" className="hidden" />
@@ -4270,16 +4653,16 @@ const SlackShell = () => {
                   setSelectedGroup(null);
                   setIsMobileSidebarOpen(false);
                 }}
-                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                   isMentionsView
-                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                    ? "bg-[#395B64] text-white font-semibold"
+                    : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                 }`}
               >
-                <i className="fa-solid fa-at w-4 text-center text-[#A5C9CA]" />
+                <i className="fa-solid fa-at w-4 text-center" />
                 <span className="flex-1 text-left">Mentions</span>
                 {unreadMentionsCount > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-[#E7F6F2]">
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] px-1 text-[10px] font-bold text-white">
                     {unreadMentionsCount}
                   </span>
                 )}
@@ -4297,16 +4680,16 @@ const SlackShell = () => {
                   setSelectedGroup(null);
                   setIsMobileSidebarOpen(false);
                 }}
-                className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition cursor-pointer ${
+                className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors cursor-pointer ${
                   isArchivedView
-                    ? "bg-[#395B64] text-white font-semibold shadow-xs"
-                    : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
+                    ? "bg-[#395B64] text-white font-semibold"
+                    : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
                 }`}
               >
-                <i className="fa-solid fa-box-archive w-4 text-center text-amber-400" />
+                <i className="fa-solid fa-box-archive w-4 text-center" />
                 <span className="flex-1 text-left">Archived</span>
                 {totalArchivedCount > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] font-bold text-amber-400 border border-amber-500/40">
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64]/20 dark:bg-[#395B64]/50 px-1 text-[10px] font-bold text-[#395B64] dark:text-[#A5C9CA]">
                     {totalArchivedCount}
                   </span>
                 )}
@@ -4315,7 +4698,7 @@ const SlackShell = () => {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 bg-[#F8FAFB] dark:bg-transparent transition-colors">
           {/* Pinned Conversations */}
           {renderPinnedSection()}
 
@@ -4323,15 +4706,16 @@ const SlackShell = () => {
             <SidebarSectionHeader
               title="Channels"
               isCollapsed={isChannelsCollapsed}
-              onToggle={() => setIsChannelsCollapsed((prev) => !prev)}
-              count={totalUnreadChannelsCount}
-              countBadgeClass="bg-emerald-600/90"
+              onToggle={() => {
+                setIsChannelsCollapsed((prev) => !prev);
+                setActiveSecondaryPanel("channels");
+              }}
               actionButton={
                 permissions.canCreateChannels && (
                   <button
                     type="button"
                     onClick={() => setShowCreateChannelModal(true)}
-                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64]/20 dark:hover:bg-[#395B64] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white text-xs transition"
                     title="Create channel"
                   >
                     <i className="fa-solid fa-plus" />
@@ -4343,7 +4727,7 @@ const SlackShell = () => {
             {!isChannelsCollapsed && (
               <div className="space-y-0.5 pt-1">
                 {activeChannels.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                  <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
                     No channels yet
                   </div>
                 ) : (
@@ -4351,6 +4735,7 @@ const SlackShell = () => {
                     const chanId = (chanItem.id || chanItem._id)?.toString();
                     const chan = { ...chanItem, id: chanId, _id: chanId };
                     const isActive =
+                      activeSecondaryPanel !== "home" &&
                       (currentChannel?.id || currentChannel?._id)?.toString() === chanId &&
                       !selectedDMUser &&
                       !isStarredView &&
@@ -4375,19 +4760,19 @@ const SlackShell = () => {
                               handleSelectChannel(chan);
                             }
                           }}
-                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm transition ${
+                          className={`group flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors ${
                             isActive
-                              ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                              ? "bg-[#395B64] text-white font-semibold"
                               : isUnread
-                                ? "text-white font-semibold hover:bg-[#2C3333]"
-                                : "text-[#A5C9CA]/90 font-medium hover:bg-[#2C3333] hover:text-white"
+                                ? "text-[#2C3333] dark:text-white font-semibold hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636]"
+                                : "text-[#52656A] dark:text-[#A5C9CA]/90 font-medium hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
                           }`}
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2">
                             {chan.type === "PRIVATE" ? (
-                              <i className="fa-solid fa-lock text-xs text-[#A5C9CA] w-3.5" />
+                              <i className={`fa-solid fa-lock text-xs w-3.5 ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
                             ) : (
-                              <span className="text-sm font-bold text-[#A5C9CA] w-3.5 text-center">
+                              <span className={`text-sm font-bold w-3.5 text-center ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`}>
                                 #
                               </span>
                             )}
@@ -4396,7 +4781,7 @@ const SlackShell = () => {
                             </span>
                             {hasDraft("channel", chan.id || chan._id) && (
                               <span
-                                className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
                                 title="Draft message"
                               >
                                 <i className="fa-solid fa-pen text-[8px]" />
@@ -4405,192 +4790,18 @@ const SlackShell = () => {
                             )}
                             {isConversationMuted("channel", chan.id) && (
                               <i
-                                className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                className="fa-solid fa-bell-slash text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 shrink-0"
                                 title="Notifications muted"
                               />
                             )}
                             {isUnread && (
                               <span
-                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
+                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
                                 title="Unread messages"
                               />
                             )}
                           </div>
-                          {/* Channel action buttons: Read/unread toggle button visible on hover / active */}
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleChannelRead(chan, e)}
-                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                isMenuOpen ? "flex" : "hidden group-hover:flex"
-                              }`}
-                              title={
-                                isUnread ? "Mark as read" : "Mark as unread"
-                              }
-                            >
-                              <i
-                                className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`}
-                              />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveChannelMenuId(
-                                  isMenuOpen ? null : chan.id,
-                                );
-                              }}
-                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                isMenuOpen ? "flex" : "hidden group-hover:flex"
-                              }`}
-                              title="Channel options"
-                            >
-                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                            </button>
                           </div>
-                        </div>
-
-                        {/* Channel Context Menu */}
-                        {isMenuOpen && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-30"
-                              onClick={() => setActiveChannelMenuId(null)}
-                            />
-                            <div
-                              className={`absolute right-2 ${openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5`}
-                            >
-                              {/* Toggle Read / Unread */}
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleToggleChannelRead(chan, e)
-                                }
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i
-                                  className={`fa-regular ${(unreadChannelCounts[chan.id.toString()] || 0) > 0 ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`}
-                                />
-                                {(unreadChannelCounts[chan.id.toString()] ||
-                                  0) > 0
-                                  ? "Mark as read"
-                                  : "Mark as unread"}
-                              </button>
-
-                              {/* Pin / Unpin */}
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleTogglePin("channel", chan.id, e)
-                                }
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i className="fa-solid fa-thumbtack text-amber-400 w-3.5" />
-                                {isPinned
-                                  ? "Unpin conversation"
-                                  : "Pin conversation"}
-                              </button>
-
-                              {/* Mute */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveChannelMenuId(null);
-                                  toggleMuteConversation("channel", chan.id);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i
-                                  className={`fa-solid ${
-                                    isConversationMuted("channel", chan.id)
-                                      ? "fa-bell text-amber-400"
-                                      : "fa-bell-slash text-[#A5C9CA]"
-                                  } w-3.5`}
-                                />
-                                {isConversationMuted("channel", chan.id)
-                                  ? "Unmute notifications"
-                                  : "Mute notifications"}
-                              </button>
-
-                              {/* Copy link */}
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleCopyConversationLink(
-                                    "channel",
-                                    chan.id,
-                                    e,
-                                  )
-                                }
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
-                                Copy link
-                              </button>
-
-                              <div className="h-px bg-[#395B64]/50 my-1" />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveChannelMenuId(null);
-                                  handleToggleArchiveChannel(chan);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                              >
-                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                                {chan.isArchived ? "Unarchive chat" : "Archive chat"}
-                              </button>
-                              {(selectedRole === "OWNER" ||
-                                selectedRole === "ADMIN") && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditingChannel(chan);
-                                      setActiveChannelMenuId(null);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                  >
-                                    <i className="fa-solid fa-pen-to-square text-[#A5C9CA] w-3.5" />
-                                    Edit channel
-                                  </button>
-                                  {channels.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setDeletingChannel(chan);
-                                        setActiveChannelMenuId(null);
-                                      }}
-                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                    >
-                                      <i className="fa-solid fa-trash-can w-3.5" />
-                                      Delete channel
-                                    </button>
-                                  )}
-                                </>
-                              )}
-
-                              {channels.length > 1 &&
-                                selectedRole === "MEMBER" && (
-                                  <>
-                                    <div className="h-px bg-[#395B64]/50 my-1" />
-                                    <button
-                                      type="button"
-                                      onClick={(e) =>
-                                        handleLeaveChannel(chan, e)
-                                      }
-                                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                    >
-                                      <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
-                                      Leave channel
-                                    </button>
-                                  </>
-                                )}
-                            </div>
-                          </>
-                        )}
                       </div>
                     );
                   })
@@ -4602,15 +4813,16 @@ const SlackShell = () => {
             <SidebarSectionHeader
               title="Direct Messages"
               isCollapsed={isDMsCollapsed}
-              onToggle={() => setIsDMsCollapsed((prev) => !prev)}
-              count={totalUnreadDMsCount}
-              countBadgeClass="bg-emerald-600/90"
+              onToggle={() => {
+                setIsDMsCollapsed((prev) => !prev);
+                setActiveSecondaryPanel("dms");
+              }}
               actionButton={
                 selectedRole === "OWNER" && (
                   <button
                     type="button"
                     onClick={() => setShowInviteModal(true)}
-                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64]/20 dark:hover:bg-[#395B64] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white text-xs transition"
                     title="Invite member"
                   >
                     <i className="fa-solid fa-plus" />
@@ -4623,7 +4835,7 @@ const SlackShell = () => {
               <div className="space-y-0.5 pt-1">
                 {visibleDirectMessageMembers.length > 0 ? (
                   visibleDirectMessageMembers.map((member, idx) => {
-                    const isSelected = selectedDMUser?.id === member.id;
+                    const isSelected = activeSecondaryPanel !== "home" && selectedDMUser?.id === member.id;
                     const isMenuOpen = activeDMMenuId === member.id;
                     const isUnread =
                       (unreadDMCounts[member.id?.toString()] || 0) > 0;
@@ -4641,12 +4853,12 @@ const SlackShell = () => {
                               handleSelectDM(member);
                             }
                           }}
-                          className={`group flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm transition cursor-pointer ${
+                          className={`group flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
                             isSelected
                               ? "bg-[#395B64] text-white font-semibold"
                               : isUnread
-                                ? "text-white font-semibold hover:bg-[#2C3333]"
-                                : "text-[#A5C9CA]/90 font-medium hover:bg-[#2C3333] hover:text-white"
+                                ? "text-[#2C3333] dark:text-white font-semibold hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636]"
+                                : "text-[#52656A] dark:text-[#A5C9CA]/90 font-medium hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
                           }`}
                         >
                           <span className="relative flex-shrink-0">
@@ -4665,7 +4877,7 @@ const SlackShell = () => {
                               status={getUserPresenceStatus(member.id)}
                         isDnd={isDndActive?.(member)}
                               size="xs"
-                              className="absolute bottom-0 right-0 ring-2 ring-[#1E2525]"
+                              className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#1E2525]"
                             />
                           </span>
                           <span className="min-w-0 flex-1 truncate">
@@ -4673,7 +4885,7 @@ const SlackShell = () => {
                           </span>
                           {hasDraft("dm", member.id || member._id) && (
                             <span
-                              className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                              className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
                               title="Draft message"
                             >
                               <i className="fa-solid fa-pen text-[8px]" />
@@ -4682,168 +4894,22 @@ const SlackShell = () => {
                           )}
                           {isConversationMuted("dm", member.id) && (
                             <i
-                              className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                              className="fa-solid fa-bell-slash text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 shrink-0"
                               title="Notifications muted"
                             />
                           )}
                           {isUnread && (
                             <span
-                              className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
+                              className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
                               title="Unread messages"
                             />
                           )}
-                          {/* DM action buttons: Read/unread toggle button visible ONLY on hover (or when menu is open) */}
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleDMRead(member, e)}
-                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                isMenuOpen ? "flex" : "hidden group-hover:flex"
-                              }`}
-                              title={
-                                isUnread ? "Mark as read" : "Mark as unread"
-                              }
-                            >
-                              <i
-                                className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`}
-                              />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveDMMenuId(
-                                  isMenuOpen ? null : member.id,
-                                );
-                              }}
-                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                isMenuOpen ? "flex" : "hidden group-hover:flex"
-                              }`}
-                              title="DM options"
-                            >
-                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                            </button>
                           </div>
-                        </div>
-
-                        {/* DM Context Menu */}
-                        {isMenuOpen && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-30"
-                              onClick={() => setActiveDMMenuId(null)}
-                            />
-                            <div
-                              className={`absolute right-2 ${openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"} z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5`}
-                            >
-                              {/* Toggle Read / Unread */}
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleDMRead(member, e)}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i
-                                  className={`fa-regular ${(unreadDMCounts[member.id?.toString()] || 0) > 0 ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`}
-                                />
-                                {(unreadDMCounts[member.id?.toString()] || 0) >
-                                0
-                                  ? "Mark as read"
-                                  : "Mark as unread"}
-                              </button>
-
-                              {/* Pin / Unpin */}
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleTogglePin("dm", member.id, e)
-                                }
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i className="fa-solid fa-thumbtack text-amber-400 w-3.5" />
-                                {isPinned
-                                  ? "Unpin conversation"
-                                  : "Pin conversation"}
-                              </button>
-
-                              {/* Hide */}
-                              <button
-                                type="button"
-                                onClick={(e) => handleHideDM(member.id, e)}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i className="fa-regular fa-eye-slash text-[#A5C9CA] w-3.5" />
-                                Hide conversation
-                              </button>
-
-                              {/* Archive chat */}
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleArchiveDM(member, e)}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                              >
-                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                                {archivedDMIds.has((member.id || member._id)?.toString()) ? "Unarchive chat" : "Archive chat"}
-                              </button>
-
-                              {/* Mute */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveDMMenuId(null);
-                                  toggleMuteConversation("dm", member.id);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i
-                                  className={`fa-solid ${
-                                    isConversationMuted("dm", member.id)
-                                      ? "fa-bell text-amber-400"
-                                      : "fa-bell-slash text-[#A5C9CA]"
-                                  } w-3.5`}
-                                />
-                                {isConversationMuted("dm", member.id)
-                                  ? "Unmute notifications"
-                                  : "Mute notifications"}
-                              </button>
-
-                              <div className="h-px bg-[#395B64]/50 my-1" />
-
-                              {/* Block */}
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleToggleBlockUser(member, e)
-                                }
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-400 hover:bg-[#395B64] transition"
-                              >
-                                <i
-                                  className={`fa-solid ${blockedUserIds.has((member.id || member._id)?.toString()) ? "fa-unlock" : "fa-ban"} w-3.5`}
-                                />
-                                {blockedUserIds.has(
-                                  (member.id || member._id)?.toString(),
-                                )
-                                  ? "Unblock user"
-                                  : "Block user"}
-                              </button>
-
-                              {/* Delete */}
-                              <button
-                                type="button"
-                                onClick={(e) => handleDeleteDMClick(member, e)}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                              >
-                                <i className="fa-solid fa-trash-can w-3.5" />
-                                Delete conversation
-                              </button>
-                            </div>
-                          </>
-                        )}
                       </div>
                     );
                   })
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                  <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
                     No members yet
                   </div>
                 )}
@@ -4856,15 +4922,16 @@ const SlackShell = () => {
             <SidebarSectionHeader
               title="Spaces"
               isCollapsed={isSpacesCollapsed}
-              onToggle={() => setIsSpacesCollapsed((prev) => !prev)}
-              count={totalUnreadSpacesCount}
-              countBadgeClass="bg-emerald-600/90"
+              onToggle={() => {
+                setIsSpacesCollapsed((prev) => !prev);
+                setActiveSecondaryPanel("spaces");
+              }}
               actionButton={
                 isSuperAdmin && (
                   <button
                     type="button"
                     onClick={() => setShowCreateSpaceModal(true)}
-                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition"
+                    className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64]/20 dark:hover:bg-[#395B64] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white text-xs transition"
                     title="Create space"
                   >
                     <i className="fa-solid fa-plus" />
@@ -4876,7 +4943,7 @@ const SlackShell = () => {
             {!isSpacesCollapsed && (
               <div className="space-y-0.5 pt-1">
                 {activeSpaces.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                  <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
                     {isSuperAdmin ? (
                       <div className="flex flex-col items-center gap-1.5">
                         <span>No Spaces yet</span>
@@ -4896,6 +4963,7 @@ const SlackShell = () => {
                   activeSpaces.map((sp) => {
                     const spId = (sp._id || sp.id)?.toString();
                     const isActive =
+                      activeSecondaryPanel !== "home" &&
                       selectedSpace &&
                       (selectedSpace._id || selectedSpace.id)?.toString() ===
                         spId;
@@ -4919,30 +4987,28 @@ const SlackShell = () => {
                               handleSelectSpace(sp);
                             }
                           }}
-                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                          className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
                             isActive
-                              ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                              ? "bg-[#395B64] text-white font-semibold"
                               : isUnread
-                                ? "text-white font-semibold hover:bg-[#2C3333]"
-                                : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                                ? "text-[#1A2525] dark:text-white font-semibold hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333]"
+                                : "text-[#52656A] dark:text-[#A5C9CA]/90 hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
                           }`}
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <span className="text-amber-400 text-xs w-3.5 text-center flex-shrink-0">
-                              ✦
-                            </span>
+                            <i className={`fa-solid fa-table-cells-large text-xs w-3.5 text-center flex-shrink-0 ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-sm leading-tight">
                                 {sp.name}
                               </div>
-                              <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
+                              <div className={`text-[11px] font-medium leading-tight ${isActive ? "text-white/85" : "text-[#4A5D61] dark:text-[#A5C9CA]"}`}>
                                 {memberCount}{" "}
                                 {memberCount === 1 ? "member" : "members"}
                               </div>
                             </div>
                             {hasDraft("space", spId) && (
                               <span
-                                className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
                                 title="Draft message"
                               >
                                 <i className="fa-solid fa-pen text-[8px]" />
@@ -4951,173 +5017,19 @@ const SlackShell = () => {
                             )}
                             {isConversationMuted("space", spId) && (
                               <i
-                                className="fa-solid fa-bell-slash text-[10px] text-[#A5C9CA]/60 shrink-0"
+                                className="fa-solid fa-bell-slash text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 shrink-0"
                                 title="Notifications muted"
                               />
                             )}
                             {isUnread && (
                               <span
-                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"
+                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
                                 title="Unread messages"
                               />
                             )}
                           </div>
 
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleSpaceRead(sp, e)}
-                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                isMenuOpen ? "flex" : "hidden group-hover:flex"
-                              }`}
-                              title={
-                                isUnread ? "Mark as read" : "Mark as unread"
-                              }
-                            >
-                              <i
-                                className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[11px]`}
-                              />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveSpaceForAction(
-                                  isMenuOpen
-                                    ? null
-                                    : { type: "menu", id: spId, space: sp },
-                                );
-                              }}
-                              className="h-5 w-5 shrink-0 flex items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition"
-                              title="Space options"
-                            >
-                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                            </button>
                           </div>
-                        </div>
-
-                        {isMenuOpen && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-30"
-                              onClick={() => setActiveSpaceForAction(null)}
-                            />
-                            <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  handleToggleSpaceRead(sp, e);
-                                  setActiveSpaceForAction(null);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i
-                                  className={`fa-regular ${isUnread ? "fa-envelope-open" : "fa-envelope"} text-[#A5C9CA] w-3.5`}
-                                />
-                                {isUnread ? "Mark as read" : "Mark as unread"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleTogglePin("space", spId, e)
-                                }
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i className="fa-solid fa-thumbtack text-amber-400 w-3.5" />
-                                {isPinned
-                                  ? "Unpin conversation"
-                                  : "Pin conversation"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveSpaceForAction(null);
-                                  toggleMuteConversation("space", spId);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i
-                                  className={`fa-solid ${
-                                    isConversationMuted("space", spId)
-                                      ? "fa-bell text-amber-400"
-                                      : "fa-bell-slash text-[#A5C9CA]"
-                                  } w-3.5`}
-                                />
-                                {isConversationMuted("space", spId)
-                                  ? "Unmute notifications"
-                                  : "Mute notifications"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleCopyConversationLink("space", spId, e)
-                                }
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i className="fa-solid fa-link text-[#A5C9CA] w-3.5" />
-                                Copy link
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleArchiveSpace(sp, e)}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                              >
-                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                                {archivedSpaceIds.has(spId) ? "Unarchive chat" : "Archive chat"}
-                              </button>
-                              <div className="h-px bg-[#395B64]/50 my-1" />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveSpaceForAction(sp);
-                                  setShowManageSpaceMembersModal(true);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                              >
-                                <i className="fa-solid fa-users text-[#A5C9CA] w-3.5" />
-                                {isSuperAdmin
-                                  ? "Manage Members"
-                                  : "View Members"}
-                              </button>
-                              {isSuperAdmin ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveSpaceForAction(sp);
-                                      setShowEditSpaceModal(true);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#E7F6F2] hover:bg-[#395B64] transition"
-                                  >
-                                    <i className="fa-solid fa-pen text-[#A5C9CA] w-3.5" />
-                                    Edit Space
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveSpaceForAction(sp);
-                                      setShowDeleteSpaceModal(true);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition"
-                                  >
-                                    <i className="fa-solid fa-trash text-rose-400 w-3.5" />
-                                    Delete Space
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleLeaveSpace(sp, e)}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-400 hover:bg-rose-950/40 transition"
-                                >
-                                  <i className="fa-solid fa-arrow-right-from-bracket w-3.5" />
-                                  Leave Space
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        )}
                       </div>
                     );
                   })
@@ -5131,9 +5043,12 @@ const SlackShell = () => {
             <SidebarSectionHeader
               title="Groups"
               isCollapsed={isGroupsCollapsed}
-              onToggle={() => setIsGroupsCollapsed((prev) => !prev)}
+              onToggle={() => {
+                setIsGroupsCollapsed((prev) => !prev);
+                setActiveSecondaryPanel("groups");
+              }}
               icon={
-                <i className="fa-solid fa-users text-[11px] text-[#A5C9CA]/80 group-hover:text-white" />
+                <i className="fa-solid fa-users text-[11px] text-[#52656A] dark:text-[#A5C9CA]/80 group-hover:text-[#2C3333] dark:group-hover:text-white" />
               }
               count={0}
               actionButton={
@@ -5144,7 +5059,7 @@ const SlackShell = () => {
                     setShowCreateGroupModal(true);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#A5C9CA] hover:text-white text-xs transition cursor-pointer"
+                  className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64] text-[#52656A] dark:text-[#A5C9CA] hover:text-white text-xs transition cursor-pointer"
                   title="Create group"
                 >
                   <i className="fa-solid fa-plus pointer-events-none" />
@@ -5155,7 +5070,7 @@ const SlackShell = () => {
             {!isGroupsCollapsed && (
               <div className="space-y-0.5 pt-1">
                 {activeGroups.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[#395B64] p-3 text-center text-xs text-[#A5C9CA]">
+                  <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
                     <div className="flex flex-col items-center gap-1.5">
                       <span>No Groups yet</span>
                       <button
@@ -5174,6 +5089,7 @@ const SlackShell = () => {
                   activeGroups.map((grp) => {
                     const grpId = (grp._id || grp.id)?.toString();
                     const isActive =
+                      activeSecondaryPanel !== "home" &&
                       selectedGroup &&
                       (selectedGroup._id || selectedGroup.id)?.toString() ===
                         grpId;
@@ -5192,26 +5108,26 @@ const SlackShell = () => {
                               handleSelectGroup(grp);
                             }
                           }}
-                          className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-left text-sm font-medium transition cursor-pointer ${
+                          className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
                             isActive
-                              ? "bg-[#395B64] text-white shadow-xs font-semibold"
-                              : "text-[#A5C9CA]/90 hover:bg-[#2C3333] hover:text-white"
+                              ? "bg-[#395B64] text-white font-semibold"
+                              : "text-[#52656A] dark:text-[#A5C9CA]/90 hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
                           }`}
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <i className="fa-solid fa-user-group text-xs w-3.5 text-center flex-shrink-0 text-[#A5C9CA]" />
+                            <i className={`fa-solid fa-user-group text-xs w-3.5 text-center flex-shrink-0 ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-sm leading-tight">
                                 {grp.name}
                               </div>
-                              <div className="text-[11px] text-[#A5C9CA]/70 font-normal leading-tight">
+                              <div className={`text-[11px] font-medium leading-tight ${isActive ? "text-white/85" : "text-[#4A5D61] dark:text-[#A5C9CA]"}`}>
                                 {memberCount}{" "}
                                 {memberCount === 1 ? "member" : "members"}
                               </div>
                             </div>
                             {hasDraft("group", grpId) && (
                               <span
-                                className="text-[10px] text-amber-400 font-semibold italic flex items-center gap-1 shrink-0"
+                                className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
                                 title="Draft message"
                               >
                                 <i className="fa-solid fa-pen text-[8px]" />
@@ -5219,44 +5135,7 @@ const SlackShell = () => {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveGroupMenuId(isMenuOpen ? null : grpId);
-                              }}
-                              className={`h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[#2C3333] text-[#A5C9CA] hover:text-white transition ${
-                                isMenuOpen ? "flex" : "hidden group-hover:flex"
-                              }`}
-                              title="Group options"
-                            >
-                              <i className="fa-solid fa-ellipsis-vertical text-[11px]" />
-                            </button>
                           </div>
-                        </div>
-
-                        {isMenuOpen && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-30"
-                              onClick={() => setActiveGroupMenuId(null)}
-                            />
-                            <div className="absolute right-2 top-[calc(100%+4px)] z-40 w-48 rounded-xl border border-[#395B64] bg-[#2C3333] p-1.5 shadow-xl text-xs space-y-0.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  setActiveGroupMenuId(null);
-                                  handleToggleArchiveGroup(grp, e);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-amber-300 hover:bg-[#395B64] transition cursor-pointer"
-                              >
-                                <i className="fa-solid fa-box-archive text-amber-400 w-3.5" />
-                                {archivedGroupIds.has(grpId) ? "Unarchive chat" : "Archive chat"}
-                              </button>
-                            </div>
-                          </>
-                        )}
                       </div>
                     );
                   })
@@ -5267,7 +5146,11 @@ const SlackShell = () => {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col bg-[#F8FAFB] dark:bg-[#121717] transition-colors">
+      {/* ── COLUMN 2: Secondary List Panel ───────────────────────── */}
+      {renderSecondaryPanel()}
+
+      {/* ── COLUMN 3: Conversation / Main View ─────────────────────── */}
+      <main className="flex min-w-0 flex-1 flex-col bg-[#F4F6F6] dark:bg-[#121717] transition-colors">
         {!selectedDMUser &&
           !isStarredView &&
           !isMentionsView &&
@@ -5275,27 +5158,27 @@ const SlackShell = () => {
           !isHomeView &&
           !selectedSpace &&
           !selectedGroup && (
-            <header className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-3 sm:px-6 shadow-xs select-none transition-colors gap-2">
-              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <header className="flex h-12 items-center justify-between border-b border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-3 sm:px-4 select-none transition-colors gap-2 flex-shrink-0">
+              <div className="flex min-w-0 items-center gap-2">
                 {/* Hamburger — mobile only */}
                 <button
                   type="button"
                   onClick={() => setIsMobileSidebarOpen(true)}
-                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F1F5F4] dark:hover:bg-[#2C3333] transition md:hidden"
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition-colors md:hidden"
                   aria-label="Open sidebar"
                 >
                   <i className="fa-solid fa-bars text-sm" />
                 </button>
 
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
                   {currentChannel?.type === "PRIVATE" ? (
-                    <i className="fa-solid fa-lock text-sm text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0" />
+                    <i className="fa-solid fa-lock text-xs text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0" />
                   ) : (
-                    <span className="text-lg font-bold text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0">
+                    <span className="text-base font-bold text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0">
                       #
                     </span>
                   )}
-                  <h1 className="truncate text-base font-bold text-[#2C3333] dark:text-white">
+                  <h1 className="truncate text-sm font-semibold text-[#2C3333] dark:text-white">
                     {currentChannel?.name || "general"}
                   </h1>
                 </div>
@@ -5316,7 +5199,7 @@ const SlackShell = () => {
                   <button
                     type="button"
                     onClick={() => handleToggleArchiveChannel(currentChannel)}
-                    className="flex-shrink-0 text-[#52656A] dark:text-[#A5C9CA] hover:text-amber-500 p-1 text-xs transition cursor-pointer"
+                    className="flex-shrink-0 text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-[#A5C9CA] p-1 text-xs transition cursor-pointer"
                     title="Archive this channel"
                   >
                     <i className="fa-solid fa-box-archive" />
@@ -5324,7 +5207,7 @@ const SlackShell = () => {
                 )}
 
                 {currentChannel?.isArchived && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#395B64]/15 text-[#395B64] dark:text-[#A5C9CA] border border-[#395B64]/30 shrink-0">
                     <i className="fa-solid fa-box-archive text-[10px]" />
                     <span>Archived</span>
                   </span>
@@ -5334,7 +5217,7 @@ const SlackShell = () => {
                   <button
                     type="button"
                     onClick={() => handleToggleArchiveChannel(currentChannel)}
-                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 border border-amber-500/40 transition cursor-pointer shrink-0"
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-semibold bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#395B64]/30 border border-[#395B64]/40 transition cursor-pointer shrink-0"
                     title="Unarchive this channel"
                   >
                     <i className="fa-solid fa-box-archive text-xs" />
@@ -5349,28 +5232,17 @@ const SlackShell = () => {
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
-                <StatusSelector align="right" />
-                <button
-                  type="button"
-                  onClick={() => setShowMembersPanel(true)}
-                  className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition"
-                  title="View members"
-                >
-                  <i className="fa-solid fa-users text-xs" />
-                  <span>{workspaceMembers.length}</span>
-                </button>
-
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 {/* Channel Search Button */}
                 <button
                   type="button"
                   onClick={() => setShowChannelSearch((prev) => !prev)}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                  className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
                     showChannelSearch
                       ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
-                      : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+                      : "border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#242D2D] text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
                   }`}
-                  title="Find in this channel"
+                  title="Search in channel"
                 >
                   <i className="fa-solid fa-magnifying-glass text-xs" />
                   <span className="hidden sm:inline">Search</span>
@@ -5380,17 +5252,17 @@ const SlackShell = () => {
                 <button
                   type="button"
                   onClick={() => setShowChannelFilesGallery((prev) => !prev)}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                  className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
                     showChannelFilesGallery
                       ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
-                      : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+                      : "border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#242D2D] text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
                   }`}
-                  title="Shared files in this channel"
+                  title="Shared files"
                 >
                   <i className="fa-solid fa-folder-open text-xs" />
                   <span className="hidden sm:inline">Files</span>
                   {channelFilesCount > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                       {channelFilesCount}
                     </span>
                   )}
@@ -5400,17 +5272,17 @@ const SlackShell = () => {
                 <button
                   type="button"
                   onClick={() => setShowChannelPinnedDrawer((prev) => !prev)}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                  className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
                     showChannelPinnedDrawer
                       ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
-                      : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+                      : "border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#242D2D] text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
                   }`}
-                  title="Pinned messages in this channel"
+                  title="Pinned messages"
                 >
                   <i className="fa-solid fa-thumbtack text-xs" />
                   <span className="hidden sm:inline">Pinned</span>
                   {safeChannelPinned.length > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] px-1 text-[10px] font-bold">
                       {safeChannelPinned.length}
                     </span>
                   )}
@@ -5418,29 +5290,15 @@ const SlackShell = () => {
 
                 <button
                   type="button"
-onClick={() => setShowDetailsPane((prev) => !prev)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                  onClick={() => setShowDetailsPane((prev) => !prev)}
+                  className={`flex h-7 w-7 items-center justify-center rounded border transition-colors ${
                     showDetailsPane
                       ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
-                      : "border-[#A5C9CA]/40 dark:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D] hover:text-[#2C3333] dark:hover:text-white"
+                      : "border-[#D8E2E1] dark:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
                   }`}
                   title="Channel details"
                 >
-                  <i className="fa-solid fa-circle-info text-sm" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition shadow-xs"
-                  title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-                  aria-label="Toggle theme"
-                >
-                  {isDark ? (
-                    <FiSun className="text-sm text-amber-400" />
-                  ) : (
-                    <FiMoon className="text-sm text-[#395B64]" />
-                  )}
+                  <i className="fa-solid fa-circle-info text-xs" />
                 </button>
               </div>
             </header>
@@ -6219,7 +6077,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
                     setShowMembersPanel(false);
                     setShowInviteModal(true);
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#395B64] py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#2C3333] transition"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#395B64] py-2 text-xs font-semibold text-white hover:bg-[#2C3333] transition"
                 >
                   <i className="fa-solid fa-user-plus text-[11px]" />
                   Invite new member
@@ -6240,7 +6098,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
                 return (
                   <div
                     key={member.id}
-                    className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#242D2D] p-3 hover:border-[#A5C9CA] dark:hover:border-[#395B64] transition shadow-xs cursor-pointer"
+                    className="flex items-center gap-3 rounded-xl border border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#242D2D] p-3 hover:border-[#A5C9CA] dark:hover:border-[#395B64] transition cursor-pointer"
                     onClick={() => setViewingProfileUser(member)}
                   >
                     <div className="relative flex-shrink-0">
@@ -6283,7 +6141,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                           member.role === "OWNER"
-                            ? "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300"
+                            ? "bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
                             : member.role === "ADMIN"
                               ? "bg-[#E7F6F2] dark:bg-[#395B64]/50 text-[#395B64] dark:text-[#A5C9CA]"
                               : "bg-slate-100 dark:bg-[#2C3333] text-slate-700 dark:text-[#A5C9CA]"
@@ -6359,14 +6217,14 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
             onClick={() => setShowNewChatModal(false)}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div className="pointer-events-auto w-full max-w-sm rounded-2xl border border-[#395B64] bg-[#1E2525] shadow-2xl overflow-hidden">
+            <div className="pointer-events-auto w-full max-w-sm rounded-2xl border border-[#D8E2E1] dark:border-[#395B64] bg-white dark:bg-[#1E2525] shadow-2xl overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#2C3333]">
-                <h2 className="text-base font-bold text-white">New chat</h2>
+              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#D8E2E1] dark:border-[#2C3333]">
+                <h2 className="text-base font-bold text-[#2C3333] dark:text-white">New chat</h2>
                 <button
                   type="button"
                   onClick={() => setShowNewChatModal(false)}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white transition"
                 >
                   <i className="fa-solid fa-xmark text-sm" />
                 </button>
@@ -6374,15 +6232,15 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
 
               {/* Search */}
               <div className="px-4 py-3">
-                <div className="flex items-center gap-2 rounded-xl bg-[#2C3333] px-3 py-2 border border-[#395B64]/40">
-                  <i className="fa-solid fa-magnifying-glass text-[#A5C9CA] text-xs" />
+                <div className="flex items-center gap-2 rounded-xl bg-[#F4F7F6] dark:bg-[#2C3333] px-3 py-2 border border-[#D8E2E1] dark:border-[#395B64]/40">
+                  <i className="fa-solid fa-magnifying-glass text-[#52656A] dark:text-[#A5C9CA] text-xs" />
                   <input
                     type="text"
                     placeholder="Search people..."
                     value={newChatSearch}
                     onChange={(e) => setNewChatSearch(e.target.value)}
                     autoFocus
-                    className="flex-1 bg-transparent text-sm text-[#E7F6F2] placeholder-[#A5C9CA]/60 outline-none"
+                    className="flex-1 bg-transparent text-sm text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#52656A]/60 dark:placeholder-[#A5C9CA]/60 outline-none"
                   />
                 </div>
               </div>
@@ -6406,7 +6264,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
                         setShowNewChatModal(false);
                         navigate(`/app/workspace/${workspaceId}`);
                       }}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[#2C3333] transition"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] transition-colors"
                     >
                       <span className="relative flex-shrink-0">
                         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#395B64] text-sm font-bold text-white overflow-hidden">
@@ -6428,10 +6286,10 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
                         />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-[#E7F6F2]">
+                        <div className="truncate text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2]">
                           {member.username}
                         </div>
-                        <div className="truncate text-xs text-[#A5C9CA]">
+                        <div className="truncate text-xs text-[#52656A] dark:text-[#A5C9CA]">
                           {member.email}
                         </div>
                       </div>
@@ -6449,7 +6307,7 @@ onClick={() => setShowDetailsPane((prev) => !prev)}
                       ?.toLowerCase()
                       .includes(newChatSearch.toLowerCase()),
                 ).length === 0 && (
-                  <div className="py-6 text-center text-sm text-[#A5C9CA]">
+                  <div className="py-6 text-center text-sm text-[#52656A] dark:text-[#A5C9CA]">
                     No members found
                   </div>
                 )}

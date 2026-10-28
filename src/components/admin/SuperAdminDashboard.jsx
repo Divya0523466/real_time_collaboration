@@ -608,167 +608,215 @@ const SuperAdminDashboard = () => {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] font-sans antialiased overflow-hidden">
-      
-      {/* ── Mobile Sidebar Backdrop ───────────────────────────────────────── */}
-      {isMobileSidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
-      )}
+    <div className="flex h-screen w-full flex-col bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] font-sans antialiased overflow-hidden transition-colors">
 
-      {/* ── Left Sidebar ─────────────────────────────────────────────────── */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#1E2525] text-white border-r border-[#2C3333] transition-transform duration-200 md:static md:translate-x-0 ${
-          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Brand */}
-        <div className="p-4 sm:p-5 border-b border-[#2C3333]">
-          <div className="flex items-center justify-between">
-            <h1 className="text-base font-semibold text-white flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64] text-sm font-semibold text-[#E7F6F2]">
-                <i className="fa-solid fa-layer-group" />
-              </span>
-              <span>WorkNest</span>
-            </h1>
-            <button
-              type="button"
-              onClick={() => setIsMobileSidebarOpen(false)}
-              className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white transition cursor-pointer"
-              aria-label="Close sidebar"
-            >
-              <i className="fa-solid fa-xmark text-base" />
-            </button>
-          </div>
-          <div className="mt-2 text-[11px] font-medium tracking-wide text-[#A5C9CA]/90 uppercase">
-            Super Admin Panel
+      {/* ── Top Full-Width Global Header ───────────────────────────────────── */}
+      <header className="flex h-14 w-full items-center justify-between border-b border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#1A2121] px-4 sm:px-6 shadow-xs z-30 flex-shrink-0 text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
+        {/* Left: Mobile Toggle & WorkNest Logo + Name + Super Admin Panel */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg border border-[#D8E2E1] dark:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition cursor-pointer"
+            aria-label="Open sidebar"
+          >
+            <i className="fa-solid fa-bars text-sm" />
+          </button>
+
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64] text-white shadow-xs flex-shrink-0">
+              <i className="fa-solid fa-layer-group text-sm" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-[#2C3333] dark:text-white leading-tight truncate">
+                WorkNest
+              </h1>
+              <p className="text-[11px] font-medium tracking-wide text-[#52656A] dark:text-[#A5C9CA] truncate uppercase">
+                Super Admin Panel
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 p-3 sm:p-4 space-y-1.5">
-          <div className="text-[11px] font-medium text-[#A5C9CA]/70 uppercase tracking-wider px-2.5 mb-2">
-            Navigation
-          </div>
-
+        {/* Right: Theme Toggle + Profile */}
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
           <button
             type="button"
-            onClick={() => {
-              setActiveTab("dashboard")
-              setIsMobileSidebarOpen(false)
-            }}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
-              activeTab === "dashboard"
-                ? "bg-[#395B64] text-white shadow-xs"
-                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-            }`}
+            onClick={toggleTheme}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white transition-colors cursor-pointer"
+            title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
           >
-            <i className="fa-solid fa-gauge-high w-5 text-center text-sm text-[#A5C9CA]" />
-            <span className="flex-1">Dashboard</span>
+            {isDark ? <FiSun className="text-sm text-[#395B64] dark:text-white" /> : <FiMoon className="text-sm text-[#52656A] dark:text-[#A5C9CA]" />}
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("users")
-              setIsMobileSidebarOpen(false)
-            }}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
-              activeTab === "users"
-                ? "bg-[#395B64] text-white shadow-xs"
-                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-            }`}
-          >
-            <i className="fa-solid fa-users w-5 text-center text-sm text-[#A5C9CA]" />
-            <span className="flex-1">Users</span>
-            {totalUsersCount > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2C3333] px-1.5 text-xs font-medium text-[#A5C9CA]">
-                {totalUsersCount}
-              </span>
-            )}
-          </button>
+          <div className="w-px h-5 bg-[#D8E2E1] dark:bg-[#395B64]/50 hidden sm:block" />
 
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("workspaces")
-              setIsMobileSidebarOpen(false)
-            }}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
-              activeTab === "workspaces"
-                ? "bg-[#395B64] text-white shadow-xs"
-                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-            }`}
-          >
-            <i className="fa-solid fa-house w-5 text-center text-sm text-[#A5C9CA]" />
-            <span className="flex-1">Workspaces</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("spaces")
-              setIsMobileSidebarOpen(false)
-            }}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
-              activeTab === "spaces"
-                ? "bg-[#395B64] text-white shadow-xs"
-                : "text-[#A5C9CA] hover:bg-[#2C3333] hover:text-white"
-            }`}
-          >
-            <i className="fa-solid fa-table-cells-large w-5 text-center text-sm text-[#A5C9CA]" />
-            <span className="flex-1">Spaces</span>
-            {spaces.length > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2C3333] px-1.5 text-xs font-medium text-[#A5C9CA]">
-                {spaces.length}
-              </span>
-            )}
-          </button>
-        </nav>
-
-        {/* Bottom Section: Profile & Logout */}
-        <div className="p-3 sm:p-4 border-t border-[#2C3333] space-y-2.5">
+          {/* User Profile (Borderless, clean hover) */}
           {user && (
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#2C3333]/60 group">
-              <div className="w-9 h-9 rounded-full bg-[#395B64] text-[#E7F6F2] font-semibold text-sm flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowProfileModal(true)}
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer text-left select-none"
+              title="Profile"
+            >
+              <div className="w-8 h-8 rounded-full bg-[#395B64] text-white font-semibold text-xs flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {user.avatar ? (
                   <img src={user.avatar} alt={user.username} className="h-full w-full object-cover" />
                 ) : (
-                  user.username?.charAt(0)?.toUpperCase() || "U"
+                  user.username?.charAt(0)?.toUpperCase() || "A"
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{user.username}</p>
-                <p className="text-xs text-[#A5C9CA] truncate">{user.email}</p>
+              <div className="hidden sm:flex flex-col min-w-0">
+                <span className="text-xs font-semibold text-[#2C3333] dark:text-white truncate max-w-[120px] leading-tight">
+                  {user.username}
+                </span>
+                <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] truncate max-w-[120px] leading-tight font-medium">
+                  Super Admin
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowProfileModal(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#A5C9CA] hover:text-white hover:bg-[#395B64] transition cursor-pointer"
-                title="Edit Profile"
-              >
-                <i className="fa-solid fa-pen-to-square text-xs" />
-              </button>
-            </div>
+            </button>
           )}
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium text-rose-400 hover:bg-rose-950/40 transition flex items-center gap-2.5 cursor-pointer"
-          >
-            <i className="fa-solid fa-arrow-right-from-bracket text-sm" /> Logout
-          </button>
         </div>
-      </aside>
+      </header>
 
-      {/* ── Main Content Area ────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* ── 2-Column Body Container (Sidebar + Content) ────────────────────── */}
+      <div className="flex flex-1 w-full min-h-0 overflow-hidden">
         
-        {/* Main Tab Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
+        {/* Mobile Backdrop */}
+        {isMobileSidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        )}
+
+        {/* ── Left Sidebar (Light in light mode, Dark in dark mode) ─────────── */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white dark:bg-[#1E2525] text-[#2C3333] dark:text-[#E7F6F2] border-r border-[#D8E2E1] dark:border-[#2C3333] transition-transform duration-200 md:static md:translate-x-0 ${
+            isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          {/* Mobile close bar */}
+          <div className="md:hidden flex items-center justify-between p-4 border-b border-[#D8E2E1] dark:border-[#2C3333]">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#395B64] text-xs font-semibold text-white">
+                <i className="fa-solid fa-layer-group" />
+              </span>
+              <span className="text-sm font-bold text-[#2C3333] dark:text-white">WorkNest</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] transition cursor-pointer"
+              aria-label="Close sidebar"
+            >
+              <i className="fa-solid fa-xmark text-sm" />
+            </button>
+          </div>
+
+          {/* Navigation Items */}
+          <nav className="flex-1 p-3 sm:p-4 space-y-1">
+            <div className="text-[11px] font-bold text-[#52656A] dark:text-[#A5C9CA]/70 uppercase tracking-wider px-2.5 mb-2">
+              Navigation
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("dashboard")
+                setIsMobileSidebarOpen(false)
+              }}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
+                activeTab === "dashboard"
+                  ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
+              }`}
+            >
+              <i className={`fa-solid fa-gauge-high w-5 text-center text-sm ${activeTab === "dashboard" ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
+              <span className="flex-1">Dashboard</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("users")
+                setIsMobileSidebarOpen(false)
+              }}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
+                activeTab === "users"
+                  ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
+              }`}
+            >
+              <i className={`fa-solid fa-users w-5 text-center text-sm ${activeTab === "users" ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
+              <span className="flex-1">Users</span>
+              {totalUsersCount > 0 && (
+                <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-medium ${
+                  activeTab === "users"
+                    ? "bg-white/20 text-white"
+                    : "bg-[#EAEFEF] dark:bg-[#2C3333] text-[#52656A] dark:text-[#A5C9CA]"
+                }`}>
+                  {totalUsersCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("workspaces")
+                setIsMobileSidebarOpen(false)
+              }}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
+                activeTab === "workspaces"
+                  ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
+              }`}
+            >
+              <i className={`fa-solid fa-house w-5 text-center text-sm ${activeTab === "workspaces" ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
+              <span className="flex-1">Workspaces</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("spaces")
+                setIsMobileSidebarOpen(false)
+              }}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
+                activeTab === "spaces"
+                  ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
+              }`}
+            >
+              <i className={`fa-solid fa-table-cells-large w-5 text-center text-sm ${activeTab === "spaces" ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
+              <span className="flex-1">Spaces</span>
+              {spaces.length > 0 && (
+                <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-medium ${
+                  activeTab === "spaces"
+                    ? "bg-white/20 text-white"
+                    : "bg-[#EAEFEF] dark:bg-[#2C3333] text-[#52656A] dark:text-[#A5C9CA]"
+                }`}>
+                  {spaces.length}
+                </span>
+              )}
+            </button>
+          </nav>
+
+          {/* Bottom Section: Logout only */}
+          <div className="p-3 sm:p-4 border-t border-[#D8E2E1] dark:border-[#2C3333]">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition flex items-center gap-2.5 cursor-pointer"
+            >
+              <i className="fa-solid fa-arrow-right-from-bracket text-sm" /> Logout
+            </button>
+          </div>
+        </aside>
+
+        {/* ── Main Tab Content ────────────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8 bg-[#F8FAFB] dark:bg-[#121717]">
           
           {/* ═══════════════════════════════════════════════════════════════
               TAB 1: DASHBOARD
@@ -777,35 +825,14 @@ const SuperAdminDashboard = () => {
             <div className="max-w-6xl mx-auto space-y-8">
               
               {/* Top Header */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileSidebarOpen(true)}
-                    className="md:hidden mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333]"
-                    aria-label="Open sidebar"
-                  >
-                    <i className="fa-solid fa-bars text-lg" />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl font-semibold text-[#2C3333] dark:text-white tracking-tight">
-                      Dashboard
-                    </h1>
-                    <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
-                      Overview of WorkNest Platform
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/80 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs cursor-pointer flex-shrink-0"
-                    title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-                  >
-                    {isDark ? <FiSun className="text-amber-400 text-sm" /> : <FiMoon className="text-[#395B64] text-sm" />}
-                  </button>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
+                    Dashboard
+                  </h1>
+                  <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+                    Overview of WorkNest Platform
+                  </p>
                 </div>
               </div>
 
@@ -813,7 +840,7 @@ const SuperAdminDashboard = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                 
                 {/* 1. Total Users */}
-                <div className="rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition">
+                <div className="rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
                       Total Users
@@ -829,7 +856,7 @@ const SuperAdminDashboard = () => {
                 </div>
 
                 {/* 2. Active Users */}
-                <div className="rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition">
+                <div className="rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
                       Active Users
@@ -845,7 +872,7 @@ const SuperAdminDashboard = () => {
                 </div>
 
                 {/* 3. Inactive Users */}
-                <div className="rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition">
+                <div className="rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
                       Inactive Users
@@ -863,7 +890,7 @@ const SuperAdminDashboard = () => {
                 {/* 4. Total Spaces */}
                 <div
                   onClick={() => setActiveTab("spaces")}
-                  className="rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition cursor-pointer group"
+                  className="rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-5 sm:p-6 shadow-xs hover:border-[#395B64]/40 dark:hover:border-[#A5C9CA]/40 transition cursor-pointer group"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
@@ -896,7 +923,7 @@ const SuperAdminDashboard = () => {
                   </button>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] shadow-xs overflow-hidden divide-y divide-gray-100 dark:divide-[#2C3333]">
+                <div className="rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] shadow-xs overflow-hidden divide-y divide-gray-100 dark:divide-[#2C3333]">
                   {recentUsers.length === 0 ? (
                     <div className="p-8 text-center text-sm text-[#52656A] dark:text-[#A5C9CA]">
                       No users registered yet.
@@ -954,44 +981,24 @@ const SuperAdminDashboard = () => {
               
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileSidebarOpen(true)}
-                    className="md:hidden mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333]"
-                    aria-label="Open sidebar"
-                  >
-                    <i className="fa-solid fa-bars text-lg" />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl font-semibold text-[#2C3333] dark:text-white tracking-tight">
-                      Users
-                    </h1>
-                    <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
-                      Manage workspace members and their roles
-                    </p>
-                  </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
+                    Users
+                  </h1>
+                  <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+                    Manage workspace members and their roles
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="relative w-full sm:w-64">
-                    <input
-                      type="text"
-                      placeholder="Search users..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full h-9 px-3.5 rounded-xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] text-xs sm:text-sm text-[#2C3333] dark:text-white outline-none focus:border-[#395B64]"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/80 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs cursor-pointer flex-shrink-0"
-                    title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-                  >
-                    {isDark ? <FiSun className="text-amber-400 text-sm" /> : <FiMoon className="text-[#395B64] text-sm" />}
-                  </button>
+                <div className="relative w-full sm:w-72">
+                  <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[#52656A] dark:text-[#A5C9CA]" />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full h-9 pl-9 pr-3.5 rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/40 bg-white dark:bg-[#1E2525] text-xs sm:text-sm text-[#2C3333] dark:text-white outline-none focus:border-[#395B64]"
+                  />
                 </div>
               </div>
 
@@ -1022,11 +1029,11 @@ const SuperAdminDashboard = () => {
               </div>
 
               {/* Users Table */}
-              <div className="rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] shadow-xs overflow-hidden">
+              <div className="rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-sm table-fixed">
                     <thead>
-                      <tr className="border-b border-gray-200/80 dark:border-[#2C3333] text-[#52656A] dark:text-[#A5C9CA] uppercase tracking-wider font-semibold text-[11px]">
+                      <tr className="border-b border-[#D8E2E1] dark:border-[#2C3333] text-[#52656A] dark:text-[#A5C9CA] uppercase tracking-wider font-semibold text-[11px]">
                         <th className="py-3 px-4 w-[28%]">NAME</th>
                         <th className="py-3 px-4 w-[30%]">EMAIL</th>
                         <th className="py-3 px-4 w-[12%]">ROLE</th>
@@ -1150,34 +1157,24 @@ const SuperAdminDashboard = () => {
           {activeTab === "workspaces" && (
             <div className="max-w-6xl mx-auto space-y-8">
               
-              {/* Header matching screenshot */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileSidebarOpen(true)}
-                    className="md:hidden mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333]"
-                    aria-label="Open sidebar"
-                  >
-                    <i className="fa-solid fa-bars text-lg" />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl font-semibold text-[#2C3333] dark:text-white tracking-tight">
-                      Welcome back, {user?.username || "Admin"}
-                    </h1>
-                    <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
-                      Select a workspace below or create a new one to start collaborating.
-                    </p>
-                  </div>
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
+                    Workspaces
+                  </h1>
+                  <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+                    Select a workspace below or create a new one to start collaborating
+                  </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={toggleTheme}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/80 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs cursor-pointer flex-shrink-0"
-                  title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+                  onClick={() => setShowCreateWorkspaceModal(true)}
+                  className="rounded-xl bg-[#395B64] hover:bg-[#2C3333] text-white px-4 py-2 text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-2"
                 >
-                  {isDark ? <FiSun className="text-amber-400 text-sm" /> : <FiMoon className="text-[#395B64] text-sm" />}
+                  <i className="fa-solid fa-plus text-xs" />
+                  Create Workspace
                 </button>
               </div>
 
@@ -1188,7 +1185,7 @@ const SuperAdminDashboard = () => {
                     key={workspace.id || workspace._id}
                     type="button"
                     onClick={() => handleSelectWorkspace(workspace)}
-                    className="group rounded-2xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-6 text-left shadow-xs hover:border-[#395B64] dark:hover:border-[#395B64] hover:shadow-md transition flex flex-col justify-between cursor-pointer min-h-[180px]"
+                    className="group rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] p-6 text-left shadow-xs hover:border-[#395B64] dark:hover:border-[#395B64] hover:shadow-md transition flex flex-col justify-between cursor-pointer min-h-[180px]"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-4">
@@ -1238,46 +1235,27 @@ const SuperAdminDashboard = () => {
               
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileSidebarOpen(true)}
-                    className="md:hidden mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333]"
-                    aria-label="Open sidebar"
-                  >
-                    <i className="fa-solid fa-bars text-lg" />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
-                      Spaces
-                    </h1>
-                    <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
-                      Create and manage workspace channels
-                    </p>
-                  </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
+                    Spaces
+                  </h1>
+                  <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+                    Create and manage workspace spaces
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/80 dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition shadow-xs cursor-pointer flex-shrink-0"
-                    title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
-                  >
-                    {isDark ? <FiSun className="text-amber-400 text-sm" /> : <FiMoon className="text-[#395B64] text-sm" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateSpaceModal(true)}
-                    className="rounded-lg bg-[#00897b] hover:bg-[#00796b] text-white px-5 py-2.5 text-sm font-semibold transition cursor-pointer shadow-xs flex items-center gap-2"
-                  >
-                    Create Space
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateSpaceModal(true)}
+                  className="rounded-xl bg-[#395B64] hover:bg-[#2C3333] text-white px-4 py-2 text-xs font-semibold transition cursor-pointer shadow-xs flex items-center gap-2"
+                >
+                  <i className="fa-solid fa-plus text-xs" />
+                  Create Space
+                </button>
               </div>
 
               {/* Spaces Table (Image 2) */}
-              <div className="rounded-xl border border-gray-200/80 dark:border-[#2C3333] bg-white dark:bg-[#1E2525] shadow-xs overflow-hidden">
+              <div className="rounded-xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>

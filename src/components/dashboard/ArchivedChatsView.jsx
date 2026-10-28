@@ -189,7 +189,7 @@ const ArchivedChatsView = ({
                 <i className="fa-solid fa-bars text-sm" />
               </button>
             )}
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 dark:bg-amber-500/20 text-amber-500 shadow-xs flex-shrink-0">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] shadow-xs flex-shrink-0">
               <i className="fa-solid fa-box-archive text-sm" />
             </span>
             <div className="min-w-0">
@@ -207,7 +207,7 @@ const ArchivedChatsView = ({
         <div className="flex-1 overflow-y-auto divide-y divide-[#E0E7E6]/60 dark:divide-[#2C3333]/70">
           {allArchived.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 mb-3 border border-amber-500/20">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#395B64]/10 text-[#395B64] dark:text-[#A5C9CA] mb-3 border border-[#395B64]/30">
                 <i className="fa-solid fa-box-archive text-xl" />
               </span>
               <p className="text-sm font-semibold text-[#2C3333] dark:text-white mb-1">
@@ -321,16 +321,16 @@ const ArchivedChatsView = ({
         {selectedChat ? (
           <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
             {/* Mobile back navigation bar */}
-            <div className="md:hidden flex h-9 items-center gap-2 px-3 bg-amber-500/10 dark:bg-amber-500/15 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
+            <div className="md:hidden flex h-9 items-center gap-2 px-3 bg-amber-500/10 dark:bg-amber-500/15 border-b border-[#395B64]/30 text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setSelectedChat(null)}
-                className="flex h-6 w-6 items-center justify-center rounded text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 mr-1 flex-shrink-0 cursor-pointer"
+                className="flex h-6 w-6 items-center justify-center rounded text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#395B64]/20 mr-1 flex-shrink-0 cursor-pointer"
                 title="Back to archived list"
               >
                 <i className="fa-solid fa-arrow-left text-xs" />
               </button>
-              <i className="fa-solid fa-box-archive text-amber-500 text-xs flex-shrink-0" />
+              <i className="fa-solid fa-box-archive text-[#395B64] dark:text-[#A5C9CA] text-xs flex-shrink-0" />
               <span className="truncate font-medium text-[11px]">Archived conversation</span>
             </div>
 
@@ -401,7 +401,7 @@ const ArchivedChatsView = ({
         ) : (
           /* Empty state for Column 3 when no chat is selected */
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-500 mb-4 border border-amber-500/20">
+            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#395B64]/10 dark:bg-[#395B64]/20 text-[#395B64] dark:text-[#A5C9CA] mb-4 border border-[#395B64]/30">
               <i className="fa-solid fa-box-archive text-2xl" />
             </span>
             <h3 className="text-base font-bold text-[#2C3333] dark:text-white mb-1">

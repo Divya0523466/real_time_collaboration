@@ -240,32 +240,32 @@ const ChannelManagementPage = () => {
   };
 
   return (
-    <div className="flex h-screen w-full flex-col bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] overflow-hidden select-none">
+    <div className="flex h-screen w-full flex-col bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] overflow-hidden select-none transition-colors">
       {/* ── TOP FULL-WIDTH GLOBAL HEADER (Dark, matching chat shell header) ────── */}
-      <header className="flex h-14 w-full items-center justify-between border-b border-[#2C3333] bg-[#1A2121] px-4 sm:px-6 shadow-xs z-20 flex-shrink-0 text-white">
+      <header className="flex h-14 w-full items-center justify-between border-b border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#1A2121] px-4 sm:px-6 shadow-xs z-20 flex-shrink-0 text-[#2C3333] dark:text-white transition-colors">
         <div className="flex items-center gap-3 min-w-0">
           {/* Back button to workspace (clean arrow button) */}
           <button
             type="button"
             onClick={() => navigate(`/app/workspace/${workspaceId}`)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#395B64]/50 bg-[#242D2D] text-[#A5C9CA] hover:bg-[#2C3636] hover:text-white transition cursor-pointer"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#242D2D] text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white transition cursor-pointer"
             title="Back to Workspace"
           >
             <i className="fa-solid fa-arrow-left text-sm" />
           </button>
 
-          <div className="h-5 w-px bg-[#2C3333]" />
+          <div className="h-5 w-px bg-[#D8E2E1] dark:bg-[#2C3333]" />
 
           {/* Title and Workspace Name */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#395B64]/30 text-[#A5C9CA] shadow-xs flex-shrink-0">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#395B64]/15 dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] shadow-xs flex-shrink-0">
               <i className="fa-solid fa-users-gear text-sm" />
             </span>
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-bold text-white leading-tight truncate">
+              <h1 className="text-sm sm:text-base font-bold text-[#2C3333] dark:text-white leading-tight truncate">
                 Channel Management
               </h1>
-              <p className="text-[11px] text-[#A5C9CA]/75 truncate">
+              <p className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/75 truncate">
                 {workspaceData?.name || "Workspace"}
               </p>
             </div>
@@ -277,10 +277,10 @@ const ChannelManagementPage = () => {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#395B64]/50 bg-[#242D2D] text-[#A5C9CA] hover:bg-[#2C3636] hover:text-white transition cursor-pointer shadow-2xs"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#242D2D] text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white transition cursor-pointer shadow-2xs"
             title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
           >
-            {isDark ? <FiSun className="text-sm text-amber-400" /> : <FiMoon className="text-sm text-[#A5C9CA]" />}
+            {isDark ? <FiSun className="text-sm text-[#395B64] dark:text-white" /> : <FiMoon className="text-sm text-[#52656A] dark:text-[#A5C9CA]" />}
           </button>
         </div>
       </header>
@@ -291,20 +291,20 @@ const ChannelManagementPage = () => {
         <div
           className={`${
             selectedChannelId ? "hidden md:flex" : "flex"
-          } w-full md:w-80 lg:w-96 flex-col flex-shrink-0 border-r border-[#2C3333] bg-[#1E2525] text-[#E7F6F2] h-full transition-colors`}
+          } w-full md:w-80 lg:w-96 flex-col flex-shrink-0 border-r border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] text-[#2C3333] dark:text-[#E7F6F2] h-full transition-colors`}
         >
           {/* Channels Header */}
-          <div className="flex h-14 items-center justify-between border-b border-[#2C3333] px-5 flex-shrink-0 bg-[#1E2525]">
-            <h2 className="text-sm font-bold text-white tracking-wide">
+          <div className="flex h-14 items-center justify-between border-b border-[#D8E2E1] dark:border-[#2C3333] px-5 flex-shrink-0 bg-white dark:bg-[#1E2525]">
+            <h2 className="text-sm font-bold text-[#2C3333] dark:text-white tracking-wide">
               Channels
             </h2>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#2C3333] text-[#A5C9CA] border border-[#395B64]/30">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#F0F4F4] dark:bg-[#2C3333] text-[#395B64] dark:text-[#A5C9CA] border border-[#D8E2E1] dark:border-[#395B64]/30">
               {displayedChannels.length}
             </span>
           </div>
 
           {/* Filter Bar with Icons: All, Private, Public */}
-          <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[#2C3333] bg-[#1A2121]/80 flex-shrink-0">
+          <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[#D8E2E1] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121]/80 flex-shrink-0">
             {filterOptions.map((f) => {
               const isActive = channelFilter === f.id;
               const count =
@@ -322,7 +322,7 @@ const ChannelManagementPage = () => {
                   className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition cursor-pointer select-none ${
                     isActive
                       ? "bg-[#395B64] text-white shadow-xs"
-                      : "text-[#A5C9CA]/80 hover:bg-[#2C3333] hover:text-white"
+                      : "text-[#52656A] dark:text-[#A5C9CA]/80 hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
                   }`}
                   title={`Show ${f.label} Channels`}
                 >
@@ -330,7 +330,7 @@ const ChannelManagementPage = () => {
                   <span>{f.label}</span>
                   <span
                     className={`text-[10px] px-1 rounded-full ${
-                      isActive ? "bg-white/20 text-white" : "bg-[#2C3333] text-[#A5C9CA]/70"
+                      isActive ? "bg-white/20 text-white" : "bg-[#EAEFEF] dark:bg-[#2C3333] text-[#52656A] dark:text-[#A5C9CA]/70"
                     }`}
                   >
                     {count}
@@ -341,16 +341,16 @@ const ChannelManagementPage = () => {
           </div>
 
           {/* Channels List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-[#2C3333]/50">
+          <div className="flex-1 overflow-y-auto divide-y divide-[#E0E7E6]/70 dark:divide-[#2C3333]/50">
             {displayedChannels.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2C3333] text-[#A5C9CA] mb-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F0F4F4] dark:bg-[#2C3333] text-[#395B64] dark:text-[#A5C9CA] mb-3">
                   <i className={channelFilter === "PRIVATE" ? "fa-solid fa-lock text-xl" : "fa-solid fa-hashtag text-xl"} />
                 </span>
-                <p className="text-sm font-semibold text-white mb-1">
+                <p className="text-sm font-semibold text-[#2C3333] dark:text-white mb-1">
                   No {channelFilter === "PRIVATE" ? "private" : channelFilter === "PUBLIC" ? "public" : ""} channels found
                 </p>
-                <p className="text-xs text-[#A5C9CA]/60 max-w-xs">
+                <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/60 max-w-xs">
                   {channelFilter === "ALL"
                     ? "There are no channels in this workspace yet."
                     : `No ${channelFilter.toLowerCase()} channels match this filter.`}
@@ -380,17 +380,17 @@ const ChannelManagementPage = () => {
                     onClick={() => setSelectedChannelId(cId)}
                     className={`group relative flex items-center justify-between p-3.5 transition-colors cursor-pointer select-none ${
                       isSelected
-                        ? "bg-[#283232] border-l-4 border-l-[#A5C9CA] text-white"
-                        : "hover:bg-[#242D2D] text-[#A5C9CA]/80 border-l-4 border-l-transparent"
+                        ? "bg-[#395B64]/15 dark:bg-[#395B64]/30 border-l-4 border-l-[#395B64] dark:border-l-[#A5C9CA]"
+                        : "hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D] border-l-4 border-l-transparent text-[#2C3333] dark:text-[#A5C9CA]/80"
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      {/* Normal neutral/brand color for BOTH private and public — NO AMBER */}
+                      {/* Brand color for private and public */}
                       <div
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-colors ${
                           isSelected
-                            ? "bg-[#395B64] text-white"
-                            : "bg-[#2C3333] text-[#A5C9CA] group-hover:bg-[#395B64]/40 group-hover:text-white"
+                            ? "bg-[#395B64] text-white shadow-xs"
+                            : "bg-[#395B64]/15 dark:bg-[#2C3333] text-[#395B64] dark:text-[#A5C9CA] group-hover:bg-[#395B64]/25 dark:group-hover:bg-[#395B64]/40"
                         }`}
                       >
                         {isPrivate ? <i className="fa-solid fa-lock text-xs" /> : <span className="font-semibold text-sm">#</span>}
@@ -399,19 +399,19 @@ const ChannelManagementPage = () => {
                       <div className="min-w-0 flex-1">
                         <h4
                           className={`truncate text-xs font-bold ${
-                            isSelected ? "text-white" : "text-[#E7F6F2] group-hover:text-white"
+                            isSelected ? "text-[#395B64] dark:text-white" : "text-[#2C3333] dark:text-[#E7F6F2] group-hover:text-[#395B64] dark:group-hover:text-white"
                           }`}
                         >
                           {c.name}
                         </h4>
-                        <p className="truncate text-[11px] text-[#A5C9CA]/60">
+                        <p className="truncate text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 font-medium">
                           {c.description || `${memberCount} ${memberCount === 1 ? "member" : "members"}`}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      <span className="text-[11px] font-semibold text-[#A5C9CA]/70 flex items-center gap-1">
+                      <span className="text-[11px] font-medium text-[#52656A] dark:text-[#A5C9CA]/70 flex items-center gap-1">
                         <i className="fa-solid fa-users text-[10px]" />
                         <span>{memberCount}</span>
                       </span>
@@ -432,7 +432,7 @@ const ChannelManagementPage = () => {
           {activeChannel ? (
             <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
               {/* Channel Header Bar */}
-              <div className="flex h-14 items-center justify-between border-b border-[#E0E7E6] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-4 sm:px-6 shadow-xs select-none transition-colors flex-shrink-0">
+              <div className="flex h-14 items-center justify-between border-b border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1A2121] px-4 sm:px-6 shadow-xs select-none transition-colors flex-shrink-0">
                 <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                   <button
                     type="button"
@@ -480,7 +480,7 @@ const ChannelManagementPage = () => {
               </div>
 
               {/* Seamless Action & Info Strip (No separated card box) */}
-              <div className="border-b border-[#E0E7E6] dark:border-[#2C3333] bg-[#F8FAFB]/75 dark:bg-[#1A2121]/60 px-4 sm:px-6 py-3.5 flex-shrink-0 space-y-3">
+              <div className="border-b border-[#D8E2E1] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#1A2121]/60 px-4 sm:px-6 py-3.5 flex-shrink-0 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80">
                     {activeChannel.description || "General channel discussion"}
@@ -501,7 +501,7 @@ const ChannelManagementPage = () => {
                       value={memberToAdd}
                       onChange={(e) => setMemberToAdd(e.target.value)}
                       disabled={addingMember || availableMembersToAdd.length === 0}
-                      className="w-full appearance-none rounded-xl border border-[#A5C9CA]/50 dark:border-[#395B64]/60 bg-white dark:bg-[#242D2D] px-3.5 py-2 text-xs text-[#2C3333] dark:text-[#E7F6F2] disabled:opacity-50 transition cursor-pointer pr-9 shadow-2xs focus:border-[#395B64] focus:outline-hidden"
+                      className="w-full appearance-none rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#242D2D] px-3.5 py-2 text-xs text-[#2C3333] dark:text-[#E7F6F2] disabled:opacity-50 transition cursor-pointer pr-9 shadow-2xs focus:border-[#395B64] focus:outline-hidden"
                     >
                       <option value="">
                         {availableMembersToAdd.length === 0
@@ -537,7 +537,7 @@ const ChannelManagementPage = () => {
               {/* Seamless Full-height Members Section (Clean List View without cards) */}
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white dark:bg-[#151B1B]">
                 {/* Section Sub-header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E0E7E6] dark:border-[#2C3333] px-4 sm:px-6 py-3 bg-white dark:bg-[#1A2121] flex-shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D8E2E1] dark:border-[#2C3333] px-4 sm:px-6 py-3 bg-white dark:bg-[#1A2121] flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
                       Channel Members
@@ -554,7 +554,7 @@ const ChannelManagementPage = () => {
                       value={memberFilterTerm}
                       onChange={(e) => setMemberFilterTerm(e.target.value)}
                       placeholder="Search enrolled members..."
-                      className="w-full rounded-xl border border-[#A5C9CA]/40 dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] pl-8 pr-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:outline-hidden transition"
+                      className="w-full rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/50 bg-[#F8FAFB] dark:bg-[#242D2D] pl-8 pr-3 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:outline-hidden transition"
                     />
                     {memberFilterTerm && (
                       <button

@@ -87,39 +87,6 @@ const GlobalDashboard = () => {
           isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Icon rail */}
-        <div className="flex w-14 flex-col items-center bg-[#2C3333] py-3.5 text-white select-none">
-          <button
-            type="button"
-            onClick={() => { navigate("/app/dashboard"); setIsMobileSidebarOpen(false) }}
-            className="w-11 h-11 rounded-xl bg-[#395B64] flex items-center justify-center font-bold mb-4 text-[#E7F6F2] hover:bg-[#A5C9CA] hover:text-[#2C3333] transition shadow-md"
-            title="WorkNest Dashboard"
-          >
-            <i className="fa-solid fa-layer-group text-lg" />
-          </button>
-          <div className="w-8 h-px bg-[#395B64]/50 mb-3" />
-          <div className="flex flex-col gap-2.5 w-full items-center">
-            {workspaces.map((workspace) => (
-              <button
-                key={workspace.id}
-                type="button"
-                title={workspace.name}
-                onClick={() => { handleSelectWorkspace(workspace); setIsMobileSidebarOpen(false) }}
-                className="w-11 h-11 rounded-xl bg-[#374242] hover:bg-[#395B64] hover:text-white text-[#E7F6F2] transition flex items-center justify-center font-bold text-xs"
-              >
-                {getWorkspaceInitials(workspace.name)}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => { setShowCreateModal(true); setIsMobileSidebarOpen(false) }}
-              className="w-11 h-11 rounded-xl border border-dashed border-[#52656A] text-[#A5C9CA] hover:border-[#E7F6F2] hover:bg-[#395B64]/40 hover:text-white transition flex items-center justify-center text-xs"
-              title="Create Workspace"
-            >
-              <i className="fa-solid fa-plus" />
-            </button>
-          </div>
-        </div>
 
         {/* GlobalNav sidebar */}
         <div className="w-64 bg-[#1E2525] flex flex-col">
@@ -138,42 +105,6 @@ const GlobalDashboard = () => {
         </div>
       </div>
 
-      {/* ── Desktop: Icon rail (hidden on mobile) ────────────────────────── */}
-      <aside className="hidden md:flex w-17 border-r border-[#2C3333]/30 bg-[#2C3333] text-white flex-col items-center py-3.5 select-none flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => navigate("/app/dashboard")}
-          className="w-11 h-11 rounded-xl bg-[#395B64] flex items-center justify-center font-bold mb-4 text-[#E7F6F2] hover:bg-[#A5C9CA] hover:text-[#2C3333] transition shadow-md"
-          title="WorkNest Dashboard"
-        >
-          <i className="fa-solid fa-layer-group text-lg" />
-        </button>
-
-        <div className="w-8 h-px bg-[#395B64]/50 mb-3" />
-
-        <div className="flex flex-col gap-2.5 w-full items-center">
-          {workspaces.map((workspace) => (
-            <button
-              key={workspace.id}
-              type="button"
-              title={workspace.name}
-              onClick={() => handleSelectWorkspace(workspace)}
-              className="w-11 h-11 rounded-xl bg-[#374242] hover:bg-[#395B64] hover:text-white text-[#E7F6F2] transition flex items-center justify-center font-bold text-xs"
-            >
-              {getWorkspaceInitials(workspace.name)}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="w-11 h-11 rounded-xl border border-dashed border-[#52656A] text-[#A5C9CA] hover:border-[#E7F6F2] hover:bg-[#395B64]/40 hover:text-white transition flex items-center justify-center text-xs"
-            title="Create Workspace"
-          >
-            <i className="fa-solid fa-plus" />
-          </button>
-        </div>
-      </aside>
 
       {/* ── Desktop: GlobalNav sidebar (hidden on mobile) ─────────────────── */}
       <aside className="hidden md:block w-64 border-r border-[#E0E7E6] dark:border-[#2C3333] bg-[#1E2525] flex-shrink-0">

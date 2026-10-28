@@ -1,3 +1,28 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ── WorkNest palette – single source of truth ─────────────────────────── */
+:root {
+  --c-dark:    #2C3333;
+  --c-primary: #395B64;
+  --c-accent:  #A5C9CA;
+  --c-light:   #E7F6F2;
+
+  --c-rail:    #252E2E;
+  --c-sidebar: #1E2525;
+  --c-topbar:  #1A2121;
+  --c-hover:   #2C3636;
+  --c-border:  rgba(57,91,100,0.40);
+  --c-muted:   rgba(165,201,202,0.70);
+
+  --c-main-bg:     #F4F6F6;
+  --c-main-border: #D8E2E1;
+  --c-main-text:   #2C3333;
+  --c-main-muted:  #52656A;
+}
+
+/* ── Custom scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb  { background: rgba(165,201,202,0.25); border-radius: 999px; }
+::-webkit-scrollbar-track  { background: transparent; }

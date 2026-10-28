@@ -4,7 +4,7 @@
 
 html {
   background: #2C3333;
-} 
+}
 
 html.dark {
   background: #121717;
@@ -14,9 +14,12 @@ html.dark {
 body {
   min-width: 320px;
   margin: 0;
-  font-family: "Inter", "Segoe UI", sans-serif;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
   color: #2C3333;
-  background: #F8FAFB;
+  background: #F4F6F6;
+  -webkit-font-smoothing: antialiased;
 }
 
 html.dark body {
@@ -34,26 +37,11 @@ textarea {
   min-height: 100vh;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(103, 116, 119, 0.4);
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 @keyframes auth-modal-in {
   from {
     opacity: 0;
     transform: translateY(12px) scale(0.98);
   }
-
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -62,5 +50,5 @@ textarea {
 
 @keyframes fadeIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
