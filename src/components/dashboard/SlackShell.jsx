@@ -44,6 +44,7 @@ import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { fetchGroupsApi } from "../../services/groupService";
 import GlobalSearchModal from "./GlobalSearchModal";
 import ArchivedChatsView from "./ArchivedChatsView";
+import { playNotificationSound } from "../../utils/notificationSound";
 import {
   fetchSpaces,
   fetchSpace,
@@ -1909,6 +1910,7 @@ const SlackShell = () => {
         ...counts,
         [senderId]: (counts[senderId] || 0) + 1,
       }));
+      playNotificationSound();
     };
 
     socket.on("receive-direct-message", handleDirectMessage);
@@ -1953,6 +1955,7 @@ const SlackShell = () => {
         ...counts,
         [messageChannelId]: (counts[messageChannelId] || 0) + 1,
       }));
+      playNotificationSound();
     };
 
     socket.on("receive-channel-message", handleChannelMessage);
@@ -2225,6 +2228,7 @@ const SlackShell = () => {
           ...prev,
           [msgSpaceId]: (prev[msgSpaceId] || 0) + 1,
         }));
+        playNotificationSound();
       }
     };
 

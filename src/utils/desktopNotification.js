@@ -1,3 +1,5 @@
+import { playNotificationSound } from "./notificationSound";
+
 export const requestNotificationPermission = async () => {
   if (!("Notification" in window)) {
     console.warn("This browser does not support desktop notification");
@@ -17,6 +19,9 @@ export const requestNotificationPermission = async () => {
 };
 
 export const showDesktopNotification = (title, options = {}) => {
+  // Always play notification sound whenever a notification is triggered
+  playNotificationSound();
+
   if (!("Notification" in window)) return;
   
   if (Notification.permission === "granted") {

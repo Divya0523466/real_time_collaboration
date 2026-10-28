@@ -8,6 +8,7 @@ import {
 } from "react";
 import { toast } from "react-toastify";
 import { showDesktopNotification } from "../utils/desktopNotification";
+import { playNotificationSound } from "../utils/notificationSound";
 import { isSuperAdminUser, isDeactivatedAccount } from "../utils/adminAuth";
 import socket, {
   connectSocket,
@@ -393,6 +394,7 @@ export const WorkspaceProvider = ({ children }) => {
       toast.info(newNotif.title, {
         icon: <i className="fa-solid fa-bell text-[#395B64]" />,
       });
+      playNotificationSound();
       showDesktopNotification(newNotif.title, {
         body: newNotif.message,
       });
@@ -1418,6 +1420,7 @@ export const WorkspaceProvider = ({ children }) => {
     mutedConversations,
     toggleMuteConversation,
     isConversationMuted,
+    playNotificationSound,
   };
 
   return (
