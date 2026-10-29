@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FiSun, FiMoon } from "react-icons/fi";
+import logo from "../../assets/worknestlogo.png";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getPermissions, getRoleDisplayName } from "../../utils/permissions";
@@ -16,6 +17,7 @@ import CreateWorkspaceModal from "./CreateWorkspaceModal";
 import EditWorkspaceModal from "./EditWorkspaceModal";
 import DeleteWorkspaceModal from "./DeleteWorkspaceModal";
 import ProfileModal from "./ProfileModal";
+import InvitationsModal from "./InvitationsModal";
 import DirectMessaging from "./DirectMessaging";
 import ChannelMessageThread from "./ChannelMessageThread";
 import NotificationPanel from "./NotificationPanel";
@@ -128,9 +130,21 @@ const SlackShell = () => {
     isDndActive,
     loading,
     error,
+    fetchUserWorkspaces,
+    invitations,
+    fetchPendingInvitations,
+    acceptInvitation,
+    declineInvitation,
   } = useWorkspace();
   const { theme, toggleTheme, isDark } = useTheme();
   const { hasDraft } = useDraftIndicators();
+
+  useEffect(() => {
+    fetchUserWorkspaces?.().catch(() => {});
+    if (user?.email) {
+      fetchPendingInvitations?.().catch(() => {});
+    }
+  }, [fetchUserWorkspaces, fetchPendingInvitations, user?.email]);
 
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
     useState(false);
@@ -142,6 +156,7 @@ const SlackShell = () => {
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showInvitationsModal, setShowInvitationsModal] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
@@ -339,6 +354,37 @@ const SlackShell = () => {
       selectWorkspace(workspaceId);
     }
   }, [workspaceId, selectedWorkspace, selectWorkspace]);
+
+  const lastActiveWorkspaceIdRef = useRef(workspaceId);
+  useEffect(() => {
+    if (!workspaceId) return;
+    if (lastActiveWorkspaceIdRef.current && lastActiveWorkspaceIdRef.current !== workspaceId) {
+      // Switched workspaces via route navigation: immediately flush previous workspace states
+      setSpaces([]);
+      setGroups([]);
+      setSelectedSpace(null);
+      setSelectedGroup(null);
+      setSelectedDMUser(null);
+      setChannelMessages([]);
+      setChannelPinnedMessages([]);
+      setChannelDetails(null);
+      setIsHomeView(true);
+      setIsStarredView(false);
+      setIsPinnedView(false);
+      setIsMentionsView(false);
+      setIsArchivedView(false);
+      setActiveSecondaryPanel("home");
+      setUnreadSpaceCounts({});
+      setUnreadChannelCounts({});
+      setUnreadDMCounts({});
+      setShowDetailsPane(false);
+      setShowMembersPanel(false);
+      setShowActivityPanel(false);
+      setPanelSearchQuery("");
+      setPanelUnreadOnly(false);
+    }
+    lastActiveWorkspaceIdRef.current = workspaceId;
+  }, [workspaceId]);
 
   const activeChannels = useMemo(() => {
     return (channels || []).filter((c) => !c.isArchived);
@@ -614,12 +660,43 @@ const SlackShell = () => {
     };
   }, [channelId, currentChannel?.id]);
 
-  const selectedRole = workspaceData?.userRole || "MEMBER";
+  const selectedRole = useMemo(() => {
+    if (workspaceData?.userRole === "OWNER" || workspaceData?.userRole === "ADMIN") {
+      return workspaceData.userRole;
+    }
+    const wsInList = (workspaces || []).find(
+      (w) => (w.id || w._id)?.toString() === workspaceId?.toString()
+    );
+    if (wsInList?.role === "OWNER" || wsInList?.role === "ADMIN") {
+      return wsInList.role;
+    }
+    // If no other user is an OWNER in the workspace, default to OWNER
+    const otherOwner = (workspaceData?.members || []).find(
+      (m) =>
+        m.role === "OWNER" &&
+        (m.id || m._id)?.toString() !== (user?.id || user?._id)?.toString()
+    );
+    if (!otherOwner) {
+      return "OWNER";
+    }
+    return workspaceData?.userRole || "OWNER";
+  }, [workspaceData, user, workspaces, workspaceId]);
   const permissions = useMemo(
     () => getPermissions(selectedRole),
     [selectedRole],
   );
   const isSuperAdmin = useMemo(() => isSuperAdminUser(user), [user]);
+  const canManageChannel = useCallback(
+    (chan) => {
+      if (isSuperAdmin) return true;
+      if (selectedRole === "OWNER" || selectedRole === "ADMIN") return true;
+      if (permissions?.canManageChannels) return true;
+      const currentUserId = (user?.id || user?._id)?.toString();
+      const creatorId = (chan?.createdBy?._id || chan?.createdBy?.id || chan?.createdBy)?.toString();
+      return Boolean(currentUserId && creatorId && currentUserId === creatorId);
+    },
+    [isSuperAdmin, selectedRole, permissions, user]
+  );
   const workspaceMembers = workspaceData?.members || [];
   const directMessageMembers = workspaceMembers.filter(
     (member) => member.id?.toString() !== user?.id?.toString(),
@@ -1771,6 +1848,8 @@ const SlackShell = () => {
 
     let cancelled = false;
     setSelectedDMUser(null);
+    setUnreadDMCounts({});
+    setUnreadChannelCounts({});
 
     // Fetch persistent unread counts directly from database
     fetchUnreadMessageCounts(workspaceId)
@@ -1817,14 +1896,18 @@ const SlackShell = () => {
   useEffect(() => {
     if (!workspaceId) return;
     let cancelled = false;
+    setSpaces([]);
 
     fetchSpaces(workspaceId)
       .then((res) => {
-        if (!cancelled && res?.spaces) {
-          setSpaces(res.spaces);
+        if (!cancelled) {
+          setSpaces(Array.isArray(res?.spaces) ? res.spaces : []);
         }
       })
-      .catch((err) => console.warn("Failed to load spaces:", err.message));
+      .catch((err) => {
+        if (!cancelled) setSpaces([]);
+        console.warn("Failed to load spaces:", err.message);
+      });
 
     fetchSpaceUnreadCountsApi(workspaceId)
       .then((counts) => {
@@ -1843,6 +1926,7 @@ const SlackShell = () => {
   useEffect(() => {
     if (!workspaceId) return;
     let cancelled = false;
+    setGroups([]);
 
     fetchGroupsApi(workspaceId)
       .then((res) => {
@@ -1851,7 +1935,10 @@ const SlackShell = () => {
           setGroups(list);
         }
       })
-      .catch((err) => console.warn("Failed to load groups:", err.message));
+      .catch((err) => {
+        if (!cancelled) setGroups([]);
+        console.warn("Failed to load groups:", err.message);
+      });
 
     return () => {
       cancelled = true;
@@ -1864,7 +1951,7 @@ const SlackShell = () => {
       const grp = data?.group || data;
       if (!grp || (!grp._id && !grp.id)) return;
       const grpWsId = (grp.workspaceId?._id || grp.workspaceId)?.toString();
-      if (workspaceId && grpWsId && grpWsId !== workspaceId.toString()) return;
+      if (workspaceId && (!grpWsId || grpWsId !== workspaceId.toString())) return;
 
       setGroups((prev) => {
         const idStr = (grp._id || grp.id).toString();
@@ -1929,7 +2016,7 @@ const SlackShell = () => {
       const sp = data?.space || data;
       if (!sp || (!sp._id && !sp.id)) return;
       const spWsId = (sp.workspaceId?._id || sp.workspaceId)?.toString();
-      if (workspaceId && spWsId && spWsId !== workspaceId.toString()) return;
+      if (workspaceId && (!spWsId || spWsId !== workspaceId.toString())) return;
 
       setSpaces((prev) => {
         const idStr = (sp._id || sp.id).toString();
@@ -2051,10 +2138,43 @@ const SlackShell = () => {
     };
   }, [workspaceId, isSuperAdmin, selectedSpace, user, navigate]);
 
-  const handleSelectWorkspace = async (id) => {
-    if (!id || id === workspaceId) return;
-    await selectWorkspace(id);
-    navigate(`/app/workspace/${id}`);
+  const handleSelectWorkspace = (id) => {
+    const targetId = (id?.id || id?._id || id)?.toString();
+    if (!targetId) return;
+
+    setShowWorkspaceMenu(false);
+    setIsMobileSidebarOpen(false);
+
+    if (targetId === workspaceId?.toString()) {
+      return;
+    }
+
+    // Instantly reset workspace-specific states so nothing from the previous workspace lingers
+    setSpaces([]);
+    setGroups([]);
+    setSelectedSpace(null);
+    setSelectedGroup(null);
+    setSelectedDMUser(null);
+    setChannelMessages([]);
+    setChannelPinnedMessages([]);
+    setChannelDetails(null);
+    setIsHomeView(true);
+    setIsStarredView(false);
+    setIsPinnedView(false);
+    setIsMentionsView(false);
+    setIsArchivedView(false);
+    setActiveSecondaryPanel("home");
+    setUnreadSpaceCounts({});
+    setUnreadChannelCounts({});
+    setUnreadDMCounts({});
+    setShowDetailsPane(false);
+    setShowMembersPanel(false);
+    setShowActivityPanel(false);
+    setPanelSearchQuery("");
+    setPanelUnreadOnly(false);
+
+    selectWorkspace(targetId);
+    navigate(`/app/workspace/${targetId}`);
   };
 
   const handleChannelDeleted = () => {
@@ -2702,8 +2822,8 @@ const SlackShell = () => {
                             type="button"
                             onClick={() => {
                               setActiveChannelMenuId(null);
-                              setActiveChannelForAction(chan);
-                              setShowManageChannelMembersModal(true);
+                              handleSelectChannel(chan);
+                              setShowDetailsPane(true);
                             }}
                             className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
                           >
@@ -2715,8 +2835,7 @@ const SlackShell = () => {
                               type="button"
                               onClick={() => {
                                 setActiveChannelMenuId(null);
-                                setActiveChannelForAction(chan);
-                                setShowEditChannelModal(true);
+                                setEditingChannel(chan);
                               }}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
                             >
@@ -2729,8 +2848,7 @@ const SlackShell = () => {
                               type="button"
                               onClick={() => {
                                 setActiveChannelMenuId(null);
-                                setActiveChannelForAction(chan);
-                                setShowDeleteChannelModal(true);
+                                setDeletingChannel(chan);
                               }}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                             >
@@ -3194,13 +3312,25 @@ const SlackShell = () => {
                               <i className="fa-solid fa-link text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
                               Copy link
                             </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveChannelMenuId(null);
+                                handleToggleArchiveChannel(chan);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
+                            >
+                              <i className="fa-solid fa-box-archive text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                              {chan.isArchived ? "Unarchive chat" : "Archive chat"}
+                            </button>
                             <div className="h-px bg-[#D8E2E1] dark:bg-[#395B64]/50 my-1" />
                             <button
                               type="button"
                               onClick={() => {
                                 setActiveChannelMenuId(null);
-                                setActiveChannelForAction(chan);
-                                setShowManageChannelMembersModal(true);
+                                handleSelectChannel(chan);
+                                setShowDetailsPane(true);
                               }}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
                             >
@@ -3212,8 +3342,7 @@ const SlackShell = () => {
                                 type="button"
                                 onClick={() => {
                                   setActiveChannelMenuId(null);
-                                  setActiveChannelForAction(chan);
-                                  setShowEditChannelModal(true);
+                                  setEditingChannel(chan);
                                 }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#EAEFEF] dark:hover:bg-[#395B64] transition-colors cursor-pointer"
                               >
@@ -3226,8 +3355,7 @@ const SlackShell = () => {
                                 type="button"
                                 onClick={() => {
                                   setActiveChannelMenuId(null);
-                                  setActiveChannelForAction(chan);
-                                  setShowDeleteChannelModal(true);
+                                  setDeletingChannel(chan);
                                 }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                               >
@@ -3695,39 +3823,302 @@ const SlackShell = () => {
     );
   };
 
-  if (loading && !workspaceData) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 dark:border-gray-700 border-t-[#395B64] dark:border-t-[#A5C9CA]" />
-          <span className="text-sm text-[#52656A] dark:text-[#A5C9CA]">
-            Loading...
-          </span>
+  const renderWorkspaceMenu = () => (
+    <>
+      <div
+        className="fixed inset-0 z-30"
+        onClick={() => setShowWorkspaceMenu(false)}
+      />
+      <div className="absolute left-2 right-2 top-[calc(100%+4px)] z-40 w-72 max-w-[calc(100vw-24px)] rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#1E2525] shadow-2xl text-xs overflow-hidden text-[#2C3333] dark:text-[#E7F6F2]">
+        {/* Workspace Name & Role Header (Matches Image 1) */}
+        <div className="px-3.5 py-3 border-b border-[#D8E2E1] dark:border-[#2C3333]">
+          <div className="font-bold text-[#2C3333] dark:text-white text-base leading-tight truncate">
+            {workspaceData?.name || "Workspace"}
+          </div>
+          <div className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80 mt-0.5 capitalize">
+            {getRoleDisplayName(selectedRole) || "Owner"}
+          </div>
+        </div>
+
+        {/* ── Workspace Settings Actions (Matches Image 1) ────────────────── */}
+        <div className="py-1.5 space-y-0.5">
+          <button
+            type="button"
+            onClick={() => {
+              setShowInviteModal(true);
+              setShowWorkspaceMenu(false);
+              setIsMobileSidebarOpen(false);
+            }}
+            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+          >
+            <i className="fa-solid fa-user-plus text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
+            <span>Invite people</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowMembersPanel(true);
+              setShowWorkspaceMenu(false);
+              setIsMobileSidebarOpen(false);
+            }}
+            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+          >
+            <i className="fa-solid fa-users-gear text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
+            <span>Manage members</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateChannelModal(true);
+              setShowWorkspaceMenu(false);
+              setIsMobileSidebarOpen(false);
+            }}
+            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+          >
+            <i className="fa-solid fa-plus text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
+            <span>Create channel</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowEditWorkspaceModal(true);
+              setShowWorkspaceMenu(false);
+              setIsMobileSidebarOpen(false);
+            }}
+            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+          >
+            <i className="fa-solid fa-pen-to-square text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
+            <span>Edit workspace</span>
+          </button>
+
+          <div className="h-px bg-[#D8E2E1] dark:bg-[#2C3333] my-1 mx-2" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowDeleteWorkspaceModal(true);
+              setShowWorkspaceMenu(false);
+              setIsMobileSidebarOpen(false);
+            }}
+            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+          >
+            <i className="fa-solid fa-trash-can w-4 text-xs" />
+            <span>Delete workspace</span>
+          </button>
+        </div>
+
+        {/* ── Workspaces Navigation (Switch & Create) ───────── */}
+        <div className="border-t border-[#D8E2E1] dark:border-[#2C3333] bg-[#F8FAFB]/60 dark:bg-[#1A2121]/50 py-1.5">
+          {workspaces && workspaces.length > 1 && (
+            <div className="mb-1">
+              <div className="flex items-center justify-between px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]/70">
+                <span>Switch Workspace</span>
+                <span className="rounded-full bg-[#D8E2E1]/70 dark:bg-black/30 px-1.5 py-0.2 text-[9px] font-semibold">
+                  {workspaces.length}
+                </span>
+              </div>
+              <div className="max-h-36 overflow-y-auto space-y-0.5 px-2 py-0.5">
+                {workspaces.map((ws) => {
+                  const wsId = (ws.id || ws._id)?.toString();
+                  const isCurrent = wsId === workspaceId?.toString();
+                  return (
+                    <button
+                      key={wsId || ws.name}
+                      type="button"
+                      onClick={() => {
+                        setShowWorkspaceMenu(false);
+                        setIsMobileSidebarOpen(false);
+                        if (!isCurrent) {
+                          handleSelectWorkspace(wsId);
+                        }
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                        isCurrent
+                          ? "bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-white font-semibold"
+                          : "text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`flex h-5 w-5 items-center justify-center rounded text-[9px] font-bold flex-shrink-0 ${
+                            isCurrent
+                              ? "bg-[#395B64] text-white"
+                              : "bg-[#D8E2E1] dark:bg-[#2C3333] text-[#395B64] dark:text-[#A5C9CA]"
+                          }`}
+                        >
+                          {getWorkspaceInitials(ws.name)}
+                        </span>
+                        <span className="text-xs truncate">{ws.name}</span>
+                      </div>
+                      {isCurrent && (
+                        <i className="fa-solid fa-check text-xs text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="px-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowWorkspaceMenu(false);
+                setIsMobileSidebarOpen(false);
+                setShowCreateWorkspaceModal(true);
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+            >
+              <i className="fa-solid fa-plus text-xs w-4 text-center" />
+              <span>Create another workspace</span>
+            </button>
+          </div>
+
+          {/* Pending Invitations (if any) */}
+          {invitations && invitations.length > 0 && (
+            <div className="mt-1 px-2 pt-1 border-t border-[#D8E2E1] dark:border-[#2C3333]">
+              <div className="flex items-center justify-between text-[10px] font-bold text-[#395B64] dark:text-[#A5C9CA] uppercase tracking-wider px-1 mb-1">
+                <span>Pending Invitations ({invitations.length})</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowWorkspaceMenu(false);
+                    setShowInvitationsModal(true);
+                  }}
+                  className="text-[10px] font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:underline cursor-pointer lowercase"
+                >
+                  view all
+                </button>
+              </div>
+              {invitations.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="p-2 rounded-lg bg-white dark:bg-[#1E2525] border border-[#D8E2E1] dark:border-[#395B64]/40 text-xs mb-1"
+                >
+                  <div className="font-semibold text-[#2C3333] dark:text-white truncate">
+                    {inv.workspaceName}
+                  </div>
+                  <div className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/80">
+                    Role: {inv.role}
+                  </div>
+                  <div className="flex gap-1.5 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        acceptInvitation(inv.id).then(() => {
+                          fetchUserWorkspaces?.().catch(() => {});
+                        });
+                      }}
+                      className="flex-1 py-1 rounded bg-[#395B64] text-white text-[10px] font-bold hover:bg-[#2C3333] transition"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => declineInvitation(inv.id)}
+                      className="flex-1 py-1 rounded border border-[#D8E2E1] dark:border-[#395B64] text-[10px] font-semibold text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] transition"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-    );
-  }
+    </>
+  );
 
-  if (error || !workspaceData) {
+  const isCurrentWorkspaceLoaded = Boolean(
+    workspaceId &&
+    workspaceData &&
+    ((workspaceData.id || workspaceData._id)?.toString() === workspaceId.toString())
+  );
+
+  if (error && !loading && !isCurrentWorkspaceLoaded) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#2C3333] px-6 text-[#E7F6F2]">
-        <div className="w-full max-w-md rounded-2xl border border-[#395B64] bg-[#1E2525] p-8 text-center shadow-2xl">
-          <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-rose-900/40 text-rose-400 text-2xl">
+      <div className="flex h-screen items-center justify-center bg-[#F8FAFB] dark:bg-[#121717] px-6 text-[#2C3333] dark:text-[#E7F6F2]">
+        <div className="w-full max-w-md rounded-2xl border border-[#D8E2E1] dark:border-[#395B64] bg-white dark:bg-[#1E2525] p-8 text-center shadow-2xl">
+          <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 text-2xl">
             <i className="fa-solid fa-triangle-exclamation" />
           </div>
-          <h2 className="mb-2 text-xl font-bold text-white">
+          <h2 className="mb-2 text-xl font-bold text-[#2C3333] dark:text-white">
             Workspace unavailable
           </h2>
           <p className="mb-6 text-sm text-[#52656A] dark:text-[#A5C9CA]">
             {error || "Unable to load this workspace."}
           </p>
-          <button
-            type="button"
-            onClick={() => navigate("/app/dashboard")}
-            className="rounded-xl bg-[#395B64] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2C3333] border border-[#A5C9CA]/30 transition"
-          >
-            Back to workspaces
-          </button>
+
+          {workspaces && workspaces.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#52656A] dark:text-[#A5C9CA]">
+                Switch to another workspace:
+              </p>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {workspaces.map((ws) => {
+                  const wsId = (ws.id || ws._id)?.toString();
+                  return (
+                    <button
+                      key={wsId || ws.name}
+                      type="button"
+                      onClick={() => handleSelectWorkspace(wsId)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl border border-[#D8E2E1] dark:border-[#2C3333] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors text-left cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-7 w-7 items-center justify-center rounded bg-[#395B64] text-xs font-bold text-white">
+                          {getWorkspaceInitials(ws.name)}
+                        </span>
+                        <span className="text-xs font-semibold text-[#2C3333] dark:text-white">
+                          {ws.name}
+                        </span>
+                      </div>
+                      <i className="fa-solid fa-arrow-right text-xs text-[#52656A] dark:text-[#A5C9CA]" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowCreateWorkspaceModal(true)}
+              className="rounded-xl bg-[#395B64] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2C3333] transition cursor-pointer"
+            >
+              Create a workspace
+            </button>
+          )}
+        </div>
+
+        {showCreateWorkspaceModal && (
+          <CreateWorkspaceModal
+            onClose={() => setShowCreateWorkspaceModal(false)}
+            onSuccess={async (newWs) => {
+              setShowCreateWorkspaceModal(false);
+              const targetId = (newWs?.id || newWs?._id)?.toString();
+              if (targetId) {
+                await fetchUserWorkspaces?.().catch(() => {});
+                handleSelectWorkspace(targetId);
+              }
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (!isCurrentWorkspaceLoaded || loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 dark:border-gray-700 border-t-[#395B64] dark:border-t-[#A5C9CA]" />
+          <span className="text-sm font-medium text-[#52656A] dark:text-[#A5C9CA]">
+            Loading workspace...
+          </span>
         </div>
       </div>
     );
@@ -3737,16 +4128,40 @@ const SlackShell = () => {
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="h-14 w-full bg-white dark:bg-[#1A2121] border-b border-[#D8E2E1] dark:border-[#252E2E] flex items-center justify-between px-4 z-30 select-none flex-shrink-0 text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
-        {/* Left: Back to main */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Left: Mobile sidebar toggle + WorkNest Logo & Brand */}
+        <div className="flex items-center gap-2.5 flex-shrink-0">
           <button
             type="button"
-            onClick={() => navigate("/app/dashboard")}
-            className="flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
-            title="Back to Workspaces"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="md:hidden flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+            title="Open menu"
+            aria-label="Open navigation menu"
           >
-            <i className="fa-solid fa-arrow-left text-sm" />
+            <i className="fa-solid fa-bars text-sm" />
           </button>
+
+          {isSuperAdmin ? (
+            <button
+              type="button"
+              onClick={() => navigate("/admin")}
+              className="flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white transition-colors cursor-pointer"
+              title="Back to Super Admin Dashboard"
+              aria-label="Back to Super Admin Dashboard"
+            >
+              <i className="fa-solid fa-arrow-left text-sm" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 select-none">
+              <img
+                src={logo}
+                alt="WorkNest"
+                className="h-7 w-7 object-contain flex-shrink-0"
+              />
+              <span className="font-bold text-base text-[#2C3333] dark:text-white tracking-tight">
+                WorkNest
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Center: search */}
@@ -3814,18 +4229,26 @@ const SlackShell = () => {
             <button
               type="button"
               onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer text-left select-none"
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer text-left select-none relative"
               title="User profile"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-semibold text-white overflow-hidden flex-shrink-0 border border-[#395B64]">
-                {user?.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt={user.username || "Profile"}
-                    className="h-full w-full object-cover"
+              <div className="relative flex-shrink-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-semibold text-white overflow-hidden border border-[#395B64]">
+                  {user?.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.username || "Profile"}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    user?.username?.charAt(0)?.toUpperCase() || "U"
+                  )}
+                </div>
+                {invitations && invitations.length > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5 rounded-full bg-[#395B64] dark:bg-[#A5C9CA] border-2 border-white dark:border-[#1A2121]"
+                    title={`${invitations.length} pending invitation${invitations.length === 1 ? "" : "s"}`}
                   />
-                ) : (
-                  user?.username?.charAt(0)?.toUpperCase() || "U"
                 )}
               </div>
               <div className="hidden sm:flex flex-col min-w-0">
@@ -3877,10 +4300,33 @@ const SlackShell = () => {
                         setShowProfileMenu(false);
                         setShowEditProfileModal(true);
                       }}
-                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] transition-colors-colors cursor-pointer"
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3333] transition-colors cursor-pointer"
                     >
-                      <i className="fa-regular fa-user text-xs text-[#52656A] dark:text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                      <i className="fa-regular fa-user text-xs text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
                       <span>Edit profile</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setShowInvitationsModal(true);
+                      }}
+                      className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3333] transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <i className="fa-solid fa-envelope-open-text text-xs text-[#52656A] dark:text-[#A5C9CA] w-3.5" />
+                        <span>Invitations</span>
+                      </div>
+                      {invitations && invitations.length > 0 ? (
+                        <span className="flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-[#395B64] dark:bg-[#A5C9CA] text-white dark:text-[#1E2525] text-[10px] font-bold px-1.5 shadow-xs">
+                          {invitations.length}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-[#52656A]/60 dark:text-[#A5C9CA]/50 font-normal">
+                          0
+                        </span>
+                      )}
                     </button>
 
                     <button
@@ -3955,7 +4401,7 @@ const SlackShell = () => {
         {/* Workspace sidebar — inside mobile drawer */}
         <div className="flex w-64 flex-col bg-[#F8FAFB] dark:bg-[#1E2525] text-sm text-[#2C3333] dark:text-[#E7F6F2] border-r border-[#D8E2E1] dark:border-[#1A2121] select-none transition-colors">
           {/* Close button & Workspace Header */}
-          <div className="flex items-center justify-between border-b border-[#D8E2E1] dark:border-[#1A2121] px-3 py-2.5">
+          <div className="relative flex items-center justify-between border-b border-[#D8E2E1] dark:border-[#1A2121] px-3 py-2.5">
             <button
               type="button"
               onClick={() => setShowWorkspaceMenu((prev) => !prev)}
@@ -3998,6 +4444,8 @@ const SlackShell = () => {
             >
               <i className="fa-solid fa-xmark text-sm" />
             </button>
+
+            {showWorkspaceMenu && renderWorkspaceMenu()}
           </div>
 
           <div className="px-3 pb-2 pt-2">
@@ -4158,6 +4606,25 @@ const SlackShell = () => {
                     </span>
                   )}
                 </button>
+
+                {invitations && invitations.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowInvitationsModal(true);
+                      setIsMobileSidebarOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between rounded px-2 py-[5px] text-sm text-[#395B64] dark:text-[#A5C9CA] bg-[#E7F6F2] dark:bg-[#395B64]/20 hover:bg-[#D8E2E1]/60 dark:hover:bg-[#395B64]/30 transition-colors cursor-pointer mt-0.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <i className="fa-solid fa-envelope-open-text w-4 text-center text-[11px]" />
+                      <span className="flex-1 text-left font-medium">Invitations</span>
+                    </div>
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] dark:bg-[#A5C9CA] text-[10px] font-bold text-white dark:text-[#1E2525] px-1.5">
+                      {invitations.length}
+                    </span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -4416,128 +4883,7 @@ const SlackShell = () => {
             <i className="fa-solid fa-plus text-xs" />
           </button>
 
-          {showWorkspaceMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-30"
-                onClick={() => setShowWorkspaceMenu(false)}
-              />
-              <div className="absolute left-3 right-3 top-[calc(100%+4px)] z-40 rounded border border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] shadow-xl text-xs overflow-hidden text-[#2C3333] dark:text-[#E7F6F2]">
-                <div className="px-3 py-2 border-b border-[#D8E2E1] dark:border-[#2C3333]">
-                  <div className="font-semibold text-[#2C3333] dark:text-white text-sm truncate">
-                    {workspaceData.name}
-                  </div>
-                  <div className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]/70 mt-0.5">
-                    {getRoleDisplayName(selectedRole)}
-                  </div>
-                </div>
-
-                <div className="py-1 space-y-px">
-                  {selectedRole === "OWNER" && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowInviteModal(true);
-                          setShowWorkspaceMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
-                      >
-                        <i className="fa-solid fa-user-plus text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
-                        Invite people
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMembersPanel(true);
-                          setShowWorkspaceMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
-                      >
-                        <i className="fa-solid fa-users-gear text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
-                        Manage members
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCreateChannelModal(true);
-                          setShowWorkspaceMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
-                      >
-                        <i className="fa-solid fa-plus text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
-                        Create channel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowEditWorkspaceModal(true);
-                          setShowWorkspaceMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
-                      >
-                        <i className="fa-solid fa-pen-to-square text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
-                        Edit workspace
-                      </button>
-                      <div className="h-px bg-[#2C3333] my-1" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowDeleteWorkspaceModal(true);
-                          setShowWorkspaceMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-rose-400 hover:bg-rose-950/30 transition-colors"
-                      >
-                        <i className="fa-solid fa-trash-can w-3.5 text-xs" />
-                        Delete workspace
-                      </button>
-                    </>
-                  )}
-
-                  {selectedRole === "ADMIN" && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCreateChannelModal(true);
-                          setShowWorkspaceMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
-                      >
-                        <i className="fa-solid fa-plus text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
-                        Create channel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMembersPanel(true);
-                          setShowWorkspaceMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
-                      >
-                        <i className="fa-solid fa-hashtag text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
-                        Manage channels &amp; members
-                      </button>
-                    </>
-                  )}
-
-                  {selectedRole === "MEMBER" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMembersPanel(true);
-                        setShowWorkspaceMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] transition-colors"
-                    >
-                      <i className="fa-solid fa-users text-[#395B64] dark:text-[#A5C9CA] w-3.5 text-xs" />
-                      View members
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+          {showWorkspaceMenu && renderWorkspaceMenu()}
         </div>
 
         <div className="px-3 pb-2 pt-2">
@@ -4694,6 +5040,22 @@ const SlackShell = () => {
                   </span>
                 )}
               </button>
+
+              {invitations && invitations.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowInvitationsModal(true)}
+                  className="flex w-full items-center justify-between rounded px-2 py-[5px] text-sm text-[#395B64] dark:text-[#A5C9CA] bg-[#E7F6F2] dark:bg-[#395B64]/20 hover:bg-[#D8E2E1]/60 dark:hover:bg-[#395B64]/30 transition-colors cursor-pointer mt-0.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <i className="fa-solid fa-envelope-open-text w-4 text-center text-xs" />
+                    <span className="flex-1 text-left font-medium">Invitations</span>
+                  </div>
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#395B64] dark:bg-[#A5C9CA] text-[10px] font-bold text-white dark:text-[#1E2525] px-1.5">
+                    {invitations.length}
+                  </span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -5194,17 +5556,6 @@ const SlackShell = () => {
                       <i className="fa-solid fa-pen" />
                     </button>
                   )}
-
-                {currentChannel && !currentChannel.isArchived && (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleArchiveChannel(currentChannel)}
-                    className="flex-shrink-0 text-[#52656A] dark:text-[#A5C9CA] hover:text-[#395B64] dark:hover:text-[#A5C9CA] p-1 text-xs transition cursor-pointer"
-                    title="Archive this channel"
-                  >
-                    <i className="fa-solid fa-box-archive" />
-                  </button>
-                )}
 
                 {currentChannel?.isArchived && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#395B64]/15 text-[#395B64] dark:text-[#A5C9CA] border border-[#395B64]/30 shrink-0">
@@ -5811,7 +6162,10 @@ const SlackShell = () => {
           onClose={() => setShowCreateWorkspaceModal(false)}
           onSuccess={(newWs) => {
             setShowCreateWorkspaceModal(false);
-            handleSelectWorkspace(newWs.id);
+            const targetId = (newWs?.id || newWs?._id)?.toString();
+            if (targetId) {
+              handleSelectWorkspace(targetId);
+            }
           }}
         />
       )}
@@ -5887,6 +6241,14 @@ const SlackShell = () => {
       {/* Edit Profile Modal */}
       {showEditProfileModal && (
         <ProfileModal onClose={() => setShowEditProfileModal(false)} />
+      )}
+
+      {/* Workspace Invitations Modal */}
+      {showInvitationsModal && (
+        <InvitationsModal
+          onClose={() => setShowInvitationsModal(false)}
+          onSelectWorkspace={handleSelectWorkspace}
+        />
       )}
 
       {/* Global Search Modal */}

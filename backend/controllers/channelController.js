@@ -5,6 +5,7 @@ import { createAndSendNotification } from "../utils/notificationService.js";
 import { sendEmail } from "../utils/sendMail.js";
 import { addedToChannel, removedFromChannel } from "../utils/templates.js";
 import User from "../models/User.js";
+import { isUserSuperAdmin } from "../utils/spaceAccess.js";
 
 const createChannel = async (req, res) => {
   try {
@@ -211,17 +212,19 @@ const getWorkspaceChannels = async (req, res) => {
     const { workspaceId } = req.params;
     const userId = req.userId;
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
+
     const membership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
     }).lean();
 
-    if (!membership) {
+    if (!membership && !isSuperAdmin) {
       return res.status(403).json({ message: "Access denied" });
     }
 
     let filter = { workspaceId };
-    if (membership.role === "MEMBER") {
+    if (!isSuperAdmin && membership && membership.role === "MEMBER") {
       filter = {
         workspaceId,
         $or: [{ type: "PUBLIC" }, { type: "PRIVATE", members: userId }],
@@ -257,12 +260,14 @@ const getChannel = async (req, res) => {
     const { workspaceId, channelId } = req.params;
     const userId = req.userId;
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
+
     const membership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
     });
 
-    if (!membership) {
+    if (!membership && !isSuperAdmin) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -275,7 +280,7 @@ const getChannel = async (req, res) => {
       return res.status(404).json({ message: "Channel not found" });
     }
 
-    if (channel.type === "PRIVATE" && membership.role === "MEMBER") {
+    if (!isSuperAdmin && channel.type === "PRIVATE" && membership && membership.role === "MEMBER") {
       const isMember = channel.members.some(
         (m) => m._id.toString() === userId.toString(),
       );

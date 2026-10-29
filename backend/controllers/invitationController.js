@@ -20,8 +20,8 @@ const inviteMembers = async (req, res) => {
     const inviteRole = ["ADMIN", "MEMBER"].includes(role) ? role : "MEMBER"
 
     const requesterMembership = await WorkspaceMembership.findOne({ userId, workspaceId })
-    if (!requesterMembership || requesterMembership.role !== "OWNER") {
-      return res.status(403).json({ message: "Only workspace owners can invite members" })
+    if (!requesterMembership) {
+      return res.status(403).json({ message: "Access denied to workspace" })
     }
 
     const invitationEmails = [...new Set(
@@ -35,10 +35,11 @@ const inviteMembers = async (req, res) => {
       return res.status(400).json({ message: "No valid email addresses were provided" })
     }
 
-    const inviterUser = await User.findById(userId).select("username");
-    const workspace = await Workspace.findById(workspaceId).select("name");
+    const inviterUser = await User.findById(userId).select("username email");
+    const workspace = await Workspace.findById(workspaceId).select("name description");
     
     const inviteLink = `${process.env.FRONTEND_URL}/app/dashboard`; 
+    const io = req.app.get("io");
 
     const createdInvites = []
     for (const email of invitationEmails) {
@@ -54,7 +55,7 @@ const inviteMembers = async (req, res) => {
         `You've been invited to join ${workspace?.name || "a workspace"} on WorkNest`,
         htmlTemplate
       );
-      const existingUser = await User.findOne({ email }).select("_id").lean();
+      const existingUser = await User.findOne({ email }).select("_id email username").lean();
       if (existingUser) {
         const alreadyMember = await WorkspaceMembership.findOne({ workspaceId, userId: existingUser._id }).select("_id").lean();
         if (alreadyMember) {
@@ -76,6 +77,37 @@ const inviteMembers = async (req, res) => {
         { upsert: true, new: true, setDefaultsOnInsert: true },
       )
       createdInvites.push({ email, status: invite.status, role: inviteRole })
+
+      // Real-time socket emission to invited user
+      if (existingUser && io) {
+        const formattedInvite = {
+          id: invite._id,
+          workspaceId: workspace?._id || workspaceId,
+          workspaceName: workspace?.name || "Workspace",
+          workspaceDescription: workspace?.description || "",
+          inviter: inviterUser
+            ? {
+                id: inviterUser._id,
+                username: inviterUser.username,
+                email: inviterUser.email,
+              }
+            : null,
+          role: inviteRole,
+          message: message || "",
+          createdAt: invite.createdAt || new Date(),
+        };
+
+        io.to(`user:${existingUser._id}`).emit("invitation-received", formattedInvite);
+
+        createAndSendNotification(io, {
+          recipientId: existingUser._id,
+          actorId: userId,
+          type: "WORKSPACE_INVITED",
+          title: `Invited to ${workspace?.name || "a workspace"}`,
+          message: `${inviterUser?.username || "A teammate"} invited you to join "${workspace?.name || "a workspace"}".`,
+          workspaceId,
+        }).catch(() => {});
+      }
     }
 
     return res.status(201).json({
@@ -172,6 +204,9 @@ const acceptInvitation = async (req, res) => {
     await invitation.save()
 
     const io = req.app.get("io")
+    if (io) {
+      io.to(`user:${userId}`).emit("invitation-removed", { invitationId });
+    }
     if (invitation.invitedBy) {
       await createAndSendNotification(io, {
         recipientId: invitation.invitedBy,
@@ -229,6 +264,9 @@ const declineInvitation = async (req, res) => {
     await invitation.save()
 
     const io = req.app.get("io")
+    if (io) {
+      io.to(`user:${userId}`).emit("invitation-removed", { invitationId });
+    }
     if (invitation.invitedBy) {
       const workspace = await Workspace.findById(invitation.workspaceId).select("name")
       await createAndSendNotification(io, {

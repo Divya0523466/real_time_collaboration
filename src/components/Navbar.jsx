@@ -100,7 +100,7 @@ const Navbar = ({ onOpenAuth }) => {
         {user ? (
           <button
             type="button"
-            onClick={() => navigate("/app/dashboard")}
+            onClick={() => navigate("/app")}
             className="cursor-pointer rounded-full bg-[#395B64] px-4 py-1.5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(57,91,100,0.22)] transition hover:bg-[#2C3333] dark:hover:bg-[#4E717B] sm:px-6 sm:py-2 sm:text-base flex items-center gap-2"
           >
             <span>Dashboard</span>

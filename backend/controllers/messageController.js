@@ -353,17 +353,18 @@ const getUnreadMessageCounts = async (req, res) => {
         .json({ message: "Valid workspaceId query parameter is required" });
     }
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
     const membership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
     });
-    if (!membership) {
+    if (!membership && !isSuperAdmin) {
       return res.status(403).json({ message: "Access denied to workspace" });
     }
 
     // 1. Channels unread counts
     let channelFilter = { workspaceId };
-    if (membership.role === "MEMBER") {
+    if (!isSuperAdmin && membership && membership.role === "MEMBER") {
       channelFilter = {
         workspaceId,
         $or: [{ type: "PUBLIC" }, { type: "PRIVATE", members: userId }],

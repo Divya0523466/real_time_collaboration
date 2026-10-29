@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Route, Routes, useNavigate } from "react-router-dom";
+import { Route, Routes, useNavigate, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import "./App.css";
 import AboutUs from "./components/AboutUs";
@@ -12,14 +12,11 @@ import HowItWorks from "./components/HowItWorks";
 import Navbar from "./components/Navbar";
 import WhyWorkNest from "./components/WhyWorkNest";
 import AuthModal from "./components/auth/AuthModal";
+import CreateWorkspaceModal from "./components/dashboard/CreateWorkspaceModal";
 import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext";
-import { Navigate } from "react-router-dom";
 import { isSuperAdminUser, isDeactivatedAccount } from "./utils/adminAuth";
 import { requestNotificationPermission } from "./utils/desktopNotification";
 
-const GlobalDashboard = lazy(
-  () => import("./components/dashboard/GlobalDashboard"),
-);
 const SlackShell = lazy(() => import("./components/dashboard/SlackShell"));
 const ChannelManagementPage = lazy(
   () => import("./components/dashboard/ChannelManagementPage"),
@@ -81,7 +78,15 @@ const LandingPage = () => {
             if (isSuperAdminUser(effectiveUser)) {
               navigate("/admin");
             } else {
-              navigate("/app/dashboard");
+              const targetWs =
+                workspaces && workspaces[0]
+                  ? workspaces[0].id || workspaces[0]._id
+                  : null;
+              if (targetWs) {
+                navigate(`/app/workspace/${targetWs}`);
+              } else {
+                navigate("/app");
+              }
             }
           }}
         />
@@ -101,8 +106,85 @@ const SimpleLoading = () => (
   </div>
 );
 
+const NoWorkspaceFallback = () => {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const { selectWorkspace, fetchUserWorkspaces } = useWorkspace();
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFB] dark:bg-[#121717] px-6 text-[#2C3333] dark:text-[#E7F6F2]">
+      <div className="w-full max-w-md rounded-3xl border border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#1E2525] p-8 text-center shadow-xl">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E7F6F2] dark:bg-[#395B64]/40 text-3xl text-[#395B64] dark:text-[#A5C9CA] mx-auto mb-4">
+          <i className="fa-solid fa-layer-group" />
+        </div>
+        <h2 className="text-xl font-bold text-[#2C3333] dark:text-white">
+          Create your first workspace
+        </h2>
+        <p className="mt-2 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+          Bring your team together in one place to start collaborating.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#395B64] px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-[#2C3333] transition"
+        >
+          <i className="fa-solid fa-plus text-xs" /> Create workspace
+        </button>
+      </div>
+
+      {showCreateModal && (
+        <CreateWorkspaceModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={async (ws) => {
+            setShowCreateModal(false);
+            await fetchUserWorkspaces().catch(() => {});
+            const targetId = ws?.id || ws?._id;
+            if (targetId) {
+              selectWorkspace(targetId);
+              navigate(`/app/workspace/${targetId}`);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const WorkspaceResolver = () => {
+  const { user, workspaces, workspaceData, fetchUserWorkspaces, loading } =
+    useWorkspace();
+  const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
+
+  useEffect(() => {
+    if (!hasAttemptedFetch && (!workspaces || workspaces.length === 0)) {
+      setHasAttemptedFetch(true);
+      fetchUserWorkspaces().catch(() => {});
+    }
+  }, [hasAttemptedFetch, workspaces, fetchUserWorkspaces]);
+
+  if (isSuperAdminUser(user)) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  const preferredId =
+    workspaceData?.id ||
+    workspaceData?._id ||
+    workspaces?.[0]?.id ||
+    workspaces?.[0]?._id;
+
+  if (preferredId) {
+    return <Navigate to={`/app/workspace/${preferredId}`} replace />;
+  }
+
+  if (loading && !hasAttemptedFetch) {
+    return <SimpleLoading />;
+  }
+
+  return <NoWorkspaceFallback />;
+};
+
 const PublicRoute = ({ children }) => {
-  const { user, isInitializing } = useWorkspace();
+  const { user, isInitializing, workspaces, workspaceData } = useWorkspace();
 
   if (isInitializing) {
     return <SimpleLoading />;
@@ -112,7 +194,15 @@ const PublicRoute = ({ children }) => {
     if (isSuperAdminUser(user)) {
       return <Navigate to="/admin" replace />;
     }
-    return <Navigate to="/app/dashboard" replace />;
+    const targetWs =
+      workspaceData?.id ||
+      workspaceData?._id ||
+      workspaces?.[0]?.id ||
+      workspaces?.[0]?._id;
+    if (targetWs) {
+      return <Navigate to={`/app/workspace/${targetWs}`} replace />;
+    }
+    return <Navigate to="/app" replace />;
   }
   return children;
 };
@@ -131,7 +221,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const SuperAdminRoute = ({ children }) => {
-  const { user, isInitializing } = useWorkspace();
+  const { user, isInitializing, workspaces, workspaceData } = useWorkspace();
 
   if (isInitializing) {
     return <SimpleLoading />;
@@ -142,7 +232,15 @@ const SuperAdminRoute = ({ children }) => {
   }
 
   if (!isSuperAdminUser(user)) {
-    return <Navigate to="/app/dashboard" replace />;
+    const targetWs =
+      workspaceData?.id ||
+      workspaceData?._id ||
+      workspaces?.[0]?.id ||
+      workspaces?.[0]?._id;
+    if (targetWs) {
+      return <Navigate to={`/app/workspace/${targetWs}`} replace />;
+    }
+    return <Navigate to="/app" replace />;
   }
 
   return children;
@@ -168,10 +266,26 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="/app"
+          element={
+            <ProtectedRoute>
+              <WorkspaceResolver />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/app/dashboard"
           element={
             <ProtectedRoute>
-              <GlobalDashboard />
+              <WorkspaceResolver />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/app/workspace"
+          element={
+            <ProtectedRoute>
+              <WorkspaceResolver />
             </ProtectedRoute>
           }
         />

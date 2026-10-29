@@ -143,7 +143,7 @@ export const getSpaces = async (req, res) => {
     }
 
     if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
-      filter.$or = [{ workspaceId }, { workspaceId: null }, { workspaceId: { $exists: false } }]
+      filter.workspaceId = workspaceId
     }
 
     const spaces = await Space.find(filter)
@@ -549,7 +549,7 @@ export const getSpaceUnreadCounts = async (req, res) => {
       filter.members = userId
     }
     if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
-      filter.$or = [{ workspaceId }, { workspaceId: null }, { workspaceId: { $exists: false } }]
+      filter.workspaceId = workspaceId
     }
 
     const accessibleSpaces = await Space.find(filter).select("_id").lean()

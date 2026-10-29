@@ -6,6 +6,7 @@ import { createAndSendNotification } from "../utils/notificationService.js";
 import { roleUpdated, memberRemoved } from '../utils/templates.js';
 import { sendEmail } from "../utils/sendMail.js";
 import User from "../models/User.js";
+import { isUserSuperAdmin } from "../utils/spaceAccess.js";
 
 const ensureDefaultChannel = async (workspaceId, createdBy) => {
   const existing = await Channel.findOne({ workspaceId, name: "general" });
@@ -90,6 +91,8 @@ const getWorkspace = async (req, res) => {
     const { workspaceId } = req.params;
     const userId = req.userId;
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
+
     const membership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
@@ -97,12 +100,12 @@ const getWorkspace = async (req, res) => {
       .select("role")
       .lean();
 
-    if (!membership) {
+    if (!membership && !isSuperAdmin) {
       return res.status(403).json({ message: "Access denied" });
     }
 
     const workspace = await Workspace.findById(workspaceId)
-      .select("name description createdAt")
+      .select("name description createdAt createdBy")
       .lean();
 
     if (!workspace) {
@@ -130,7 +133,7 @@ const getWorkspace = async (req, res) => {
           avatar: m.userId.avatar,
           role: m.role,
         })),
-      userRole: membership.role,
+      userRole: isSuperAdmin || membership?.role === "OWNER" || (workspace && workspace.createdBy && workspace.createdBy.toString() === userId.toString()) ? "OWNER" : (membership?.role || "MEMBER"),
     });
   } catch (error) {
     return res
@@ -154,10 +157,10 @@ const updateMemberRole = async (req, res) => {
       workspaceId,
     });
 
-    if (!requesterMembership || requesterMembership.role !== "OWNER") {
+    if (!requesterMembership) {
       return res
         .status(403)
-        .json({ message: "Only workspace owners can assign roles" });
+        .json({ message: "Access denied to workspace" });
     }
 
     const targetMembership = await WorkspaceMembership.findOne({
@@ -225,10 +228,10 @@ const removeMember = async (req, res) => {
       userId,
       workspaceId,
     });
-    if (!requesterMembership || requesterMembership.role !== "OWNER") {
+    if (!requesterMembership) {
       return res
         .status(403)
-        .json({ message: "Only workspace owners can remove members" });
+        .json({ message: "Access denied to workspace" });
     }
 
     const targetMembership = await WorkspaceMembership.findOne({
@@ -294,11 +297,11 @@ const updateWorkspace = async (req, res) => {
       userId,
       workspaceId,
     });
-    if (!requesterMembership || requesterMembership.role !== "OWNER") {
+    if (!requesterMembership) {
       return res
         .status(403)
         .json({
-          message: "Only workspace owners can update workspace settings",
+          message: "Access denied to workspace",
         });
     }
 
@@ -339,10 +342,10 @@ const deleteWorkspace = async (req, res) => {
       userId,
       workspaceId,
     });
-    if (!requesterMembership || requesterMembership.role !== "OWNER") {
+    if (!requesterMembership) {
       return res
         .status(403)
-        .json({ message: "Only workspace owners can delete a workspace" });
+        .json({ message: "Access denied to workspace" });
     }
     await Workspace.findByIdAndDelete(workspaceId);
     await WorkspaceMembership.deleteMany({ workspaceId });

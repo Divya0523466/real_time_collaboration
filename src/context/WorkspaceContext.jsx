@@ -357,6 +357,35 @@ export const WorkspaceProvider = ({ children }) => {
       }
     } catch (err) {}
   }, []);
+  const fetchPendingInvitations = useCallback(async () => {
+    if (!user?.email) {
+      setInvitations([]);
+      return [];
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/workspaces/invitations`, {
+        credentials: "include",
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Failed to fetch invitations");
+      }
+
+      const data = await response.json();
+      const nextInvitations = Array.isArray(data.invitations)
+        ? data.invitations
+        : [];
+      setInvitations(nextInvitations);
+      return nextInvitations;
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, [API_URL, user?.email]);
+
   const userId = user?.id || user?._id || null;
 
   useEffect(() => {
@@ -365,9 +394,49 @@ export const WorkspaceProvider = ({ children }) => {
       return undefined;
     }
 
+    const handleInvitationReceived = (newInvitation) => {
+      if (!newInvitation || (!newInvitation.id && !newInvitation._id)) return;
+      const invId = (newInvitation.id || newInvitation._id).toString();
+      setInvitations((prev) => {
+        const exists = prev.some(
+          (inv) => (inv.id || inv._id)?.toString() === invId,
+        );
+        if (exists) return prev;
+        return [newInvitation, ...prev];
+      });
+
+      if (!isMutedGlobalRef.current) {
+        toast.info(
+          `You've been invited to join "${newInvitation.workspaceName || "a workspace"}"!`,
+          {
+            icon: <i className="fa-solid fa-envelope-open-text text-[#395B64]" />,
+          },
+        );
+        playNotificationSound();
+        showDesktopNotification(
+          `Invited to ${newInvitation.workspaceName || "a workspace"}`,
+          {
+            body: `${newInvitation.inviter?.username || "A teammate"} invited you to join "${newInvitation.workspaceName || "a workspace"}".`,
+          },
+        );
+      }
+    };
+
+    const handleInvitationRemoved = (data) => {
+      if (!data?.invitationId) return;
+      const targetIdStr = data.invitationId.toString();
+      setInvitations((prev) =>
+        prev.filter((inv) => (inv.id || inv._id)?.toString() !== targetIdStr),
+      );
+    };
+
     const handleNotification = (newNotif) => {
       setNotifications((prev) => [newNotif, ...prev]);
       setUnreadNotificationsCount((prev) => prev + 1);
+
+      if (newNotif.type === "WORKSPACE_INVITED") {
+        fetchPendingInvitations().catch(() => {});
+      }
 
       if (isMutedGlobalRef.current) return;
       if (userRef.current?.dndUntil && new Date(userRef.current.dndUntil).getTime() > Date.now()) return;
@@ -489,6 +558,7 @@ export const WorkspaceProvider = ({ children }) => {
 
     const handleSocketConnect = () => {
       requestOnlineUsers();
+      fetchPendingInvitations().catch(() => {});
     };
 
     const handleChannelArchiveToggled = ({ channelId, isArchived, archivedAt }) => {
@@ -502,6 +572,8 @@ export const WorkspaceProvider = ({ children }) => {
     };
 
     socket.on("receive-notification", handleNotification);
+    socket.on("invitation-received", handleInvitationReceived);
+    socket.on("invitation-removed", handleInvitationRemoved);
     socket.on("user-dnd-updated", handleUserDndUpdated);
     socket.on("channel-member-removed", handleChannelMemberRemoved);
     socket.on("channel-member-added", handleChannelMemberAdded);
@@ -515,9 +587,12 @@ export const WorkspaceProvider = ({ children }) => {
     connectSocket();
 
     fetchNotifications().catch(() => {});
+    fetchPendingInvitations().catch(() => {});
 
     return () => {
       socket.off("receive-notification", handleNotification);
+      socket.off("invitation-received", handleInvitationReceived);
+      socket.off("invitation-removed", handleInvitationRemoved);
       socket.off("user-dnd-updated", handleUserDndUpdated);
       socket.off("channel-member-removed", handleChannelMemberRemoved);
       socket.off("channel-member-added", handleChannelMemberAdded);
@@ -530,7 +605,7 @@ export const WorkspaceProvider = ({ children }) => {
       offUserStatusChanged(handleUserStatusChanged);
       socket.disconnect();
     };
-  }, [userId, fetchNotifications]);
+  }, [userId, fetchNotifications, fetchPendingInvitations]);
 
   const clearAuth = useCallback(() => {
     localStorage.removeItem("worknestToken");
@@ -578,34 +653,7 @@ export const WorkspaceProvider = ({ children }) => {
     [],
   );
 
-  const fetchPendingInvitations = useCallback(async () => {
-    if (!user?.email) {
-      setInvitations([]);
-      return [];
-    }
 
-    try {
-      const response = await fetch(`${API_URL}/workspaces/invitations`, {
-        credentials: "include",
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || "Failed to fetch invitations");
-      }
-
-      const data = await response.json();
-      const nextInvitations = Array.isArray(data.invitations)
-        ? data.invitations
-        : [];
-      setInvitations(nextInvitations);
-      return nextInvitations;
-    } catch (err) {
-      setError(err.message);
-      return [];
-    }
-  }, [API_URL, user?.email]);
 
   const fetchUserWorkspaces = useCallback(async () => {
     setLoading(true);
@@ -755,7 +803,22 @@ export const WorkspaceProvider = ({ children }) => {
 
         const data = await response.json();
         const newWorkspace = data.workspace;
-        setWorkspaces((prev) => [newWorkspace, ...prev]);
+        setWorkspaces((prev) => [
+          newWorkspace,
+          ...prev.filter(
+            (w) => (w.id || w._id)?.toString() !== (newWorkspace.id || newWorkspace._id)?.toString()
+          ),
+        ]);
+        try {
+          const stored = JSON.parse(localStorage.getItem("worknestWorkspaces") || "[]");
+          const next = [
+            newWorkspace,
+            ...stored.filter(
+              (w) => (w.id || w._id)?.toString() !== (newWorkspace.id || newWorkspace._id)?.toString()
+            ),
+          ];
+          localStorage.setItem("worknestWorkspaces", JSON.stringify(next));
+        } catch {}
         return newWorkspace;
       } catch (err) {
         setError(err.message);

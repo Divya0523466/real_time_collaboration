@@ -526,7 +526,8 @@ const SuperAdminDashboard = () => {
   }
 
   const handleSelectWorkspace = (workspace) => {
-    const wsId = workspace.id || workspace._id
+    const wsId = (workspace?.id || workspace?._id || workspace)?.toString()
+    if (!wsId) return
     if (selectWorkspace) {
       selectWorkspace(wsId)
     }
@@ -580,7 +581,7 @@ const SuperAdminDashboard = () => {
   useEffect(() => {
     if (user && !isSuperAdminUser(user)) {
       toast.error("Access denied. Super Admin privileges required.")
-      navigate("/app/dashboard", { replace: true })
+      navigate("/app", { replace: true })
     }
   }, [user, navigate])
 
@@ -597,7 +598,7 @@ const SuperAdminDashboard = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate("/app/dashboard")}
+            onClick={() => navigate("/app")}
             className="rounded-xl bg-[#395B64] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#2C3333] transition"
           >
             Return to Workspaces

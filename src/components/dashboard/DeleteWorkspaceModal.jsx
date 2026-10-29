@@ -24,7 +24,7 @@ const DeleteWorkspaceModal = ({ workspace, onClose }) => {
       await deleteWorkspace()
       toast.error(`Workspace "${workspace.name}" was permanently deleted`)
       onClose()
-      navigate("/app/dashboard")
+      navigate("/app")
     } catch (err) {
       setError(err.message || "Failed to delete workspace")
       toast.error(err.message || "Failed to delete workspace")
