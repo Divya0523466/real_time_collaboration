@@ -142,6 +142,7 @@ const issueAuthSession = async (res, user) => {
       isActive: user.isActive !== false,
       status: user.status || "active",
       twoFactorEnabled: Boolean(user.twoFactorEnabled),
+      subscription: user.subscription || { plan: "FREE", status: "active" },
     },
     workspaces,
   });
@@ -606,6 +607,7 @@ const updateProfile = async (req, res) => {
         bio: updatedUser.bio || "",
         customStatus: updatedUser.customStatus || { text: "", emoji: "" },
         twoFactorEnabled: Boolean(updatedUser.twoFactorEnabled),
+        subscription: updatedUser.subscription || { plan: "FREE", status: "active" },
       },
     });
   } catch (error) {

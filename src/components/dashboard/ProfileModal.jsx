@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { uploadFile } from "../../services/uploadService";
 import { toast } from "react-toastify";
+import UpgradeModal from "./UpgradeModal";
+import { cancelSubscriptionApi } from "../../services/billingService";
+import { isProUser } from "../../utils/subscriptionUtils";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -50,6 +53,55 @@ const ProfileModal = ({ onClose }) => {
   const isDnd = isDndActive
     ? isDndActive(user)
     : Boolean(user?.dndUntil && new Date(user.dndUntil).getTime() > Date.now());
+
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const isPro = isProUser(user);
+  const isCanceling = Boolean(
+    user?.subscription?.cancelAtPeriodEnd ||
+      user?.subscription?.status === "canceling",
+  );
+
+  const periodEndDateStr = user?.subscription?.currentPeriodEnd
+    ? new Date(user.subscription.currentPeriodEnd).toLocaleDateString(
+        undefined,
+        {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        },
+      )
+    : "end of period";
+
+  const handleCancelSubscription = async () => {
+    setIsCancelling(true);
+    try {
+      const res = await cancelSubscriptionApi();
+      if (res.success) {
+        if (setUser && res.user) {
+          setUser((prev) => {
+            const updated = {
+              ...prev,
+              ...res.user,
+              subscription: res.subscription,
+            };
+            localStorage.setItem("worknestUser", JSON.stringify(updated));
+            return updated;
+          });
+        }
+        setShowCancelConfirm(false);
+        toast.info(
+          res.message ||
+            "Auto-renewal cancelled. Pro access remains active until your billing expiry date.",
+        );
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to cancel subscription");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   const [twoFactorMode, setTwoFactorMode] = useState("idle");
   const [setupOtp, setSetupOtp] = useState("");
@@ -338,7 +390,7 @@ const ProfileModal = ({ onClose }) => {
       }}
     >
       <div
-        className="m-auto w-full max-w-2xl rounded-2xl bg-white dark:bg-[#181F20] border border-gray-200/80 dark:border-[#2C3636] p-5 sm:p-6 shadow-2xl transition-colors"
+        className="m-auto w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#181F20] border border-gray-200/80 dark:border-[#2C3636] p-4 sm:p-6 shadow-2xl transition-colors"
         role="dialog"
         aria-modal="true"
       >
@@ -767,6 +819,78 @@ const ProfileModal = ({ onClose }) => {
                   </div>
                 )}
               </div>
+
+              {/* Subscription & Plan Card */}
+              <div className="rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/40 bg-[#F8FAFB] dark:bg-[#1C2324] p-3 transition-all">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]">
+                      <i
+                        className={`fa-solid ${isPro ? "fa-crown" : "fa-layer-group"} text-xs`}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2] truncate leading-tight">
+                          {isPro ? "WorkNest Pro" : "Free Plan"}
+                        </p>
+                        {isPro && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#395B64] text-white dark:bg-[#A5C9CA] dark:text-[#1E2525] leading-none">
+                            PRO
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80 truncate leading-tight mt-0.5">
+                        {isPro
+                          ? isCanceling
+                            ? `Valid until ${periodEndDateStr} • Reverts to Free on expiry`
+                            : "Active subscription • Unlimited workspaces & channels"
+                          : "Standard plan • Upgrade for unlimited workspaces"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {!isPro ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#395B64] hover:bg-[#2C3333] dark:hover:bg-[#2C3636] transition shadow-2xs whitespace-nowrap"
+                    >
+                      <i className="fa-solid fa-crown text-[10px]" />
+                      <span>Upgrade to Pro</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isCanceling ? (
+                        <div className="text-right">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#395B64] dark:text-[#A5C9CA]">
+                            <i className="fa-solid fa-clock text-[10px]" />
+                            Expires {periodEndDateStr}
+                          </span>
+                          <p className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/70 leading-none">
+                            Auto-renewal cancelled
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] flex items-center gap-1">
+                            <i className="fa-solid fa-circle-check text-xs" />
+                            Active
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowCancelConfirm(true)}
+                            className="cursor-pointer px-2.5 py-1 rounded text-xs font-medium text-[#52656A] hover:text-rose-600 dark:text-[#A5C9CA]/80 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                            title="Cancel recurring auto-renewal"
+                          >
+                            Cancel Plan
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -793,6 +917,58 @@ const ProfileModal = ({ onClose }) => {
           </div>
         </form>
       </div>
+
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
+
+      {/* Cancel Subscription Confirmation Dialog */}
+      {showCancelConfirm && (
+        <div
+          className="fixed inset-0 z-60 grid overflow-y-auto bg-black/60 px-4 py-6 backdrop-blur-xs sm:px-6 animate-[fadeIn_0.15s_ease-out]"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="m-auto w-full max-w-sm rounded-2xl bg-white dark:bg-[#1E2525] border border-[#D8E2E1] dark:border-[#395B64]/50 p-5 shadow-2xl text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 mx-auto mb-3">
+              <i className="fa-solid fa-triangle-exclamation text-lg" />
+            </div>
+
+            <h3 className="text-base font-bold text-[#2C3333] dark:text-white">
+              Cancel Auto-Renewal?
+            </h3>
+            <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80 mt-1 mb-4">
+              No further recurring payments will be charged. You will keep full WorkNest Pro access until <strong>{periodEndDateStr}</strong>, after which your account will switch to the Free plan.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={isCancelling}
+                className="flex-1 py-2 px-3 rounded-lg border border-[#D8E2E1] dark:border-[#395B64]/50 text-xs font-semibold text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition cursor-pointer disabled:opacity-50"
+              >
+                Keep Pro
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelSubscription}
+                disabled={isCancelling}
+                className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isCancelling ? (
+                  <>
+                    <i className="fa-solid fa-circle-notch fa-spin text-xs" />
+                    <span>Cancelling...</span>
+                  </>
+                ) : (
+                  <span>Cancel Plan</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

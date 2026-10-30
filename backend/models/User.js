@@ -83,6 +83,34 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    subscription: {
+      plan: {
+        type: String,
+        enum: ["FREE", "PRO"],
+        default: "FREE",
+      },
+      status: {
+        type: String,
+        enum: ["none", "active", "canceling", "incomplete", "canceled", "past_due"],
+        default: "active",
+      },
+      cancelAtPeriodEnd: {
+        type: Boolean,
+        default: false,
+      },
+      stripeCustomerId: {
+        type: String,
+        default: null,
+      },
+      stripeSubscriptionId: {
+        type: String,
+        default: null,
+      },
+      currentPeriodEnd: {
+        type: Date,
+        default: null,
+      },
+    },
     resetOtp: {
       type: String,
       default: null,

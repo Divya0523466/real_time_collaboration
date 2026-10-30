@@ -1,17 +1,31 @@
 import { useState } from "react"
 import { useWorkspace } from "../../context/WorkspaceContext"
 import { toast } from "react-toastify"
+import { isProUser } from "../../utils/subscriptionUtils"
+import UpgradeModal from "./UpgradeModal"
 
 const CreateWorkspaceModal = ({ onClose, onSuccess }) => {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const { createWorkspace } = useWorkspace()
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const { createWorkspace, user, workspaces } = useWorkspace()
+
+  const isPro = isProUser(user)
+  const ownedWorkspaces = (workspaces || []).filter(
+    (w) => w.role === "OWNER" || w.userRole === "OWNER"
+  )
+  const isLimitReached = !isPro && ownedWorkspaces.length >= 1
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
+
+    if (isLimitReached) {
+      setShowUpgradeModal(true)
+      return
+    }
 
     if (!name.trim()) {
       setError("Workspace name is required")
@@ -26,6 +40,9 @@ const CreateWorkspaceModal = ({ onClose, onSuccess }) => {
     } catch (err) {
       setError(err.message || "Failed to create workspace")
       toast.error(err.message || "Failed to create workspace")
+      if (err.message && err.message.toLowerCase().includes("free plan limit")) {
+        setShowUpgradeModal(true)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -36,11 +53,11 @@ const CreateWorkspaceModal = ({ onClose, onSuccess }) => {
       className="fixed inset-0 z-50 grid overflow-y-auto bg-[#2C3333]/60 px-4 py-6 backdrop-blur-xs sm:px-6"
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget && !isLoading) onClose()
       }}
     >
       <div
-        className="m-auto w-full max-w-md rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-5 sm:p-8 shadow-[0_24px_70px_rgba(44,51,51,0.35)]"
+        className="m-auto w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#1E2525] dark:border dark:border-[#395B64]/40 p-5 sm:p-8 shadow-[0_24px_70px_rgba(44,51,51,0.35)]"
         role="dialog"
         aria-modal="true"
       >
@@ -52,59 +69,96 @@ const CreateWorkspaceModal = ({ onClose, onSuccess }) => {
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[#52656A] hover:bg-[#E7F6F2] hover:text-[#2C3333] dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] dark:hover:text-[#E7F6F2] transition cursor-pointer"
           >
             <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] dark:text-[#E7F6F2] mb-1.5">
-              Workspace Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Engineering, Product Team"
-              className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#2C3333] px-3.5 py-2.5 text-sm text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#2C3333] focus:outline-none transition"
-            />
+        {isLimitReached ? (
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-[#D8E2E1] dark:border-[#395B64]/50 bg-[#E7F6F2]/60 dark:bg-[#1C2324] p-4 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] mx-auto mb-3">
+                <i className="fa-solid fa-layer-group text-lg" />
+              </div>
+              <h3 className="text-base font-bold text-[#2C3333] dark:text-white">
+                Workspace Limit Reached
+              </h3>
+              <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80 mt-1 mb-4 leading-relaxed">
+                The Free plan allows creating <strong>1 workspace</strong>. To create and manage unlimited workspaces, upgrade to WorkNest Pro.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-xs text-white bg-[#395B64] hover:bg-[#2C3333] dark:hover:bg-[#2C3636] transition cursor-pointer shadow-xs"
+              >
+                <i className="fa-solid fa-crown text-[10px]" />
+                <span>Upgrade to Pro for Unlimited Workspaces</span>
+              </button>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-[#52656A] hover:bg-gray-100 dark:text-[#A5C9CA] dark:hover:bg-[#2C3333] transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] dark:text-[#E7F6F2] mb-1.5">
+                Workspace Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Engineering, Product Team"
+                className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#2C3333] px-3.5 py-2.5 text-sm text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#2C3333] focus:outline-none transition"
+              />
+            </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] dark:text-[#E7F6F2] mb-1.5">
-              Description <span className="text-[11px] font-normal text-[#52656A] dark:text-[#A5C9CA] lowercase">(optional)</span>
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this workspace about?"
-              rows="3"
-              className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#2C3333] px-3.5 py-2.5 text-sm text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#2C3333] focus:outline-none transition resize-none"
-            />
-          </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#2C3333] dark:text-[#E7F6F2] mb-1.5">
+                Description <span className="text-[11px] font-normal text-[#52656A] dark:text-[#A5C9CA] lowercase">(optional)</span>
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What's this workspace about?"
+                rows="3"
+                className="w-full rounded-xl border border-[#A5C9CA] dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#2C3333] px-3.5 py-2.5 text-sm text-[#2C3333] dark:text-[#E7F6F2] placeholder-[#7B8B8F] dark:placeholder-[#A5C9CA]/50 focus:border-[#395B64] focus:bg-white dark:focus:bg-[#2C3333] focus:outline-none transition resize-none"
+              />
+            </div>
 
-          {error && <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>}
+            {error && <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>}
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] py-2.5 text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 rounded-xl bg-[#395B64] py-2.5 text-sm font-semibold text-white shadow-md hover:bg-[#2C3333] dark:hover:bg-[#4E717B] disabled:opacity-60 transition"
-            >
-              {isLoading ? "Creating..." : "Create workspace"}
-            </button>
-          </div>
-        </form>
+            <div className="flex flex-col sm:flex-row gap-3 pt-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 rounded-xl border border-[#A5C9CA] dark:border-[#395B64] py-2.5 text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3333] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 rounded-xl bg-[#395B64] py-2.5 text-sm font-semibold text-white shadow-md hover:bg-[#2C3333] dark:hover:bg-[#4E717B] disabled:opacity-60 transition cursor-pointer"
+              >
+                {isLoading ? "Creating..." : "Create workspace"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
+
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
     </div>
   )
 }

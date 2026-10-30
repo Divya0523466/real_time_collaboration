@@ -7,6 +7,7 @@ import { roleUpdated, memberRemoved } from '../utils/templates.js';
 import { sendEmail } from "../utils/sendMail.js";
 import User from "../models/User.js";
 import { isUserSuperAdmin } from "../utils/spaceAccess.js";
+import { isUserPro, PLAN_LIMITS } from "../utils/subscriptionUtils.js";
 
 const ensureDefaultChannel = async (workspaceId, createdBy) => {
   const existing = await Channel.findOne({ workspaceId, name: "general" });
@@ -29,6 +30,24 @@ const createWorkspace = async (req, res) => {
 
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Workspace name is required" });
+    }
+
+    const user = await User.findById(userId);
+    const hasPro = isUserPro(user);
+
+    if (!hasPro) {
+      const ownedWorkspacesCount = await WorkspaceMembership.countDocuments({
+        userId,
+        role: "OWNER",
+      });
+      if (ownedWorkspacesCount >= PLAN_LIMITS.FREE.maxWorkspaces) {
+        return res.status(403).json({
+          message:
+            "Free plan limit reached: You can create only 1 workspace on the Free plan. Upgrade to WorkNest Pro for unlimited workspaces.",
+          limitReached: "workspaces",
+          upgradeRequired: true,
+        });
+      }
     }
 
     const workspace = await Workspace.create({
@@ -152,15 +171,23 @@ const updateMemberRole = async (req, res) => {
       return res.status(400).json({ message: "Invalid role" });
     }
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
     const requesterMembership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
     });
 
-    if (!requesterMembership) {
+    if (!requesterMembership && !isSuperAdmin) {
       return res
         .status(403)
         .json({ message: "Access denied to workspace" });
+    }
+
+    const requesterRole = isSuperAdmin ? "OWNER" : requesterMembership?.role;
+    if (requesterRole !== "OWNER" && requesterRole !== "ADMIN") {
+      return res.status(403).json({
+        message: "Only workspace owners and admins can manage member roles",
+      });
     }
 
     const targetMembership = await WorkspaceMembership.findOne({
@@ -170,6 +197,20 @@ const updateMemberRole = async (req, res) => {
 
     if (!targetMembership) {
       return res.status(404).json({ message: "Member not found in workspace" });
+    }
+
+    // Admins cannot change roles of other admins or owners, and cannot promote to owner
+    if (requesterRole === "ADMIN") {
+      if (targetMembership.role === "OWNER" || targetMembership.role === "ADMIN") {
+        return res.status(403).json({
+          message: "Admins cannot modify the role of owners or other admins",
+        });
+      }
+      if (role === "OWNER") {
+        return res.status(403).json({
+          message: "Admins cannot promote members to owner",
+        });
+      }
     }
 
     if (targetMembership.role === "OWNER" && role !== "OWNER") {
@@ -191,7 +232,6 @@ const updateMemberRole = async (req, res) => {
         htmlTemplate
       );
     }
-
 
     const io = req.app.get("io");
     const workspace = await Workspace.findById(workspaceId).select("name");
@@ -224,14 +264,22 @@ const removeMember = async (req, res) => {
         .json({ message: "Cannot remove yourself from the workspace" });
     }
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
     const requesterMembership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
     });
-    if (!requesterMembership) {
+    if (!requesterMembership && !isSuperAdmin) {
       return res
         .status(403)
         .json({ message: "Access denied to workspace" });
+    }
+
+    const requesterRole = isSuperAdmin ? "OWNER" : requesterMembership?.role;
+    if (requesterRole !== "OWNER" && requesterRole !== "ADMIN") {
+      return res.status(403).json({
+        message: "Only workspace owners and admins can remove members",
+      });
     }
 
     const targetMembership = await WorkspaceMembership.findOne({
@@ -246,6 +294,12 @@ const removeMember = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Cannot remove an owner from the workspace" });
+    }
+
+    if (requesterRole === "ADMIN" && (targetMembership.role === "ADMIN" || targetMembership.role === "OWNER")) {
+      return res.status(403).json({
+        message: "Admins cannot remove other admins or owners",
+      });
     }
 
     await WorkspaceMembership.deleteOne({ _id: targetMembership._id });
@@ -293,16 +347,24 @@ const updateWorkspace = async (req, res) => {
       return res.status(400).json({ message: "Workspace name is required" });
     }
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
     const requesterMembership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
     });
-    if (!requesterMembership) {
+    if (!requesterMembership && !isSuperAdmin) {
       return res
         .status(403)
         .json({
           message: "Access denied to workspace",
         });
+    }
+
+    const requesterRole = isSuperAdmin ? "OWNER" : requesterMembership?.role;
+    if (requesterRole !== "OWNER" && requesterRole !== "ADMIN") {
+      return res.status(403).json({
+        message: "Only workspace owners and admins can edit workspace settings",
+      });
     }
 
     const workspace = await Workspace.findByIdAndUpdate(
@@ -338,15 +400,24 @@ const deleteWorkspace = async (req, res) => {
     const { workspaceId } = req.params;
     const userId = req.userId;
 
+    const isSuperAdmin = await isUserSuperAdmin(userId);
     const requesterMembership = await WorkspaceMembership.findOne({
       userId,
       workspaceId,
     });
-    if (!requesterMembership) {
+    if (!requesterMembership && !isSuperAdmin) {
       return res
         .status(403)
         .json({ message: "Access denied to workspace" });
     }
+
+    const requesterRole = isSuperAdmin ? "OWNER" : requesterMembership?.role;
+    if (requesterRole !== "OWNER") {
+      return res.status(403).json({
+        message: "Only the workspace owner can delete the workspace",
+      });
+    }
+
     await Workspace.findByIdAndDelete(workspaceId);
     await WorkspaceMembership.deleteMany({ workspaceId });
     await Channel.deleteMany({ workspaceId });

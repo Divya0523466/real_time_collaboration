@@ -6,6 +6,7 @@ import User from "../models/User.js"
 import { createAndSendNotification } from "../utils/notificationService.js";
 import { sendEmail } from "../utils/sendMail.js";
 import {workspaceInvitation} from "../utils/templates.js"
+import { isUserSuperAdmin } from "../utils/spaceAccess.js";
 
 const inviteMembers = async (req, res) => {
   try {
@@ -19,9 +20,19 @@ const inviteMembers = async (req, res) => {
 
     const inviteRole = ["ADMIN", "MEMBER"].includes(role) ? role : "MEMBER"
 
+    const isSuperAdmin = await isUserSuperAdmin(userId)
     const requesterMembership = await WorkspaceMembership.findOne({ userId, workspaceId })
-    if (!requesterMembership) {
+    if (!requesterMembership && !isSuperAdmin) {
       return res.status(403).json({ message: "Access denied to workspace" })
+    }
+
+    const requesterRole = isSuperAdmin ? "OWNER" : requesterMembership?.role
+    if (requesterRole !== "OWNER" && requesterRole !== "ADMIN") {
+      return res.status(403).json({ message: "Only workspace owners and admins can invite members" })
+    }
+
+    if (requesterRole === "ADMIN" && inviteRole === "OWNER") {
+      return res.status(403).json({ message: "Admins cannot invite members as workspace owners" })
     }
 
     const invitationEmails = [...new Set(

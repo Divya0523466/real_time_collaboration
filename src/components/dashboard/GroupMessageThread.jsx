@@ -378,7 +378,6 @@ const GroupMessageThread = ({
 
         {/* Header Right Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-          <StatusSelector align="right" />
           {/* Pinned Messages Button */}
           <button
             type="button"

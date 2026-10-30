@@ -4,6 +4,7 @@ import SpaceReadState from "../models/SpaceReadState.js"
 import ChannelMessage from "../models/ChannelMessage.js"
 import User from "../models/User.js"
 import { getSpaceAccess, isUserSuperAdmin } from "../utils/spaceAccess.js"
+import { isUserPro, PLAN_LIMITS } from "../utils/subscriptionUtils.js"
 import { createAndSendNotification } from "../utils/notificationService.js"
 import { buildReplyToMessage } from "./messageController.js"
 
@@ -58,9 +59,20 @@ export const formatSpaceMessage = (message, currentUserId = null) => ({
 
 export const createSpace = async (req, res) => {
   try {
-    const isSuper = await isUserSuperAdmin(req.userId)
-    if (!isSuper) {
-      return res.status(403).json({ message: "Access denied. Only Super Admins can create Spaces." })
+    const user = await User.findById(req.userId);
+    const isSuper = await isUserSuperAdmin(req.userId);
+    const hasPro = isUserPro(user);
+
+    if (!isSuper && !hasPro) {
+      const userSpacesCount = await Space.countDocuments({ createdBy: req.userId });
+      if (userSpacesCount >= PLAN_LIMITS.FREE.maxSpaces) {
+        return res.status(403).json({
+          message:
+            "Free plan limit reached: You can create up to 3 spaces on the Free plan. Upgrade to WorkNest Pro for unlimited spaces.",
+          limitReached: "spaces",
+          upgradeRequired: true,
+        });
+      }
     }
 
     const { name, description = "", members = [], workspaceId = null } = req.body
@@ -138,12 +150,24 @@ export const getSpaces = async (req, res) => {
     const { workspaceId } = req.query
 
     let filter = {}
-    if (!isSuper) {
+    if (isSuper) {
+      if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
+        filter.$or = [
+          { workspaceId: new mongoose.Types.ObjectId(workspaceId) },
+          { workspaceId: null },
+          { workspaceId: { $exists: false } },
+        ]
+      }
+    } else {
       filter.members = req.userId
-    }
-
-    if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
-      filter.workspaceId = workspaceId
+      if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
+        filter.$or = [
+          { workspaceId: new mongoose.Types.ObjectId(workspaceId) },
+          { workspaceId: null },
+          { workspaceId: { $exists: false } },
+          { members: req.userId },
+        ]
+      }
     }
 
     const spaces = await Space.find(filter)
@@ -545,11 +569,24 @@ export const getSpaceUnreadCounts = async (req, res) => {
     const { workspaceId } = req.query
 
     let filter = {}
-    if (!isSuper) {
+    if (isSuper) {
+      if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
+        filter.$or = [
+          { workspaceId: new mongoose.Types.ObjectId(workspaceId) },
+          { workspaceId: null },
+          { workspaceId: { $exists: false } },
+        ]
+      }
+    } else {
       filter.members = userId
-    }
-    if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
-      filter.workspaceId = workspaceId
+      if (workspaceId && mongoose.isValidObjectId(workspaceId)) {
+        filter.$or = [
+          { workspaceId: new mongoose.Types.ObjectId(workspaceId) },
+          { workspaceId: null },
+          { workspaceId: { $exists: false } },
+          { members: userId },
+        ]
+      }
     }
 
     const accessibleSpaces = await Space.find(filter).select("_id").lean()

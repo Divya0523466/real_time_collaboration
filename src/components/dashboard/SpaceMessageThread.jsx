@@ -528,13 +528,14 @@ const SpaceMessageThread = ({
   return (
     <div className="flex min-w-0 flex-1 w-full h-full flex-col bg-white dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
       {/* ── Space Header ─────────────────────────────────────────────── */}
-      <div className="flex h-14 items-center justify-between border-b border-gray-200 dark:border-[#2C3333] px-3.5 sm:px-6 bg-white dark:bg-[#1A2121] flex-shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex h-14 items-center justify-between border-b border-gray-200 dark:border-[#2C3333] px-2.5 sm:px-6 bg-white dark:bg-[#1A2121] flex-shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
           {handleOpenSidebar && (
             <button
               type="button"
               onClick={handleOpenSidebar}
-              className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-[#A5C9CA] hover:bg-gray-100 dark:hover:bg-[#2C3333]"
+              className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 dark:text-[#A5C9CA] hover:bg-gray-100 dark:hover:bg-[#2C3333] flex-shrink-0"
+              aria-label="Open sidebar"
             >
               <i className="fa-solid fa-bars text-sm" />
             </button>
@@ -542,8 +543,8 @@ const SpaceMessageThread = ({
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#395B64]/10 dark:bg-[#395B64] text-[#395B64] dark:text-[#E7F6F2] flex-shrink-0 shadow-xs">
             <i className="fa-solid fa-table-cells-large text-sm" />
           </span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
               <h1 className="truncate text-sm sm:text-base font-bold text-gray-900 dark:text-white">
                 #{space?.name || "Space"}
               </h1>
@@ -552,15 +553,15 @@ const SpaceMessageThread = ({
               <button
                 type="button"
                 onClick={handleManageMembers}
-                className="hover:underline flex items-center gap-1 cursor-pointer"
+                className="hover:underline flex items-center gap-1 cursor-pointer flex-shrink-0"
               >
                 <i className="fa-solid fa-users text-[10px]" />
                 <span>{spaceMembers.length} {spaceMembers.length === 1 ? "member" : "members"}</span>
               </button>
               {space?.description && (
                 <>
-                  <span>·</span>
-                  <span className="truncate max-w-[150px] sm:max-w-xs">{space.description}</span>
+                  <span className="hidden sm:inline">·</span>
+                  <span className="truncate max-w-[150px] sm:max-w-xs hidden sm:inline">{space.description}</span>
                 </>
               )}
             </div>
@@ -568,12 +569,11 @@ const SpaceMessageThread = ({
         </div>
 
         {/* Space Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-          <StatusSelector align="right" />
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <button
             type="button"
             onClick={handleManageMembers}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] px-2.5 py-1.5 text-xs font-semibold text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer"
             title="Space members"
           >
             <i className="fa-solid fa-users text-xs text-[#395B64] dark:text-[#A5C9CA]" />
@@ -584,7 +584,7 @@ const SpaceMessageThread = ({
           <button
             type="button"
             onClick={() => setShowPinnedDrawer(true)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
               showPinnedDrawer
                 ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
@@ -604,7 +604,7 @@ const SpaceMessageThread = ({
           <button
             type="button"
             onClick={() => setShowSpaceSearch((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
               showSpaceSearch
                 ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"
@@ -619,7 +619,7 @@ const SpaceMessageThread = ({
           <button
             type="button"
             onClick={() => setShowFilesGallery((prev) => !prev)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
+            className={`flex items-center gap-1.5 rounded-lg border p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold transition shadow-xs cursor-pointer ${
               showFilesGallery
                 ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA]"
                 : "border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] text-gray-700 dark:text-[#A5C9CA] hover:bg-gray-50 dark:hover:bg-[#395B64]/40"

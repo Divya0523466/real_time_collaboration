@@ -6,6 +6,7 @@ import { sendEmail } from "../utils/sendMail.js";
 import { addedToChannel, removedFromChannel } from "../utils/templates.js";
 import User from "../models/User.js";
 import { isUserSuperAdmin } from "../utils/spaceAccess.js";
+import { isUserPro, PLAN_LIMITS } from "../utils/subscriptionUtils.js";
 
 const createChannel = async (req, res) => {
   try {
@@ -26,6 +27,21 @@ const createChannel = async (req, res) => {
       return res
         .status(403)
         .json({ message: "You do not have permission to create channels" });
+    }
+
+    const user = await User.findById(userId);
+    const hasPro = isUserPro(user);
+
+    if (!hasPro) {
+      const channelCount = await Channel.countDocuments({ workspaceId });
+      if (channelCount >= PLAN_LIMITS.FREE.maxChannelsPerWorkspace) {
+        return res.status(403).json({
+          message:
+            "Free plan limit reached: Workspaces on the Free plan are limited to 5 channels. Upgrade to WorkNest Pro for unlimited channels.",
+          limitReached: "channels",
+          upgradeRequired: true,
+        });
+      }
     }
 
     const channelType =

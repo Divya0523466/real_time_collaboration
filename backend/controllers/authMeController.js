@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import WorkspaceMembership from "../models/WorkspaceMembership.js";
+import { isUserPro } from "../utils/subscriptionUtils.js";
 
 export const getMe = async (req, res) => {
   try {
@@ -10,16 +11,22 @@ export const getMe = async (req, res) => {
 
     if (user.isActive === false || user.status === "inactive") {
       return res.status(403).json({
-        message: "Your account has been deactivated. Please contact the administrator.",
+        message:
+          "Your account has been deactivated. Please contact the administrator.",
       });
     }
 
-    if (user.email?.toLowerCase() === "admin@gmail.com" && user.role !== "super_admin") {
+    if (
+      user.email?.toLowerCase() === "admin@gmail.com" &&
+      user.role !== "super_admin"
+    ) {
       user.role = "super_admin";
       await user.save().catch(() => {});
     }
 
-    const memberships = await WorkspaceMembership.find({ userId: user._id }).populate("workspaceId");
+    const memberships = await WorkspaceMembership.find({
+      userId: user._id,
+    }).populate("workspaceId");
     const workspaces = memberships
       .filter((m) => m.workspaceId)
       .map((m) => ({
@@ -34,6 +41,8 @@ export const getMe = async (req, res) => {
       user.role === "admin" ||
       user.email?.toLowerCase() === "admin@gmail.com";
 
+    isUserPro(user);
+
     return res.json({
       token: req.token,
       user: {
@@ -41,13 +50,14 @@ export const getMe = async (req, res) => {
         username: user.username,
         email: user.email,
         avatar: user.avatar,
-        role: isSuperAdmin ? "admin" : (user.role || "user"),
+        role: isSuperAdmin ? "admin" : user.role || "user",
         platformRole: isSuperAdmin ? "super_admin" : "user",
         isSuperAdmin,
         isActive: user.isActive !== false,
         status: user.status || "active",
         presenceStatus: user.presenceStatus || "active",
         twoFactorEnabled: Boolean(user.twoFactorEnabled),
+        subscription: user.subscription || { plan: "FREE", status: "active" },
         bio: user.bio || "",
         customStatus: user.customStatus || { text: "", emoji: "" },
         dndUntil: user.dndUntil || null,

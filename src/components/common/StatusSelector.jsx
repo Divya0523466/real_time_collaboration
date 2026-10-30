@@ -60,7 +60,7 @@ const StatusSelector = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors cursor-pointer select-none text-xs font-medium ${
+        className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full border transition-colors cursor-pointer select-none text-xs font-medium ${
           isDnd
             ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#252E2E] text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#D8EAE5] dark:hover:bg-[#2C3636]"
             : "border-[#D8E2E1] dark:border-[#395B64]/60 bg-white dark:bg-[#252E2E] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] text-[#2C3333] dark:text-[#E7F6F2]"
@@ -73,7 +73,7 @@ const StatusSelector = ({
         aria-label="Change availability status"
       >
         <StatusBadge status={currentStatus} isDnd={isDnd} size="xs" />
-        <span>{getStatusDisplay(currentStatus)}</span>
+        <span className="hidden sm:inline">{getStatusDisplay(currentStatus)}</span>
         <i
           className={`fa-solid fa-chevron-down text-[8px] text-[#52656A] dark:text-[#A5C9CA]/70 ml-0.5 transition-transform ${
             isOpen ? "rotate-180" : ""

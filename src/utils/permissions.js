@@ -13,11 +13,11 @@ const ROLE_PERMISSIONS = {
     canAccessAllChannels: true,
   },
   ADMIN: {
-    canManageWorkspace: false,
-    canManageMembers: false,
-    canManageRoles: false,
+    canManageWorkspace: true,
+    canManageMembers: true,
+    canManageRoles: true,
     canInviteAdmins: false,
-    canInviteMembers: false,
+    canInviteMembers: true,
     canCreateChannels: true,
     canManageChannels: true,
     canManageChannelMembers: true,
@@ -38,33 +38,30 @@ const ROLE_PERMISSIONS = {
     canEditChannels: false,
     canAccessAllChannels: false,
   },
-}
-
+};
 
 export const getPermissions = (role) => {
   if (!role || !ROLE_PERMISSIONS[role]) {
-    return ROLE_PERMISSIONS.MEMBER
+    return ROLE_PERMISSIONS.MEMBER;
   }
-  return ROLE_PERMISSIONS[role]
-}
-
+  return ROLE_PERMISSIONS[role];
+};
 
 export const hasPermission = (role, permission) => {
-  const permissions = getPermissions(role)
-  return permissions[permission] === true
-}
+  const permissions = getPermissions(role);
+  return permissions[permission] === true;
+};
 
 export const getRoleDisplayName = (role) => {
   const names = {
     OWNER: "Owner",
     ADMIN: "Admin",
     MEMBER: "Member",
-  }
-  return names[role] || role
-}
-
+  };
+  return names[role] || role;
+};
 
 export const canManageRole = (userRole, targetRole) => {
-  const roleHierarchy = { OWNER: 3, ADMIN: 2, MEMBER: 1 }
-  return (roleHierarchy[userRole] || 0) > (roleHierarchy[targetRole] || 0)
-}
+  const roleHierarchy = { OWNER: 3, ADMIN: 2, MEMBER: 1 };
+  return (roleHierarchy[userRole] || 0) > (roleHierarchy[targetRole] || 0);
+};

@@ -25,6 +25,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
+import billingRoutes from "./routes/billingRoutes.js";
 import Group from "./models/Group.js";
 import { formatGroupMessage } from "./controllers/groupController.js";
 import { createAndSendNotification } from "./utils/notificationService.js";
@@ -63,7 +64,13 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
@@ -77,6 +84,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/billing", billingRoutes);
 
 //socket io authentication middleware
 io.use((socket, next) => {

@@ -27,6 +27,12 @@ const SetPassword = lazy(() => import("./components/SetPassword"));
 const SuperAdminDashboard = lazy(
   () => import("./components/admin/SuperAdminDashboard"),
 );
+const BillingSuccess = lazy(
+  () => import("./components/billing/BillingSuccess"),
+);
+const BillingCancel = lazy(
+  () => import("./components/billing/BillingCancel"),
+);
 
 const LandingPage = () => {
   const [authMode, setAuthMode] = useState(null);
@@ -367,6 +373,22 @@ const AppRoutes = () => {
             <PublicRoute>
               <SetPassword />
             </PublicRoute>
+          }
+        />
+        <Route
+          path="/billing/success"
+          element={
+            <ProtectedRoute>
+              <BillingSuccess />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing/cancel"
+          element={
+            <ProtectedRoute>
+              <BillingCancel />
+            </ProtectedRoute>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />

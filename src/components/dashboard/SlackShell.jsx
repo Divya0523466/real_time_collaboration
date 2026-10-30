@@ -6,6 +6,7 @@ import { useWorkspace } from "../../context/WorkspaceContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getPermissions, getRoleDisplayName } from "../../utils/permissions";
 import { isSuperAdminUser } from "../../utils/adminAuth";
+import { isProUser } from "../../utils/subscriptionUtils";
 import { toast } from "react-toastify";
 import socket, { joinChannel, leaveChannel } from "../../services/socket";
 import CreateChannelModal from "./CreateChannelModal";
@@ -18,6 +19,7 @@ import EditWorkspaceModal from "./EditWorkspaceModal";
 import DeleteWorkspaceModal from "./DeleteWorkspaceModal";
 import ProfileModal from "./ProfileModal";
 import InvitationsModal from "./InvitationsModal";
+import UpgradeModal from "./UpgradeModal";
 import DirectMessaging from "./DirectMessaging";
 import ChannelMessageThread from "./ChannelMessageThread";
 import NotificationPanel from "./NotificationPanel";
@@ -157,6 +159,7 @@ const SlackShell = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showInvitationsModal, setShowInvitationsModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
@@ -660,32 +663,30 @@ const SlackShell = () => {
     };
   }, [channelId, currentChannel?.id]);
 
+  const isSuperAdmin = useMemo(() => isSuperAdminUser(user), [user]);
+
   const selectedRole = useMemo(() => {
-    if (workspaceData?.userRole === "OWNER" || workspaceData?.userRole === "ADMIN") {
+    if (isSuperAdmin) return "OWNER";
+    if (workspaceData?.userRole) {
       return workspaceData.userRole;
     }
     const wsInList = (workspaces || []).find(
       (w) => (w.id || w._id)?.toString() === workspaceId?.toString()
     );
-    if (wsInList?.role === "OWNER" || wsInList?.role === "ADMIN") {
+    if (wsInList?.role) {
       return wsInList.role;
     }
-    // If no other user is an OWNER in the workspace, default to OWNER
-    const otherOwner = (workspaceData?.members || []).find(
-      (m) =>
-        m.role === "OWNER" &&
-        (m.id || m._id)?.toString() !== (user?.id || user?._id)?.toString()
-    );
-    if (!otherOwner) {
-      return "OWNER";
-    }
-    return workspaceData?.userRole || "OWNER";
-  }, [workspaceData, user, workspaces, workspaceId]);
+    return "MEMBER";
+  }, [workspaceData?.userRole, workspaces, workspaceId, isSuperAdmin]);
+
+  const isOwner = selectedRole === "OWNER" || isSuperAdmin;
+  const isAdmin = selectedRole === "ADMIN";
+  const canManageWorkspace = isOwner || isAdmin;
+
   const permissions = useMemo(
     () => getPermissions(selectedRole),
     [selectedRole],
   );
-  const isSuperAdmin = useMemo(() => isSuperAdminUser(user), [user]);
   const canManageChannel = useCallback(
     (chan) => {
       if (isSuperAdmin) return true;
@@ -2016,7 +2017,7 @@ const SlackShell = () => {
       const sp = data?.space || data;
       if (!sp || (!sp._id && !sp.id)) return;
       const spWsId = (sp.workspaceId?._id || sp.workspaceId)?.toString();
-      if (workspaceId && (!spWsId || spWsId !== workspaceId.toString())) return;
+      if (workspaceId && spWsId && spWsId !== workspaceId.toString()) return;
 
       setSpaces((prev) => {
         const idStr = (sp._id || sp.id).toString();
@@ -2364,7 +2365,7 @@ const SlackShell = () => {
     };
 
     return (
-      <aside className="w-72 lg:w-80 flex-shrink-0 flex flex-col border-r border-[#D8E2E1] dark:border-[#1A2121] bg-white dark:bg-[#1E2525] select-none z-10 transition-colors h-full">
+      <aside className="hidden md:flex w-72 lg:w-80 flex-shrink-0 flex-col border-r border-[#D8E2E1] dark:border-[#1A2121] bg-white dark:bg-[#1E2525] select-none z-10 transition-colors h-full">
         {/* Panel Header */}
         <div className="px-3.5 py-3 border-b border-[#D8E2E1] dark:border-[#1A2121] flex items-center justify-between gap-2 flex-shrink-0">
           <h2 className="text-sm font-bold text-[#2C3333] dark:text-[#E7F6F2] truncate">
@@ -3836,24 +3837,26 @@ const SlackShell = () => {
             {workspaceData?.name || "Workspace"}
           </div>
           <div className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80 mt-0.5 capitalize">
-            {getRoleDisplayName(selectedRole) || "Owner"}
+            {getRoleDisplayName(selectedRole) || "Member"}
           </div>
         </div>
 
-        {/* ── Workspace Settings Actions (Matches Image 1) ────────────────── */}
+        {/* ── Workspace Settings Actions (Role-restricted) ────────────────── */}
         <div className="py-1.5 space-y-0.5">
-          <button
-            type="button"
-            onClick={() => {
-              setShowInviteModal(true);
-              setShowWorkspaceMenu(false);
-              setIsMobileSidebarOpen(false);
-            }}
-            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
-          >
-            <i className="fa-solid fa-user-plus text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
-            <span>Invite people</span>
-          </button>
+          {canManageWorkspace && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowInviteModal(true);
+                setShowWorkspaceMenu(false);
+                setIsMobileSidebarOpen(false);
+              }}
+              className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+            >
+              <i className="fa-solid fa-user-plus text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
+              <span>Invite people</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -3864,50 +3867,57 @@ const SlackShell = () => {
             }}
             className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
           >
-            <i className="fa-solid fa-users-gear text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
-            <span>Manage members</span>
+            <i className={`fa-solid ${canManageWorkspace ? "fa-users-gear" : "fa-users"} text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs`} />
+            <span>{canManageWorkspace ? "Manage members" : "View members"}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowCreateChannelModal(true);
-              setShowWorkspaceMenu(false);
-              setIsMobileSidebarOpen(false);
-            }}
-            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
-          >
-            <i className="fa-solid fa-plus text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
-            <span>Create channel</span>
-          </button>
+          {permissions.canCreateChannels && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateChannelModal(true);
+                setShowWorkspaceMenu(false);
+                setIsMobileSidebarOpen(false);
+              }}
+              className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+            >
+              <i className="fa-solid fa-plus text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
+              <span>Create channel</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowEditWorkspaceModal(true);
-              setShowWorkspaceMenu(false);
-              setIsMobileSidebarOpen(false);
-            }}
-            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
-          >
-            <i className="fa-solid fa-pen-to-square text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
-            <span>Edit workspace</span>
-          </button>
+          {canManageWorkspace && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowEditWorkspaceModal(true);
+                setShowWorkspaceMenu(false);
+                setIsMobileSidebarOpen(false);
+              }}
+              className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer"
+            >
+              <i className="fa-solid fa-pen-to-square text-[#395B64] dark:text-[#A5C9CA] w-4 text-xs" />
+              <span>Edit workspace</span>
+            </button>
+          )}
 
-          <div className="h-px bg-[#D8E2E1] dark:bg-[#2C3333] my-1 mx-2" />
-
-          <button
-            type="button"
-            onClick={() => {
-              setShowDeleteWorkspaceModal(true);
-              setShowWorkspaceMenu(false);
-              setIsMobileSidebarOpen(false);
-            }}
-            className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-          >
-            <i className="fa-solid fa-trash-can w-4 text-xs" />
-            <span>Delete workspace</span>
-          </button>
+          {isOwner && (
+            <>
+              <div className="h-px bg-[#D8E2E1] dark:bg-[#2C3333] my-1 mx-2" />
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteWorkspaceModal(true);
+                  setShowWorkspaceMenu(false);
+                  setIsMobileSidebarOpen(false);
+                }}
+                className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-xs font-medium text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+              >
+                <i className="fa-solid fa-trash-can w-4 text-xs" />
+                <span>Delete workspace</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* ── Workspaces Navigation (Switch & Create) ───────── */}
@@ -4127,9 +4137,9 @@ const SlackShell = () => {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F8FAFB] dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="h-14 w-full bg-white dark:bg-[#1A2121] border-b border-[#D8E2E1] dark:border-[#252E2E] flex items-center justify-between px-4 z-30 select-none flex-shrink-0 text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
+      <header className="h-14 w-full bg-white dark:bg-[#1A2121] border-b border-[#D8E2E1] dark:border-[#252E2E] flex items-center justify-between px-2.5 sm:px-4 z-30 select-none flex-shrink-0 text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
         {/* Left: Mobile sidebar toggle + WorkNest Logo & Brand */}
-        <div className="flex items-center gap-2.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
           <button
             type="button"
             onClick={() => setIsMobileSidebarOpen(true)}
@@ -4151,13 +4161,13 @@ const SlackShell = () => {
               <i className="fa-solid fa-arrow-left text-sm" />
             </button>
           ) : (
-            <div className="flex items-center gap-2 select-none">
+            <div className="flex items-center gap-1.5 sm:gap-2 select-none">
               <img
                 src={logo}
                 alt="WorkNest"
                 className="h-7 w-7 object-contain flex-shrink-0"
               />
-              <span className="font-bold text-base text-[#2C3333] dark:text-white tracking-tight">
+              <span className="hidden sm:inline font-bold text-base text-[#2C3333] dark:text-white tracking-tight">
                 WorkNest
               </span>
             </div>
@@ -4165,11 +4175,11 @@ const SlackShell = () => {
         </div>
 
         {/* Center: search */}
-        <div className="flex-1 max-w-[480px] mx-4">
+        <div className="flex-1 max-w-[480px] mx-1.5 sm:mx-4 min-w-0">
           <button
             type="button"
             onClick={() => setShowGlobalSearch(true)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded bg-[#F4F7F7] dark:bg-[#242D2D] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] border border-[#D8E2E1] dark:border-[#395B64]/40 hover:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA]/70 hover:text-[#2C3333] dark:hover:text-[#A5C9CA] transition-colors cursor-pointer"
+            className="w-full flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 rounded bg-[#F4F7F7] dark:bg-[#242D2D] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] border border-[#D8E2E1] dark:border-[#395B64]/40 hover:border-[#395B64]/50 text-[#52656A] dark:text-[#A5C9CA]/70 hover:text-[#2C3333] dark:hover:text-[#A5C9CA] transition-colors cursor-pointer"
             title="Search workspace (Ctrl+K)"
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -4185,7 +4195,7 @@ const SlackShell = () => {
         </div>
 
         {/* Right: status + actions + user profile */}
-        <div className="flex items-center gap-2 justify-end flex-shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 justify-end flex-shrink-0">
           {/* User Status pill directly in the navbar */}
           <StatusSelector align="right" />
 
@@ -4193,7 +4203,7 @@ const SlackShell = () => {
             <button
               type="button"
               onClick={() => navigate(`/app/workspace/${workspaceId}/channels-manage`)}
-              className="flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors cursor-pointer"
+              className="hidden sm:flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors cursor-pointer"
               title="Channel management"
             >
               <i className="fa-solid fa-users-gear text-sm" />
@@ -4229,7 +4239,7 @@ const SlackShell = () => {
             <button
               type="button"
               onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer text-left select-none relative"
+              className="flex items-center gap-2 pl-1 pr-1 sm:pr-2 py-1 rounded hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] transition-colors cursor-pointer text-left select-none relative"
               title="User profile"
             >
               <div className="relative flex-shrink-0">
@@ -4252,9 +4262,24 @@ const SlackShell = () => {
                 )}
               </div>
               <div className="hidden sm:flex flex-col min-w-0">
-                <span className="text-xs font-semibold text-[#2C3333] dark:text-white truncate max-w-[130px] leading-tight">
-                  {user?.username || "User"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-[#2C3333] dark:text-white truncate max-w-[120px] leading-tight">
+                    {user?.username || "User"}
+                  </span>
+                  {isProUser(user) && (
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#395B64] text-white dark:bg-[#A5C9CA] dark:text-[#1E2525] leading-none shrink-0"
+                      title={
+                        user?.subscription?.cancelAtPeriodEnd
+                          ? "WorkNest Pro (Auto-renewal cancelled)"
+                          : "WorkNest Pro Plan"
+                      }
+                    >
+                      <i className="fa-solid fa-crown text-[8px]" />
+                      <span>PRO</span>
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/80 truncate max-w-[130px] leading-tight capitalize">
                   {getRoleDisplayName(selectedRole) || "Member"}
                 </span>
@@ -4294,6 +4319,48 @@ const SlackShell = () => {
 
                   {/* Menu items */}
                   <div className="py-1">
+                    {/* Subscription Status / Upgrade to Pro */}
+                    {isProUser(user) ? (
+                      <div className="mx-2 my-1.5 flex items-center justify-between rounded-md bg-[#E7F6F2] dark:bg-[#395B64]/20 border border-[#A5C9CA]/50 dark:border-[#395B64]/50 px-2.5 py-1.5 text-xs text-[#2C3333] dark:text-[#E7F6F2] font-semibold select-none">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <i className="fa-solid fa-crown text-xs text-[#395B64] dark:text-[#A5C9CA] shrink-0" />
+                          <span className="truncate">
+                            {user?.subscription?.cancelAtPeriodEnd
+                              ? "Pro (Cancelling)"
+                              : "Pro Plan"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowEditProfileModal(true);
+                          }}
+                          className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/80 hover:text-rose-600 dark:hover:text-rose-400 font-medium underline cursor-pointer shrink-0"
+                          title="Manage or cancel subscription"
+                        >
+                          Manage Plan
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowUpgradeModal(true);
+                        }}
+                        className="mx-2 my-1.5 flex w-[calc(100%-16px)] items-center justify-between rounded-md bg-[#E7F6F2] dark:bg-[#395B64]/20 border border-[#A5C9CA]/50 dark:border-[#395B64]/40 px-2.5 py-1.5 text-left text-xs font-semibold text-[#2C3333] dark:text-[#E7F6F2] hover:bg-[#D8E2E1] dark:hover:bg-[#395B64]/35 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <i className="fa-solid fa-crown text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+                          <span>Upgrade to Pro</span>
+                        </div>
+                        <span className="text-[10px] font-bold bg-[#395B64] text-white dark:bg-[#A5C9CA] dark:text-[#1E2525] px-1.5 py-0.5 rounded leading-none">
+                          $12/mo
+                        </span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {
@@ -4731,6 +4798,241 @@ const SlackShell = () => {
                               )}
                             </div>
                             </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Direct Messages */}
+            <div>
+              <SidebarSectionHeader
+                title="Direct Messages"
+                isCollapsed={isDMsCollapsed}
+                onToggle={() => {
+                  setIsDMsCollapsed((prev) => !prev);
+                }}
+                actionButton={
+                  canManageWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInviteModal(true);
+                        setIsMobileSidebarOpen(false);
+                      }}
+                      className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64]/20 dark:hover:bg-[#395B64] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white text-xs transition"
+                      title="Invite member"
+                    >
+                      <i className="fa-solid fa-plus" />
+                    </button>
+                  )
+                }
+              />
+
+              {!isDMsCollapsed && (
+                <div className="space-y-0.5 pt-1">
+                  {visibleDirectMessageMembers.length > 0 ? (
+                    visibleDirectMessageMembers.map((member) => {
+                      const isSelected = selectedDMUser?.id === member.id;
+                      const isUnread =
+                        (unreadDMCounts[member.id?.toString()] || 0) > 0;
+                      return (
+                        <div key={member.id} className="relative group">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              handleSelectDM(member);
+                              setIsMobileSidebarOpen(false);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleSelectDM(member);
+                                setIsMobileSidebarOpen(false);
+                              }
+                            }}
+                            className={`group flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-[#395B64] text-white font-semibold"
+                                : isUnread
+                                  ? "text-[#2C3333] dark:text-white font-semibold hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636]"
+                                  : "text-[#52656A] dark:text-[#A5C9CA]/90 font-medium hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
+                            }`}
+                          >
+                            <span className="relative flex-shrink-0">
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#395B64] text-xs font-bold text-white overflow-hidden">
+                                {member.avatar || member.avatarUrl ? (
+                                  <img
+                                    src={member.avatar || member.avatarUrl}
+                                    alt={member.username}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  member.username?.charAt(0)?.toUpperCase() || "U"
+                                )}
+                              </span>
+                              <StatusBadge
+                                status={getUserPresenceStatus(member.id)}
+                                isDnd={isDndActive?.(member)}
+                                size="xs"
+                                className="absolute bottom-0 right-0 ring-2 ring-white dark:ring-[#1E2525]"
+                              />
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {member.username}
+                            </span>
+                            {hasDraft("dm", member.id || member._id) && (
+                              <span
+                                className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
+                                title="Draft message"
+                              >
+                                <i className="fa-solid fa-pen text-[8px]" />
+                                <span>Draft</span>
+                              </span>
+                            )}
+                            {isConversationMuted("dm", member.id) && (
+                              <i
+                                className="fa-solid fa-bell-slash text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 shrink-0"
+                                title="Notifications muted"
+                              />
+                            )}
+                            {isUnread && (
+                              <span
+                                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                                title="Unread messages"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
+                      No members yet
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Spaces */}
+            <div>
+              <SidebarSectionHeader
+                title="Spaces"
+                isCollapsed={isSpacesCollapsed}
+                onToggle={() => {
+                  setIsSpacesCollapsed((prev) => !prev);
+                }}
+                actionButton={
+                  isSuperAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateSpaceModal(true);
+                        setIsMobileSidebarOpen(false);
+                      }}
+                      className="flex h-5 w-5 items-center justify-center rounded hover:bg-[#395B64]/20 dark:hover:bg-[#395B64] text-[#395B64] dark:text-[#A5C9CA] hover:text-[#2C3333] dark:hover:text-white text-xs transition"
+                      title="Create space"
+                    >
+                      <i className="fa-solid fa-plus" />
+                    </button>
+                  )
+                }
+              />
+
+              {!isSpacesCollapsed && (
+                <div className="space-y-0.5 pt-1">
+                  {activeSpaces.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#D8E2E1] dark:border-[#395B64] p-3 text-center text-xs text-[#52656A] dark:text-[#A5C9CA]">
+                      {isSuperAdmin ? (
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span>No Spaces yet</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCreateSpaceModal(true);
+                              setIsMobileSidebarOpen(false);
+                            }}
+                            className="text-[11px] font-semibold text-[#E7F6F2] hover:text-white underline underline-offset-2"
+                          >
+                            Create a Space
+                          </button>
+                        </div>
+                      ) : (
+                        <span>You haven't been added to any Spaces yet</span>
+                      )}
+                    </div>
+                  ) : (
+                    activeSpaces.map((sp) => {
+                      const spId = (sp._id || sp.id)?.toString();
+                      const isActive =
+                        selectedSpace &&
+                        (selectedSpace._id || selectedSpace.id)?.toString() ===
+                          spId;
+                      const isUnread = (unreadSpaceCounts[spId] || 0) > 0;
+                      const memberCount = sp.members?.length || 0;
+
+                      return (
+                        <div key={spId} className="relative group">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              handleSelectSpace(sp);
+                              setIsMobileSidebarOpen(false);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleSelectSpace(sp);
+                                setIsMobileSidebarOpen(false);
+                              }
+                            }}
+                            className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-left text-sm transition-colors cursor-pointer ${
+                              isActive
+                                ? "bg-[#395B64] text-white font-semibold"
+                                : isUnread
+                                  ? "text-[#1A2525] dark:text-white font-semibold hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636]"
+                                  : "text-[#52656A] dark:text-[#A5C9CA]/90 hover:bg-[#E5EDEC] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-white"
+                            }`}
+                          >
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <i className={`fa-solid fa-table-cells-large text-xs w-3.5 text-center flex-shrink-0 ${isActive ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm leading-tight">
+                                  {sp.name}
+                                </div>
+                                <div className={`text-[11px] font-medium leading-tight ${isActive ? "text-white/85" : "text-[#4A5D61] dark:text-[#A5C9CA]"}`}>
+                                  {memberCount}{" "}
+                                  {memberCount === 1 ? "member" : "members"}
+                                </div>
+                              </div>
+                              {hasDraft("space", spId) && (
+                                <span
+                                  className="text-[10px] text-[#52656A] dark:text-[#A5C9CA] font-semibold italic flex items-center gap-1 shrink-0"
+                                  title="Draft message"
+                                >
+                                  <i className="fa-solid fa-pen text-[8px]" />
+                                  <span>Draft</span>
+                                </span>
+                              )}
+                              {isConversationMuted("space", spId) && (
+                                <i
+                                  className="fa-solid fa-bell-slash text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 shrink-0"
+                                  title="Notifications muted"
+                                />
+                              )}
+                              {isUnread && (
+                                <span
+                                  className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                                  title="Unread messages"
+                                />
+                              )}
+                            </div>
+                          </div>
                         </div>
                       );
                     })
@@ -5180,7 +5482,7 @@ const SlackShell = () => {
                 setActiveSecondaryPanel("dms");
               }}
               actionButton={
-                selectedRole === "OWNER" && (
+                canManageWorkspace && (
                   <button
                     type="button"
                     onClick={() => setShowInviteModal(true)}
@@ -6251,6 +6553,11 @@ const SlackShell = () => {
         />
       )}
 
+      {/* Upgrade to Pro Modal */}
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
+      )}
+
       {/* Global Search Modal */}
       {showGlobalSearch && (
         <GlobalSearchModal
@@ -6278,6 +6585,8 @@ const SlackShell = () => {
         <CreateSpaceModal
           workspaceId={workspaceId}
           workspaceMembers={workspaceMembers}
+          spaces={spaces}
+          currentUserId={user?._id || user?.id}
           onClose={() => setShowCreateSpaceModal(false)}
           onSpaceCreated={(newSpace) => {
             setSpaces((prev) => [
@@ -6407,7 +6716,7 @@ const SlackShell = () => {
                   Workspace
                 </p>
                 <h3 className="text-lg font-bold text-[#2C3333] dark:text-white">
-                  Manage Members
+                  {canManageWorkspace ? "Manage Members" : "Workspace Members"}
                 </h3>
               </div>
               <button
@@ -6432,7 +6741,7 @@ const SlackShell = () => {
                 />
               </div>
 
-              {selectedRole === "OWNER" && (
+              {canManageWorkspace && (
                 <button
                   type="button"
                   onClick={() => {
@@ -6456,7 +6765,13 @@ const SlackShell = () => {
 
               {filteredMembers.map((member) => {
                 const isSelf = member.id === user?.id;
-                const isOwner = member.role === "OWNER";
+                const isOwnerMember = member.role === "OWNER";
+                const isAdminMember = member.role === "ADMIN";
+                const canManageThisMember =
+                  canManageWorkspace &&
+                  !isSelf &&
+                  !isOwnerMember &&
+                  (isOwner || (isAdmin && !isAdminMember));
                 return (
                   <div
                     key={member.id}
@@ -6512,8 +6827,8 @@ const SlackShell = () => {
                         {member.role}
                       </span>
 
-                      {/* Owner controls: Change role or remove member */}
-                      {selectedRole === "OWNER" && !isSelf && !isOwner && (
+                      {/* Owner/Admin controls: Change role or remove member */}
+                      {canManageThisMember && (
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
