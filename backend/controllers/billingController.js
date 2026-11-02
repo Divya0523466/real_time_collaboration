@@ -176,6 +176,12 @@ export const cancelSubscription = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (user.role === "super_admin" || user.email === "admin@gmail.com") {
+      return res.status(400).json({
+        message: "Super admin has permanent lifetime Pro access and cannot cancel.",
+      });
+    }
+
     const subId = user.subscription?.stripeSubscriptionId;
     if (subId && process.env.STRIPE_SECRET_KEY) {
       try {

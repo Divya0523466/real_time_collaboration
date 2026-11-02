@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import UpgradeModal from "./UpgradeModal";
 import { cancelSubscriptionApi } from "../../services/billingService";
 import { isProUser } from "../../utils/subscriptionUtils";
+import { isSuperAdminUser } from "../../utils/adminAuth";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -58,6 +59,7 @@ const ProfileModal = ({ onClose }) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const isPro = isProUser(user);
+  const isSuperAdmin = isSuperAdminUser(user);
   const isCanceling = Boolean(
     user?.subscription?.cancelAtPeriodEnd ||
       user?.subscription?.status === "canceling",
@@ -834,14 +836,20 @@ const ProfileModal = ({ onClose }) => {
                         <p className="text-sm font-semibold text-[#2C3333] dark:text-[#E7F6F2] truncate leading-tight">
                           {isPro ? "WorkNest Pro" : "Free Plan"}
                         </p>
-                        {isPro && (
+                        {isSuperAdmin ? (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#395B64] text-white dark:bg-[#A5C9CA] dark:text-[#1E2525] leading-none">
+                            SUPER ADMIN
+                          </span>
+                        ) : isPro ? (
                           <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#395B64] text-white dark:bg-[#A5C9CA] dark:text-[#1E2525] leading-none">
                             PRO
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <p className="text-xs text-[#52656A] dark:text-[#A5C9CA]/80 truncate leading-tight mt-0.5">
-                        {isPro
+                        {isSuperAdmin
+                          ? "System Super Admin • Lifetime Pro Access"
+                          : isPro
                           ? isCanceling
                             ? `Valid until ${periodEndDateStr} • Reverts to Free on expiry`
                             : "Active subscription • Unlimited workspaces & channels"
@@ -850,7 +858,12 @@ const ProfileModal = ({ onClose }) => {
                     </div>
                   </div>
 
-                  {!isPro ? (
+                  {isSuperAdmin ? (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA] text-xs font-semibold shrink-0">
+                      <i className="fa-solid fa-shield-halved text-[11px]" />
+                      <span>Lifetime Access</span>
+                    </div>
+                  ) : !isPro ? (
                     <button
                       type="button"
                       onClick={() => setShowUpgradeModal(true)}

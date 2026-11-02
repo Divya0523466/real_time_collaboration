@@ -15,6 +15,11 @@ import {
   removeSpaceMemberApi,
 } from "../../services/spaceService"
 import {
+  getAdminManualPaymentsApi,
+  approveManualPaymentApi,
+  rejectManualPaymentApi,
+} from "../../services/billingService"
+import {
   isSuperAdminUser,
   addSuperAdmin,
   removeSuperAdmin,
@@ -89,6 +94,41 @@ const SuperAdminDashboard = () => {
 
   // Modal for delete user action
   const [deleteUserConfirm, setDeleteUserConfirm] = useState(null)
+
+  const [manualPayments, setManualPayments] = useState([])
+
+  const loadPayments = useCallback(async () => {
+    try {
+      const res = await getAdminManualPaymentsApi()
+      setManualPayments(res.payments || [])
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    loadPayments()
+  }, [loadPayments])
+
+  const handleApprove = async (id) => {
+    try {
+      await approveManualPaymentApi(id)
+      toast.success("Payment approved")
+      loadPayments()
+    } catch (err) {
+      toast.error(err.message || "Failed to approve")
+    }
+  }
+
+  const handleReject = async (id) => {
+    const reason = window.prompt("Reason for rejection:")
+    if (!reason) return
+    try {
+      await rejectManualPaymentApi(id, reason)
+      toast.info("Payment rejected")
+      loadPayments()
+    } catch (err) {
+      toast.error(err.message || "Failed to reject")
+    }
+  }
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 
@@ -802,6 +842,27 @@ const SuperAdminDashboard = () => {
                 </span>
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("payments")
+                setIsMobileSidebarOpen(false)
+              }}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-3 cursor-pointer ${
+                activeTab === "payments"
+                  ? "bg-[#395B64] text-white shadow-xs font-semibold"
+                  : "text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3333] hover:text-[#2C3333] dark:hover:text-white"
+              }`}
+            >
+              <i className={`fa-solid fa-receipt w-5 text-center text-sm ${activeTab === "payments" ? "text-white" : "text-[#52656A] dark:text-[#A5C9CA]"}`} />
+              <span className="flex-1">Payments</span>
+              {manualPayments.filter((p) => p.status === "PENDING").length > 0 && (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-bold bg-amber-500 text-white">
+                  {manualPayments.filter((p) => p.status === "PENDING").length}
+                </span>
+              )}
+            </button>
           </nav>
 
           {/* Bottom Section: Logout only */}
@@ -1354,6 +1415,107 @@ const SuperAdminDashboard = () => {
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {activeTab === "payments" && (
+            <div className="max-w-6xl mx-auto space-y-6">
+              <div>
+                <h1 className="text-2xl font-bold text-[#2C3333] dark:text-white tracking-tight">
+                  Payment Approvals
+                </h1>
+                <p className="mt-1 text-sm text-[#52656A] dark:text-[#A5C9CA]">
+                  Verify manual QR code payments and activate Pro subscriptions
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[#D8E2E1] dark:border-[#2C3333] bg-white dark:bg-[#1E2525] overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#D8E2E1] dark:border-[#2C3333] bg-[#F8FAFB] dark:bg-[#161D1D] text-xs font-bold text-[#52656A] dark:text-[#A5C9CA]">
+                      <th className="py-3 px-4">User</th>
+                      <th className="py-3 px-4">Amount</th>
+                      <th className="py-3 px-4">Transaction ID</th>
+                      <th className="py-3 px-4">Screenshot</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#D8E2E1] dark:divide-[#2C3333] text-xs">
+                    {manualPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-center text-[#52656A] dark:text-[#A5C9CA]">
+                          No payment requests found.
+                        </td>
+                      </tr>
+                    ) : (
+                      manualPayments.map((item) => (
+                        <tr key={item._id} className="hover:bg-[#F8FAFB] dark:hover:bg-[#242D2D]/50">
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-[#2C3333] dark:text-white">
+                              {item.userId?.username || "Unknown"}
+                            </p>
+                            <p className="text-[11px] text-[#52656A] dark:text-[#A5C9CA]">
+                              {item.userId?.email || ""}
+                            </p>
+                          </td>
+                          <td className="py-3 px-4 font-bold text-[#2C3333] dark:text-white">
+                            ${item.amount || 12}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px]">
+                            {item.transactionReference}
+                          </td>
+                          <td className="py-3 px-4">
+                            <a
+                              href={item.screenshotUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#395B64] dark:text-[#A5C9CA] underline font-medium"
+                            >
+                              View Receipt
+                            </a>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              item.status === "APPROVED"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                : item.status === "REJECTED"
+                                ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                            }`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {item.status === "PENDING" ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleApprove(item._id)}
+                                  className="px-2.5 py-1 rounded bg-[#395B64] hover:bg-[#2C3333] text-white font-medium text-xs cursor-pointer"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReject(item._id)}
+                                  className="px-2.5 py-1 rounded border border-rose-300 text-rose-600 hover:bg-rose-50 font-medium text-xs cursor-pointer"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[#52656A] dark:text-[#A5C9CA] text-[11px]">
+                                {new Date(item.updatedAt || item.createdAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

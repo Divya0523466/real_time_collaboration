@@ -10,10 +10,14 @@ import {
   deleteUser,
   deleteWorkspace,
 } from "../controllers/adminController.js";
+import {
+  getAdminManualPayments,
+  approveManualPayment,
+  rejectManualPayment,
+} from "../controllers/manualPaymentController.js";
 
 const router = express.Router();
 
-// All admin routes require authentication and super admin privileges
 router.use(authenticateToken);
 router.use(requireSuperAdmin);
 
@@ -25,5 +29,9 @@ router.patch("/users/:userId/status", updateUserStatus);
 router.patch("/users/:userId", updateUserStatus);
 router.delete("/users/:userId", deleteUser);
 router.delete("/workspaces/:workspaceId", deleteWorkspace);
+
+router.get("/manual-payments", getAdminManualPayments);
+router.patch("/manual-payments/:id/approve", approveManualPayment);
+router.patch("/manual-payments/:id/reject", rejectManualPayment);
 
 export default router;
