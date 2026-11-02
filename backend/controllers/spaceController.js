@@ -4,7 +4,7 @@ import SpaceReadState from "../models/SpaceReadState.js"
 import ChannelMessage from "../models/ChannelMessage.js"
 import User from "../models/User.js"
 import { getSpaceAccess, isUserSuperAdmin } from "../utils/spaceAccess.js"
-import { isUserPro, PLAN_LIMITS } from "../utils/subscriptionUtils.js"
+import { isUserPro, PLAN_LIMITS, isSpaceReadOnly } from "../utils/subscriptionUtils.js"
 import { createAndSendNotification } from "../utils/notificationService.js"
 import { buildReplyToMessage } from "./messageController.js"
 
@@ -174,8 +174,19 @@ export const getSpaces = async (req, res) => {
       .populate("createdBy", "_id username email avatar")
       .populate("members", "_id username email avatar role")
       .sort({ createdAt: -1 })
+      .lean()
 
-    return res.json({ spaces })
+    const enrichedSpaces = await Promise.all(
+      spaces.map(async (sp) => {
+        const isReadOnly = await isSpaceReadOnly(sp._id)
+        return {
+          ...sp,
+          isReadOnly,
+        }
+      })
+    )
+
+    return res.json({ spaces: enrichedSpaces })
   } catch (error) {
     return res.status(500).json({ message: "Server error", error: error.message })
   }
@@ -195,7 +206,9 @@ export const getSpace = async (req, res) => {
       .populate("members", "_id username email avatar role status isActive")
       .lean()
 
-    return res.json({ space: populated, isSuperAdmin: isSuper })
+    const isReadOnly = await isSpaceReadOnly(space._id)
+
+    return res.json({ space: { ...populated, isReadOnly }, isSuperAdmin: isSuper })
   } catch (error) {
     return res.status(500).json({ message: "Server error", error: error.message })
   }
@@ -214,6 +227,13 @@ export const updateSpace = async (req, res) => {
     const space = await Space.findById(spaceId)
     if (!space) {
       return res.status(404).json({ message: "Space not found" })
+    }
+
+    if (await isSpaceReadOnly(spaceId)) {
+      return res.status(403).json({
+        message: "Upgrade to WorkNest Pro to edit space settings.",
+        upgradeRequired: true,
+      })
     }
 
     if (name && name.trim()) {
@@ -289,6 +309,13 @@ export const addSpaceMembers = async (req, res) => {
     const space = await Space.findById(spaceId)
     if (!space) {
       return res.status(404).json({ message: "Space not found" })
+    }
+
+    if (await isSpaceReadOnly(spaceId)) {
+      return res.status(403).json({
+        message: "Upgrade to WorkNest Pro to add members to this space.",
+        upgradeRequired: true,
+      })
     }
 
     const existingMemberIds = new Set((space.members || []).map((m) => m.toString()))

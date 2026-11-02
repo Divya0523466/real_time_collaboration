@@ -179,7 +179,7 @@ const UpgradeModal = ({ onClose }) => {
             }`}
           >
             <i className="fa-solid fa-credit-card text-xs" />
-            <span>Card (Stripe)</span>
+            <span>Payments</span>
           </button>
           <button
             type="button"
@@ -194,7 +194,7 @@ const UpgradeModal = ({ onClose }) => {
             }`}
           >
             <i className="fa-solid fa-qrcode text-xs" />
-            <span>Scan QR Code</span>
+            <span>Manual Payment</span>
           </button>
         </div>
 

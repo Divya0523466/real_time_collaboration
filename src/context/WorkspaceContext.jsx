@@ -53,6 +53,12 @@ const normalizeWorkspaceData = (payload, fallbackId = null) => {
     description: workspace.description ?? "",
     createdAt: workspace.createdAt ?? null,
     userRole: payload?.userRole ?? workspace.userRole ?? null,
+    isReadOnly: Boolean(
+      payload?.isReadOnly ??
+      payload?.workspace?.isReadOnly ??
+      workspace.isReadOnly ??
+      false
+    ),
     members: Array.isArray(payload?.members)
       ? payload.members
       : Array.isArray(workspace.members)

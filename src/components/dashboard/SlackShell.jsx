@@ -3963,9 +3963,25 @@ const SlackShell = () => {
                         </span>
                         <span className="text-xs truncate">{ws.name}</span>
                       </div>
-                      {isCurrent && (
-                        <i className="fa-solid fa-check text-xs text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0" />
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {ws.role && (
+                          <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA] leading-none">
+                            {ws.role.toLowerCase()}
+                          </span>
+                        )}
+                        {ws.isReadOnly && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#395B64] text-white dark:bg-[#A5C9CA] dark:text-[#1E2525] leading-none"
+                            title="Requires WorkNest Pro"
+                          >
+                            <i className="fa-solid fa-crown text-[7px]" />
+                            <span>PRO</span>
+                          </span>
+                        )}
+                        {isCurrent && (
+                          <i className="fa-solid fa-check text-xs text-[#395B64] dark:text-[#A5C9CA] flex-shrink-0" />
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -4087,7 +4103,23 @@ const SlackShell = () => {
                           {ws.name}
                         </span>
                       </div>
-                      <i className="fa-solid fa-arrow-right text-xs text-[#52656A] dark:text-[#A5C9CA]" />
+                      <div className="flex items-center gap-2">
+                        {ws.role && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#E7F6F2] dark:bg-[#395B64]/40 text-[#395B64] dark:text-[#A5C9CA] leading-tight">
+                            {ws.role.toLowerCase()}
+                          </span>
+                        )}
+                        {ws.isReadOnly && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#395B64] text-white dark:bg-[#A5C9CA] dark:text-[#1E2525] leading-none"
+                            title="Requires WorkNest Pro"
+                          >
+                            <i className="fa-solid fa-crown text-[7px]" />
+                            <span>PRO</span>
+                          </span>
+                        )}
+                        <i className="fa-solid fa-arrow-right text-xs text-[#52656A] dark:text-[#A5C9CA]" />
+                      </div>
                     </button>
                   );
                 })}
@@ -6140,6 +6172,7 @@ const SlackShell = () => {
               currentUser={user}
               isSuperAdmin={isSuperAdmin}
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+              onOpenUpgradeModal={() => setShowUpgradeModal(true)}
               onManageMembers={() => {
                 setActiveSpaceForAction(selectedSpace);
                 setShowManageSpaceMembersModal(true);
@@ -6171,6 +6204,7 @@ const SlackShell = () => {
               onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               channel={activeChannel || currentChannel}
               currentUserId={user?.id || user?._id}
+              onOpenUpgradeModal={() => setShowUpgradeModal(true)}
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
               onMessagesChange={setChannelMessages}

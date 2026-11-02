@@ -787,7 +787,7 @@ const ChannelMessageThread = ({
   onNavigateSource = () => {},
   onMessagesChange = () => {},
   onViewProfile,
-
+  onOpenUpgradeModal,
 }) => {
   const { workspaceData, user } = useWorkspace();
   const resolvedCurrentUserId = (
@@ -1610,7 +1610,14 @@ const ChannelMessageThread = ({
               handleKeystroke(e.target.value);
               saveDraft(e.target.value);
             }}
-            onKeyDown={handleKeyDown}
+            onKeyDown={(e) => {
+              if (workspaceData?.isReadOnly && e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onOpenUpgradeModal?.();
+                return;
+              }
+              handleKeyDown(e);
+            }}
             onBlur={handleStopTypingNow}
             onClick={(e) => mention.handleCursorChange(e.target.selectionStart)}
             onKeyUp={(e) => mention.handleCursorChange(e.target.selectionStart)}
@@ -1619,14 +1626,25 @@ const ChannelMessageThread = ({
             className="min-w-0 flex-1 resize-none bg-transparent text-[15px] text-[#2C3333] dark:text-[#E7F6F2] outline-none placeholder:text-[#52656A]/50 dark:placeholder:text-[#A5C9CA]/50 leading-5 py-0.5"
           />
           <EmojiPickerButton onEmojiSelect={handleEmojiSelect} />
-          <button
-            type="button"
-            onClick={handleSendNewMessage}
-            disabled={!mention.value.trim() && !attachedFile}
-            className="flex items-center gap-1.5 self-center rounded-lg bg-[#395B64] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex-shrink-0"
-          >
-            Send <i className="fa-solid fa-paper-plane text-[9px]" />
-          </button>
+          {workspaceData?.isReadOnly ? (
+            <button
+              type="button"
+              onClick={onOpenUpgradeModal}
+              className="flex items-center gap-1.5 self-center rounded-lg bg-[#395B64] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2C3333] transition-colors flex-shrink-0 cursor-pointer shadow-2xs"
+            >
+              <i className="fa-solid fa-crown text-[10px]" />
+              <span>Upgrade</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSendNewMessage}
+              disabled={!mention.value.trim() && !attachedFile}
+              className="flex items-center gap-1.5 self-center rounded-lg bg-[#395B64] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2C3333] disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex-shrink-0"
+            >
+              Send <i className="fa-solid fa-paper-plane text-[9px]" />
+            </button>
+          )}
         </div>
       </div>
     </div>

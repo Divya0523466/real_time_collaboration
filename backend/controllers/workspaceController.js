@@ -7,7 +7,7 @@ import { roleUpdated, memberRemoved } from '../utils/templates.js';
 import { sendEmail } from "../utils/sendMail.js";
 import User from "../models/User.js";
 import { isUserSuperAdmin } from "../utils/spaceAccess.js";
-import { isUserPro, PLAN_LIMITS } from "../utils/subscriptionUtils.js";
+import { isUserPro, PLAN_LIMITS, isWorkspaceReadOnly } from "../utils/subscriptionUtils.js";
 
 const ensureDefaultChannel = async (workspaceId, createdBy) => {
   const existing = await Channel.findOne({ workspaceId, name: "general" });
@@ -88,14 +88,22 @@ const getUserWorkspaces = async (req, res) => {
       "workspaceId",
     );
 
-    const workspaces = memberships
-      .filter((m) => m.workspaceId)
-      .map((m) => ({
-        id: m.workspaceId._id,
-        name: m.workspaceId.name,
-        description: m.workspaceId.description,
-        role: m.role,
-      }));
+    const workspaces = await Promise.all(
+      memberships
+        .filter((m) => m.workspaceId)
+        .map(async (m) => {
+          const wsId = m.workspaceId._id;
+          const isReadOnly = await isWorkspaceReadOnly(wsId);
+          return {
+            id: wsId,
+            name: m.workspaceId.name,
+            description: m.workspaceId.description,
+            role: m.role,
+            createdAt: m.workspaceId.createdAt,
+            isReadOnly,
+          };
+        }),
+    );
 
     return res.json({ workspaces });
   } catch (error) {
@@ -136,12 +144,15 @@ const getWorkspace = async (req, res) => {
       .select("userId role")
       .lean();
 
+    const isReadOnly = await isWorkspaceReadOnly(workspaceId);
+
     return res.json({
       workspace: {
         id: workspace._id,
         name: workspace.name,
         description: workspace.description,
         createdAt: workspace.createdAt,
+        isReadOnly,
       },
       members: members
         .filter((m) => m.userId) 
@@ -364,6 +375,13 @@ const updateWorkspace = async (req, res) => {
     if (requesterRole !== "OWNER" && requesterRole !== "ADMIN") {
       return res.status(403).json({
         message: "Only workspace owners and admins can edit workspace settings",
+      });
+    }
+
+    if (await isWorkspaceReadOnly(workspaceId)) {
+      return res.status(403).json({
+        message: "Upgrade to WorkNest Pro to edit settings for this workspace.",
+        upgradeRequired: true,
       });
     }
 

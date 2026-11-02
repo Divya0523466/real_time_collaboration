@@ -6,7 +6,7 @@ import { sendEmail } from "../utils/sendMail.js";
 import { addedToChannel, removedFromChannel } from "../utils/templates.js";
 import User from "../models/User.js";
 import { isUserSuperAdmin } from "../utils/spaceAccess.js";
-import { isUserPro, PLAN_LIMITS } from "../utils/subscriptionUtils.js";
+import { isUserPro, PLAN_LIMITS, isWorkspaceReadOnly } from "../utils/subscriptionUtils.js";
 
 const createChannel = async (req, res) => {
   try {
@@ -27,6 +27,14 @@ const createChannel = async (req, res) => {
       return res
         .status(403)
         .json({ message: "You do not have permission to create channels" });
+    }
+
+    if (await isWorkspaceReadOnly(workspaceId)) {
+      return res.status(403).json({
+        message: "Upgrade to WorkNest Pro to create channels in this workspace.",
+        limitReached: "workspace_locked",
+        upgradeRequired: true,
+      });
     }
 
     const user = await User.findById(userId);

@@ -36,6 +36,7 @@ import {
 } from "./utils/mentionValidation.js";
 import getSpaceAccess from "./utils/spaceAccess.js";
 import { formatSpaceMessage } from "./controllers/spaceController.js";
+import { isWorkspaceReadOnly, isSpaceReadOnly } from "./utils/subscriptionUtils.js";
 
 if (process.env.FRONTEND_URL) {
   process.env.FRONTEND_URL = process.env.FRONTEND_URL.replace(/\/+$/, "");
@@ -290,6 +291,15 @@ io.on("connection", async (socket) => {
           return;
         }
 
+        const isWsReadOnly = await isWorkspaceReadOnly(access.channel.workspaceId);
+        if (isWsReadOnly) {
+          socket.emit("send-channel-message-error", {
+            message: "Upgrade to WorkNest Pro to post messages in this workspace.",
+            isReadOnly: true,
+          });
+          return;
+        }
+
         const mentionValidation = await validateChannelMentions(
           mentions,
           access.channel,
@@ -533,6 +543,15 @@ io.on("connection", async (socket) => {
         if (!space) {
           socket.emit("send-space-message-error", {
             message: "Access denied to Space",
+          });
+          return;
+        }
+
+        const isSpReadOnly = await isSpaceReadOnly(space._id);
+        if (isSpReadOnly) {
+          socket.emit("send-space-message-error", {
+            message: "Upgrade to WorkNest Pro to send messages in this space.",
+            isReadOnly: true,
           });
           return;
         }

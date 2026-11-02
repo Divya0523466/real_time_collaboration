@@ -127,6 +127,7 @@ const SpaceMessageThread = ({
   onMobileMenuClick,
   onOpenSidebar,
   onViewProfile,
+  onOpenUpgradeModal,
 }) => {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1239,7 +1240,14 @@ const SpaceMessageThread = ({
               handleKeystroke(e.target.value)
               saveDraft(e.target.value)
             }}
-            onKeyDown={handleKeyDown}
+            onKeyDown={(e) => {
+              if (space?.isReadOnly && e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onOpenUpgradeModal?.();
+                return;
+              }
+              handleKeyDown(e);
+            }}
             onBlur={handleStopTypingNow}
             placeholder={`Message #${space?.name || "Space"}...`}
             className="flex-1 max-h-32 resize-none bg-transparent py-1 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#A5C9CA]/50 outline-none"
@@ -1271,14 +1279,25 @@ const SpaceMessageThread = ({
             onJumpToMessage={handleJumpToMessage}
           />
 
-          <button
-            type="button"
-            disabled={!mention.value.trim() && attachedFiles.length === 0}
-            onClick={handleSendMessage}
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00897b] text-white hover:bg-[#00796b] disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer"
-          >
-            <i className="fa-solid fa-paper-plane text-xs" />
-          </button>
+          {space?.isReadOnly ? (
+            <button
+              type="button"
+              onClick={onOpenUpgradeModal}
+              className="flex items-center gap-1.5 self-center rounded-xl bg-[#395B64] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2C3333] transition-colors flex-shrink-0 cursor-pointer shadow-2xs"
+            >
+              <i className="fa-solid fa-crown text-[10px]" />
+              <span>Upgrade</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!mention.value.trim() && attachedFiles.length === 0}
+              onClick={handleSendMessage}
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00897b] text-white hover:bg-[#00796b] disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer"
+            >
+              <i className="fa-solid fa-paper-plane text-xs" />
+            </button>
+          )}
         </div>
       </div>
     </div>
