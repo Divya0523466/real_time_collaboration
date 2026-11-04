@@ -91,3 +91,34 @@ export const deleteNotification = async (id) => {
 
   return data;
 };
+
+export const deleteAllNotifications = async () => {
+  const response = await fetch(`${API_URL}/notifications/all`, {
+    credentials: "include",
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to delete all notifications");
+  }
+
+  return data;
+};
+
+export const deleteSelectedNotifications = async (ids) => {
+  const response = await fetch(`${API_URL}/notifications/batch`, {
+    credentials: "include",
+    method: "DELETE",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ ids }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to delete selected notifications");
+  }
+
+  return data;
+};

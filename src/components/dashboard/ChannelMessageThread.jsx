@@ -18,6 +18,9 @@ import SeenAvatars from "../common/SeenAvatars";
 import FileUpload from "../common/FileUpload";
 import MessageContent from "../common/MessageContent";
 import DateSeparator from "../common/DateSeparator";
+import MessageDeleteModal from "../common/MessageDeleteModal";
+import MessageSelectBar from "../common/MessageSelectBar";
+import { deleteChannelMessagesBatchApi, clearChannelConversationApi } from "../../services/messageService";
 import {
   formatMessageDate,
   formatMessageTime,
@@ -306,6 +309,9 @@ const MessageRow = ({
   onNavigateSource = null,
   onViewProfile,
   isReply = false,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
 }) => {
   const activeUserId = (
     currentUserId?._id ||
@@ -353,10 +359,51 @@ const MessageRow = ({
   return (
     <div
       id={msgDomId}
-      className={`group flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015] ${
-        isReply ? "py-0.5" : ""
-      } ${isSender ? "justify-end" : "justify-start"}`}
+      onClick={
+        isSelectMode && !isDeleted && onToggleSelect
+          ? () => onToggleSelect((message.id || message._id)?.toString())
+          : undefined
+      }
+      className={`w-full flex items-center transition-colors group relative rounded-lg ${
+        isSelectMode && !isDeleted
+          ? "cursor-pointer hover:bg-[#395B64]/5 dark:hover:bg-[#395B64]/10"
+          : ""
+      } ${
+        isSelected ? "bg-[#395B64]/10 dark:bg-[#395B64]/20" : ""
+      }`}
     >
+      {/* Far-Left Vertical Selection Column */}
+      {isSelectMode && (
+        <div
+          className="w-9 sm:w-11 flex-shrink-0 flex items-center justify-center pl-2 select-none"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isDeleted && onToggleSelect)
+              onToggleSelect((message.id || message._id)?.toString());
+          }}
+        >
+          {!isDeleted ? (
+            <div
+              className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer ${
+                isSelected
+                  ? "bg-[#395B64] border-2 border-[#395B64] text-white shadow-xs scale-105"
+                  : "border-2 border-gray-300 dark:border-gray-500 hover:border-[#395B64] bg-white/80 dark:bg-[#242D2D]"
+              }`}
+            >
+              {isSelected && <i className="fa-solid fa-check text-[10px]" />}
+            </div>
+          ) : (
+            <div className="w-5 h-5" />
+          )}
+        </div>
+      )}
+
+      {/* Message Row Body */}
+      <div
+        className={`flex-1 flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors ${
+          isReply ? "py-0.5" : ""
+        } ${isSender ? "justify-end" : "justify-start"}`}
+      >
       {/* Receiver Avatar (left side) */}
       {!isSender && (
         <div className="flex-shrink-0 mb-0.5 cursor-pointer" onClick={() => onViewProfile && onViewProfile(senderMember || message.sender || { username, avatar })} title="View profile">
@@ -760,6 +807,7 @@ const MessageRow = ({
           <Avatar username={username} avatar={avatar} small={isReply} />
         </div>
       )}
+      </div>
     </div>
   );
 };
@@ -783,6 +831,9 @@ const ReplyCountBadge = ({ count, onClick }) => {
 const ChannelMessageThread = ({
   channel = null,
   currentUserId = null,
+  currentUser = null,
+  externalSelectMode = false,
+  onExitExternalSelectMode = () => {},
   onForwardMessage = () => {},
   onNavigateSource = () => {},
   onMessagesChange = () => {},
@@ -1216,8 +1267,169 @@ const ChannelMessageThread = ({
     setEditingState(null);
   };
 
+  const [internalSelectMode, setInternalSelectMode] = useState(false);
+  const isSelectMode = externalSelectMode || internalSelectMode;
+  const [selectedMessageIds, setSelectedMessageIds] = useState(new Set());
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    type: null,
+    targetMessages: [],
+    allMine: false,
+    isDeleting: false,
+  });
+
+  const activeNonDeletedMessages = useMemo(() => {
+    return messages.filter((m) => !m.isDeleted);
+  }, [messages]);
+
+  const isAllSelected =
+    activeNonDeletedMessages.length > 0 &&
+    activeNonDeletedMessages.every((m) =>
+      selectedMessageIds.has((m.id || m._id)?.toString())
+    );
+
+  const toggleSelectMessage = (msgId) => {
+    setSelectedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(msgId)) next.delete(msgId);
+      else next.add(msgId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllMessages = () => {
+    if (isAllSelected) {
+      setSelectedMessageIds(new Set());
+    } else {
+      setSelectedMessageIds(
+        new Set(activeNonDeletedMessages.map((m) => (m.id || m._id)?.toString()))
+      );
+    }
+  };
+
+  const exitSelectMode = () => {
+    setInternalSelectMode(false);
+    onExitExternalSelectMode && onExitExternalSelectMode();
+    setSelectedMessageIds(new Set());
+  };
+
+  const openClearChatModal = () => {
+    setDeleteModal({
+      isOpen: true,
+      type: "CLEAR_CHAT",
+      targetMessages: [],
+      allMine: false,
+      isDeleting: false,
+    });
+  };
+
+  const openDeleteSingleModal = (message) => {
+    const senderId = (
+      message.senderId?._id ||
+      message.senderId?.id ||
+      message.senderId ||
+      message.sender?.id ||
+      message.sender?._id
+    )?.toString();
+    const isMine = Boolean(
+      senderId && resolvedCurrentUserId && senderId === resolvedCurrentUserId
+    );
+
+    setDeleteModal({
+      isOpen: true,
+      type: "DELETE_MESSAGES",
+      targetMessages: [message],
+      allMine: isMine,
+      isDeleting: false,
+    });
+  };
+
+  const openDeleteSelectedModal = () => {
+    const targetMsgs = messages.filter(
+      (m) => selectedMessageIds.has((m.id || m._id)?.toString()) && !m.isDeleted
+    );
+    if (targetMsgs.length === 0) return;
+
+    const allMine = targetMsgs.every((m) => {
+      const sId = (
+        m.senderId?._id ||
+        m.senderId?.id ||
+        m.senderId ||
+        m.sender?.id ||
+        m.sender?._id
+      )?.toString();
+      return Boolean(sId && resolvedCurrentUserId && sId === resolvedCurrentUserId);
+    });
+
+    setDeleteModal({
+      isOpen: true,
+      type: "DELETE_MESSAGES",
+      targetMessages: targetMsgs,
+      allMine,
+      isDeleting: false,
+    });
+  };
+
+  const handleConfirmDelete = async (deleteForEveryone) => {
+    try {
+      setDeleteModal((prev) => ({ ...prev, isDeleting: true }));
+      const channelIdentifier = (channel?.id || channel?._id)?.toString();
+
+      if (deleteModal.type === "CLEAR_CHAT") {
+        if (channelIdentifier) {
+          await clearChannelConversationApi(channelIdentifier);
+          setMessages([]);
+          toast.success("Channel chat cleared for your account");
+        }
+      } else if (deleteModal.type === "DELETE_MESSAGES") {
+        const messageIds = deleteModal.targetMessages.map((m) =>
+          (m.id || m._id)?.toString()
+        );
+
+        if (deleteForEveryone) {
+          for (const m of deleteModal.targetMessages) {
+            deleteChannelMessage(m.id || m._id);
+          }
+        }
+
+        await deleteChannelMessagesBatchApi({ messageIds, deleteForEveryone });
+        const idSet = new Set(messageIds);
+
+        if (deleteForEveryone) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              idSet.has((m.id || m._id)?.toString())
+                ? { ...m, isDeleted: true, content: null, attachments: [] }
+                : m
+            )
+          );
+          toast.success("Messages deleted for everyone");
+        } else {
+          setMessages((prev) =>
+            prev.filter((m) => !idSet.has((m.id || m._id)?.toString()))
+          );
+          toast.success("Messages deleted for you");
+        }
+        exitSelectMode();
+      }
+
+      setDeleteModal({
+        isOpen: false,
+        type: null,
+        targetMessages: [],
+        allMine: false,
+        isDeleting: false,
+      });
+    } catch (err) {
+      console.error("Delete failed:", err);
+      toast.error(err.message || "Failed to delete messages");
+    } finally {
+      setDeleteModal((prev) => ({ ...prev, isDeleting: false }));
+    }
+  };
+
   const handleDelete = (message) => {
-    deleteChannelMessage(message.id?.toString());
+    openDeleteSingleModal(message);
   };
 
   const handleTogglePin = async (message) => {
@@ -1364,7 +1576,8 @@ const ChannelMessageThread = ({
     onForwardMessage,
     onNavigateSource,
     onViewProfile,
-
+    isSelectMode,
+    onToggleSelect: toggleSelectMessage,
   };
 
   if (!channel) {
@@ -1379,6 +1592,18 @@ const ChannelMessageThread = ({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-[#121717] transition-colors">
+      {/* WhatsApp Selection Bar */}
+      {isSelectMode && (
+        <MessageSelectBar
+          selectedCount={selectedMessageIds.size}
+          isAllSelected={isAllSelected}
+          onToggleSelectAll={toggleSelectAllMessages}
+          onDeleteSelected={openDeleteSelectedModal}
+          onExit={exitSelectMode}
+          className="sticky top-0 z-40"
+        />
+      )}
+
       {/* ── Scrollable message area ─────────────────────────────────────────── */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto">
         {/* Channel intro header */}
@@ -1398,6 +1623,30 @@ const ChannelMessageThread = ({
               {channel.description}
             </p>
           )}
+
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2 mt-3.5">
+            <button
+              type="button"
+              onClick={() => setInternalSelectMode(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-[#A5C9CA]/50 dark:border-[#395B64] bg-[#F8FAFB] dark:bg-[#242D2D] px-2.5 py-1 text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer"
+              title="Select messages"
+            >
+              <i className="fa-solid fa-check-double text-xs" />
+              <span>Select Messages</span>
+            </button>
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={openClearChatModal}
+                className="flex items-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-900/40 bg-[#F8FAFB] dark:bg-[#242D2D] px-2.5 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition shadow-xs cursor-pointer"
+                title="Clear this channel chat"
+              >
+                <i className="fa-solid fa-trash-can text-xs" />
+                <span>Clear Chat</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Error banner */}
@@ -1463,6 +1712,7 @@ const ChannelMessageThread = ({
                     <MessageRow
                       message={rootMsg}
                       {...actionProps}
+                      isSelected={selectedMessageIds.has(rootMsg.id?.toString())}
                       isReply={false}
                     />
 
@@ -1504,6 +1754,7 @@ const ChannelMessageThread = ({
                               key={reply.id}
                               message={reply}
                               {...actionProps}
+                              isSelected={selectedMessageIds.has(reply.id?.toString())}
                               isReply={true}
                             />
                           ))}
@@ -1647,6 +1898,26 @@ const ChannelMessageThread = ({
           )}
         </div>
       </div>
+
+      {/* WhatsApp-Style Custom Confirmation Modal */}
+      <MessageDeleteModal
+        isOpen={deleteModal.isOpen}
+        type={deleteModal.type}
+        count={deleteModal.targetMessages.length}
+        allMine={deleteModal.allMine}
+        isDeleting={deleteModal.isDeleting}
+        onClose={() =>
+          !deleteModal.isDeleting &&
+          setDeleteModal({
+            isOpen: false,
+            type: null,
+            targetMessages: [],
+            allMine: false,
+            isDeleting: false,
+          })
+        }
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };

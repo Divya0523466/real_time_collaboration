@@ -22,7 +22,7 @@ import InvitationsModal from "./InvitationsModal";
 import UpgradeModal from "./UpgradeModal";
 import DirectMessaging from "./DirectMessaging";
 import ChannelMessageThread from "./ChannelMessageThread";
-import NotificationPanel from "./NotificationPanel";
+import NotificationsView from "./NotificationsView";
 import StarredMessagesView from "./StarredMessagesView";
 import PinnedMessagesView from "./PinnedMessagesView";
 import MentionsView from "./MentionsView";
@@ -194,6 +194,7 @@ const SlackShell = () => {
   const [showDetailsPane, setShowDetailsPane] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
+  const [isNotificationsView, setIsNotificationsView] = useState(false);
   const [isStarredView, setIsStarredView] = useState(false);
   const [isPinnedView, setIsPinnedView] = useState(false);
   const [isMentionsView, setIsMentionsView] = useState(false);
@@ -203,6 +204,7 @@ const SlackShell = () => {
   const [showChannelPinnedDrawer, setShowChannelPinnedDrawer] = useState(false);
   const [showChannelFilesGallery, setShowChannelFilesGallery] = useState(false);
   const [showChannelSearch, setShowChannelSearch] = useState(false);
+  const [channelSelectMode, setChannelSelectMode] = useState(false);
   const [channelMessages, setChannelMessages] = useState([]);
   const channelFilesCount = useMemo(() => {
     return channelMessages.reduce((acc, msg) => {
@@ -372,7 +374,8 @@ const SlackShell = () => {
       setChannelPinnedMessages([]);
       setChannelDetails(null);
       setIsHomeView(true);
-      setIsStarredView(false);
+      setIsNotificationsView(false);
+    setIsStarredView(false);
       setIsPinnedView(false);
       setIsMentionsView(false);
       setIsArchivedView(false);
@@ -971,6 +974,7 @@ const SlackShell = () => {
     setSelectedSpace(null);
     setSelectedDMUser(null);
     setIsHomeView(false);
+    setIsNotificationsView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
     setIsArchivedView(false);
@@ -988,6 +992,7 @@ const SlackShell = () => {
     setSelectedSpace(sp);
     setSelectedGroup(null);
     setIsHomeView(false);
+    setIsNotificationsView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
     setIsArchivedView(false);
@@ -1037,6 +1042,7 @@ const SlackShell = () => {
       setActiveSecondaryPanel("channels");
     }
     setIsHomeView(false);
+    setIsNotificationsView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
     setIsArchivedView(false);
@@ -1279,6 +1285,7 @@ const SlackShell = () => {
     const mId = (member.id || member._id)?.toString();
     if (mId) handleUnhideDM(mId);
     setIsHomeView(false);
+    setIsNotificationsView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
     setIsArchivedView(false);
@@ -1598,6 +1605,7 @@ const SlackShell = () => {
       workspaceData?._id;
 
     setIsHomeView(false);
+    setIsNotificationsView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
     setShowDetailsPane(false);
@@ -1690,7 +1698,8 @@ const SlackShell = () => {
         targetChannel.id || targetChannel._id
       )?.toString();
       setIsHomeView(false);
-      setIsStarredView(false);
+      setIsNotificationsView(false);
+    setIsStarredView(false);
       setIsMentionsView(false);
       setSelectedDMUser(null);
       setShowDetailsPane(false);
@@ -1730,7 +1739,8 @@ const SlackShell = () => {
 
     if (targetMember) {
       setIsHomeView(false);
-      setIsStarredView(false);
+      setIsNotificationsView(false);
+    setIsStarredView(false);
       setIsMentionsView(false);
       setSelectedDMUser(targetMember);
       setShowDetailsPane(false);
@@ -1753,7 +1763,8 @@ const SlackShell = () => {
     // 4. Fallback for DM: open with available user ID
     if (rawId) {
       setIsHomeView(false);
-      setIsStarredView(false);
+      setIsNotificationsView(false);
+    setIsStarredView(false);
       setIsMentionsView(false);
       setSelectedDMUser({
         id: rawId,
@@ -1982,6 +1993,7 @@ const SlackShell = () => {
     }
 
     setIsHomeView(false);
+    setIsNotificationsView(false);
     setIsStarredView(false);
     setIsMentionsView(false);
     setSelectedDMUser(null);
@@ -2160,6 +2172,7 @@ const SlackShell = () => {
     setChannelPinnedMessages([]);
     setChannelDetails(null);
     setIsHomeView(true);
+    setIsNotificationsView(false);
     setIsStarredView(false);
     setIsPinnedView(false);
     setIsMentionsView(false);
@@ -2307,7 +2320,7 @@ const SlackShell = () => {
 
   // ── COLUMN 2: Secondary List Panel (Middle Column) ───────────────────────
   const renderSecondaryPanel = () => {
-    if (isArchivedView || isStarredView || isMentionsView) {
+    if (isArchivedView || isStarredView || isMentionsView || isNotificationsView) {
       return null;
     }
 
@@ -2668,7 +2681,7 @@ const SlackShell = () => {
               </div>
             ) : (
               filteredChannels.map((chan, idx) => {
-                const isActive = (currentChannel?.id || currentChannel?._id)?.toString() === (chan.id || chan._id)?.toString() && !selectedDMUser && !selectedSpace && !selectedGroup && !isHomeView;
+                const isActive = (currentChannel?.id || currentChannel?._id)?.toString() === (chan.id || chan._id)?.toString() && !selectedDMUser && !selectedSpace && !selectedGroup && !isHomeView && !isNotificationsView && !isStarredView && !isMentionsView && !isArchivedView;
                 const isMenuOpen = activeChannelMenuId === chan.id;
                 const isUnread = (unreadChannelCounts[chan.id?.toString()] || 0) > 0;
                 const openUpward = idx >= 4;
@@ -3202,7 +3215,7 @@ const SlackShell = () => {
                 if (item.type === "channel") {
                   const chan = item.data;
                   const chanId = (chan.id || chan._id)?.toString();
-                  const isActive = (currentChannel?.id || currentChannel?._id)?.toString() === chanId && !selectedDMUser && !selectedSpace && !selectedGroup && !isHomeView;
+                  const isActive = (currentChannel?.id || currentChannel?._id)?.toString() === chanId && !selectedDMUser && !selectedSpace && !selectedGroup && !isHomeView && !isNotificationsView && !isStarredView && !isMentionsView && !isArchivedView;
                   const isMenuOpen = activeChannelMenuId === chan.id;
                   const isUnread = (unreadChannelCounts[chanId] || 0) > 0;
 
@@ -4253,8 +4266,22 @@ const SlackShell = () => {
 
           <button
             type="button"
-            onClick={() => setShowActivityPanel(true)}
-            className="relative flex h-8 w-8 items-center justify-center rounded text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors cursor-pointer"
+            onClick={() => {
+              setIsHomeView(false);
+              setIsNotificationsView(true);
+    setIsStarredView(false);
+              setIsPinnedView(false);
+              setIsMentionsView(false);
+              setIsArchivedView(false);
+              setSelectedDMUser(null);
+              setSelectedSpace(null);
+              setSelectedGroup(null);
+            }}
+            className={`relative flex h-8 w-8 items-center justify-center rounded transition-colors cursor-pointer ${
+              isNotificationsView
+                ? "bg-[#395B64]/15 text-[#395B64] dark:bg-[#395B64]/40 dark:text-[#A5C9CA]"
+                : "text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#F0F4F4] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
+            }`}
             title="Notifications"
           >
             <i className="fa-solid fa-bell text-sm" />
@@ -4560,7 +4587,8 @@ const SlackShell = () => {
                   type="button"
                   onClick={() => {
                     setIsHomeView(true);
-                    setIsStarredView(false);
+                    setIsNotificationsView(false);
+    setIsStarredView(false);
                     setIsMentionsView(false);
                     setIsArchivedView(false);
                     setSelectedDMUser(null);
@@ -4572,6 +4600,8 @@ const SlackShell = () => {
                   }}
                   className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                     activeSecondaryPanel === "home" &&
+                    isHomeView &&
+                    !isNotificationsView &&
                     !isStarredView &&
                     !isMentionsView &&
                     !isArchivedView
@@ -4586,10 +4616,23 @@ const SlackShell = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowActivityPanel(true);
+                    setActiveSecondaryPanel("notifications");
+                    setIsHomeView(false);
+                    setIsNotificationsView(true);
+    setIsStarredView(false);
+                    setIsPinnedView(false);
+                    setIsMentionsView(false);
+                    setIsArchivedView(false);
+                    setSelectedDMUser(null);
+                    setSelectedSpace(null);
+                    setSelectedGroup(null);
                     setIsMobileSidebarOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm text-[#455252] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+                  className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors cursor-pointer ${
+                    isNotificationsView
+                      ? "bg-[#395B64] text-white font-semibold"
+                      : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
+                  }`}
                 >
                   <i
                     className={`fa-solid ${isMutedGlobal ? "fa-bell-slash" : "fa-bell"} w-4 text-center text-[11px]`}
@@ -4601,7 +4644,13 @@ const SlackShell = () => {
                     </span>
                   )}
                   {unreadNotificationsCount > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64] px-1 text-[10px] font-bold text-white">
+                    <span
+                      className={`flex h-4 min-w-[16px] items-center justify-center rounded-sm px-1 text-[10px] font-bold ${
+                        isNotificationsView
+                          ? "bg-white text-[#395B64]"
+                          : "bg-[#395B64] text-white"
+                      }`}
+                    >
                       {unreadNotificationsCount}
                     </span>
                   )}
@@ -4635,7 +4684,8 @@ const SlackShell = () => {
                   onClick={() => {
                     setIsHomeView(false);
                     return;
-                    setIsStarredView(false);
+                    setIsNotificationsView(false);
+    setIsStarredView(false);
                     setIsMentionsView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
@@ -4657,7 +4707,8 @@ const SlackShell = () => {
                   onClick={() => {
                     setIsHomeView(false);
                     setIsMentionsView(true);
-                    setIsStarredView(false);
+                    setIsNotificationsView(false);
+    setIsStarredView(false);
                     setIsArchivedView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
@@ -4684,7 +4735,8 @@ const SlackShell = () => {
                   onClick={() => {
                     setIsHomeView(false);
                     setIsArchivedView(true);
-                    setIsStarredView(false);
+                    setIsNotificationsView(false);
+    setIsStarredView(false);
                     setIsMentionsView(false);
                     setSelectedDMUser(null);
                     setSelectedSpace(null);
@@ -4768,6 +4820,8 @@ const SlackShell = () => {
                         !selectedDMUser &&
                         !isStarredView &&
                         !isMentionsView &&
+                        !isNotificationsView &&
+                        !isArchivedView &&
                         !isHomeView &&
                         !selectedSpace &&
                         !selectedGroup;
@@ -5234,6 +5288,7 @@ const SlackShell = () => {
                 type="button"
                 onClick={() => {
                   setIsHomeView(true);
+                  setIsNotificationsView(false);
                   setIsStarredView(false);
                   setIsMentionsView(false);
                   setIsArchivedView(false);
@@ -5246,6 +5301,8 @@ const SlackShell = () => {
                 }}
                 className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors ${
                   activeSecondaryPanel === "home" &&
+                  isHomeView &&
+                  !isNotificationsView &&
                   !isStarredView &&
                   !isMentionsView &&
                   !isArchivedView
@@ -5259,8 +5316,24 @@ const SlackShell = () => {
 
               <button
                 type="button"
-                onClick={() => setShowActivityPanel(true)}
-                className="flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm text-[#455252] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2] transition-colors"
+                onClick={() => {
+                  setActiveSecondaryPanel("notifications");
+                  setIsHomeView(false);
+                  setIsNotificationsView(true);
+    setIsStarredView(false);
+                  setIsPinnedView(false);
+                  setIsMentionsView(false);
+                  setIsArchivedView(false);
+                  setSelectedDMUser(null);
+                  setSelectedSpace(null);
+                  setSelectedGroup(null);
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 rounded px-2 py-[5px] text-sm transition-colors cursor-pointer ${
+                  isNotificationsView
+                    ? "bg-[#395B64] text-white font-semibold"
+                    : "text-[#455252] dark:text-[#A5C9CA] hover:bg-[#EAEFEF] dark:hover:bg-[#2C3636] hover:text-[#2C3333] dark:hover:text-[#E7F6F2]"
+                }`}
               >
                 <i
                   className={`fa-solid ${isMutedGlobal ? "fa-bell-slash" : "fa-bell"} w-4 text-center text-[11px]`}
@@ -5270,7 +5343,13 @@ const SlackShell = () => {
                   <span className="text-[10px] text-[#52656A] dark:text-[#A5C9CA]/60 px-1">Muted</span>
                 )}
                 {unreadNotificationsCount > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-sm bg-[#395B64] px-1 text-[10px] font-bold text-white">
+                  <span
+                    className={`flex h-4 min-w-[16px] items-center justify-center rounded-sm px-1 text-[10px] font-bold ${
+                      isNotificationsView
+                        ? "bg-white text-[#395B64]"
+                        : "bg-[#395B64] text-white"
+                    }`}
+                  >
                     {unreadNotificationsCount}
                   </span>
                 )}
@@ -5281,6 +5360,7 @@ const SlackShell = () => {
                 onClick={() => {
                   setIsHomeView(false);
                   setIsStarredView(true);
+                  setIsNotificationsView(false);
                   setIsPinnedView(false);
                   setIsMentionsView(false);
                   setIsArchivedView(false);
@@ -5304,7 +5384,8 @@ const SlackShell = () => {
                 onClick={() => {
                   setIsHomeView(false);
                   return;
-                  setIsStarredView(false);
+                  setIsNotificationsView(false);
+    setIsStarredView(false);
                   setIsMentionsView(false);
                   setSelectedDMUser(null);
                   setSelectedSpace(null);
@@ -5326,6 +5407,7 @@ const SlackShell = () => {
                 onClick={() => {
                   setIsHomeView(false);
                   setIsMentionsView(true);
+                  setIsNotificationsView(false);
                   setIsStarredView(false);
                   setIsArchivedView(false);
                   setSelectedDMUser(null);
@@ -5353,6 +5435,7 @@ const SlackShell = () => {
                 onClick={() => {
                   setIsHomeView(false);
                   setIsArchivedView(true);
+                  setIsNotificationsView(false);
                   setIsStarredView(false);
                   setIsMentionsView(false);
                   setSelectedDMUser(null);
@@ -5436,6 +5519,8 @@ const SlackShell = () => {
                       !selectedDMUser &&
                       !isStarredView &&
                       !isMentionsView &&
+                      !isNotificationsView &&
+                      !isArchivedView &&
                       !isHomeView &&
                       !selectedSpace &&
                       !selectedGroup;
@@ -5848,6 +5933,7 @@ const SlackShell = () => {
       {/* ── COLUMN 3: Conversation / Main View ─────────────────────── */}
       <main className="flex min-w-0 flex-1 flex-col bg-[#F4F6F6] dark:bg-[#121717] transition-colors">
         {!selectedDMUser &&
+          !isNotificationsView &&
           !isStarredView &&
           !isMentionsView &&
           !isArchivedView &&
@@ -5953,6 +6039,21 @@ const SlackShell = () => {
                   )}
                 </button>
 
+                {/* Channel Select Messages Button */}
+                <button
+                  type="button"
+                  onClick={() => setChannelSelectMode((prev) => !prev)}
+                  className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                    channelSelectMode
+                      ? "border-[#395B64] bg-[#E7F6F2] dark:bg-[#395B64]/30 text-[#395B64] dark:text-[#A5C9CA]"
+                      : "border-[#D8E2E1] dark:border-[#395B64]/50 bg-white dark:bg-[#242D2D] text-[#52656A] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#2C3636]"
+                  }`}
+                  title="Select messages"
+                >
+                  <i className="fa-solid fa-check-double text-xs" />
+                  <span className="hidden sm:inline">Select</span>
+                </button>
+
                 {/* Pinned Messages Header Button */}
                 <button
                   type="button"
@@ -6037,19 +6138,65 @@ const SlackShell = () => {
               }}
               onOpenSidebar={() => setIsMobileSidebarOpen(true)}
             />
-          ) : isStarredView ? (
-            <StarredMessagesView
+          ) : isNotificationsView ? (
+            <NotificationsView
               workspaceId={workspaceId}
               onNavigateChannel={(cId) => {
                 setIsHomeView(false);
-                setIsStarredView(false);
+                setIsNotificationsView(false);
                 setSelectedDMUser(null);
                 setSelectedSpace(null);
                 navigate(`/app/workspace/${workspaceId}/channel/${cId}`);
               }}
               onNavigateSpace={(sId) => {
                 setIsHomeView(false);
-                setIsStarredView(false);
+                setIsNotificationsView(false);
+                setSelectedDMUser(null);
+                const found = spaces.find(
+                  (s) => (s._id || s.id)?.toString() === sId?.toString(),
+                );
+                setSelectedSpace(found || { id: sId, name: "Space" });
+                navigate(`/app/workspace/${workspaceId}/space/${sId}`);
+              }}
+              onNavigateDM={(otherUserId, otherUser) => {
+                const targetId = otherUserId || otherUser?.id || otherUser?._id;
+                if (targetId) handleUnhideDM(targetId);
+                setIsHomeView(false);
+                setIsNotificationsView(false);
+                setSelectedSpace(null);
+                if (otherUser && (otherUser.id || otherUser._id)) {
+                  setSelectedDMUser({
+                    id: otherUser.id || otherUser._id,
+                    username: otherUser.username,
+                    avatar: otherUser.avatar,
+                  });
+                } else {
+                  const found = workspaceData?.members?.find(
+                    (m) =>
+                      (m.id || m._id)?.toString() === otherUserId?.toString(),
+                  );
+                  setSelectedDMUser(
+                    found || { id: otherUserId, username: "User" },
+                  );
+                }
+              }}
+              onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+            />
+          ) : isStarredView ? (
+            <StarredMessagesView
+              workspaceId={workspaceId}
+              onNavigateChannel={(cId) => {
+                setIsHomeView(false);
+                setIsNotificationsView(false);
+    setIsStarredView(false);
+                setSelectedDMUser(null);
+                setSelectedSpace(null);
+                navigate(`/app/workspace/${workspaceId}/channel/${cId}`);
+              }}
+              onNavigateSpace={(sId) => {
+                setIsHomeView(false);
+                setIsNotificationsView(false);
+    setIsStarredView(false);
                 setSelectedDMUser(null);
                 const found = spaces.find(
                   (s) => (s._id || s.id)?.toString() === sId?.toString(),
@@ -6059,7 +6206,8 @@ const SlackShell = () => {
               }}
               onNavigateDM={(otherUserId, otherUser) => {
                 setIsHomeView(false);
-                setIsStarredView(false);
+                setIsNotificationsView(false);
+    setIsStarredView(false);
                 setSelectedSpace(null);
                 if (otherUser && (otherUser.id || otherUser._id)) {
                   setSelectedDMUser({
@@ -6204,6 +6352,9 @@ const SlackShell = () => {
               onViewProfile={(targetUser) => setViewingProfileUser(targetUser)}
               channel={activeChannel || currentChannel}
               currentUserId={user?.id || user?._id}
+              currentUser={user}
+              externalSelectMode={channelSelectMode}
+              onExitExternalSelectMode={() => setChannelSelectMode(false)}
               onOpenUpgradeModal={() => setShowUpgradeModal(true)}
               onForwardMessage={handleOpenForwardModal}
               onNavigateSource={handleNavigateSource}
@@ -6214,6 +6365,7 @@ const SlackShell = () => {
           {/* Mobile backdrop for Details Pane */}
           {showDetailsPane &&
             !selectedDMUser &&
+            !isNotificationsView &&
             !isStarredView &&
             !isMentionsView &&
             !isArchivedView &&
@@ -6228,6 +6380,7 @@ const SlackShell = () => {
 
           {showDetailsPane &&
             !selectedDMUser &&
+            !isNotificationsView &&
             !isStarredView &&
             !isMentionsView &&
             !isArchivedView &&
@@ -6894,32 +7047,7 @@ const SlackShell = () => {
           </div>
         </div>
       )}
-      <NotificationPanel
-        isOpen={showActivityPanel}
-        onClose={() => setShowActivityPanel(false)}
-        onSelectChannel={(cId) => {
-          setIsStarredView(false);
-          setSelectedDMUser(null);
-          navigate(`/app/workspace/${workspaceId}/channel/${cId}`);
-        }}
-        onSelectDM={(otherUserId, otherUser) => {
-          const targetId = otherUserId || otherUser?.id || otherUser?._id;
-          if (targetId) handleUnhideDM(targetId);
-          setIsStarredView(false);
-          if (otherUser && (otherUser.id || otherUser._id)) {
-            setSelectedDMUser({
-              id: otherUser.id || otherUser._id,
-              username: otherUser.username,
-              avatar: otherUser.avatar,
-            });
-          } else {
-            const found = workspaceData?.members?.find(
-              (m) => (m.id || m._id)?.toString() === otherUserId?.toString(),
-            );
-            setSelectedDMUser(found || { id: otherUserId, username: "User" });
-          }
-        }}
-      />
+      {/* Notifications view is rendered on-screen */}
       {/* ── New Chat Modal ─────────────────────────────────────────────── */}
       {showNewChatModal && (
         <>

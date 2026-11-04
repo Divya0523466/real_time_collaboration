@@ -29,6 +29,8 @@ import {
   starMessageApi,
   unstarMessageApi,
   togglePinMessageApi,
+  deleteDirectConversationApi,
+  deleteDirectMessagesBatchApi,
 } from "../../services/messageService";
 import { onPinnedUpdated, offPinnedUpdated } from "../../services/socket";
 import { isImageOrFileMessage } from "../../utils/fileUtils";
@@ -306,6 +308,50 @@ const DirectMessaging = ({
     deleteDirectMessage(messageId);
   };
 
+  const handleClearChat = async () => {
+    const targetUserId = (currentSelectedUser?.id || currentSelectedUser?._id)?.toString();
+    if (!targetUserId) return;
+    try {
+      await deleteDirectConversationApi(targetUserId);
+      setMessages([]);
+      toast.success("Chat cleared successfully");
+    } catch (err) {
+      toast.error(err.message || "Failed to clear chat");
+    }
+  };
+
+  const handleDeleteBatch = async ({ messageIds, deleteForEveryone }) => {
+    try {
+      if (deleteForEveryone) {
+        for (const msgId of messageIds) {
+          deleteDirectMessage(msgId);
+        }
+      }
+      await deleteDirectMessagesBatchApi({ messageIds, deleteForEveryone });
+      const idSet = new Set(messageIds.map(String));
+      if (deleteForEveryone) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            idSet.has((m.id || m._id)?.toString())
+              ? { ...m, isDeleted: true, content: null, attachments: [] }
+              : m
+          )
+        );
+      } else {
+        setMessages((prev) =>
+          prev.filter((m) => !idSet.has((m.id || m._id)?.toString()))
+        );
+      }
+      toast.success(
+        deleteForEveryone
+          ? "Message deleted for everyone"
+          : "Message deleted for you"
+      );
+    } catch (err) {
+      toast.error(err.message || "Failed to delete messages");
+    }
+  };
+
   const handleToggleStar = async (message) => {
     if (!message || isImageOrFileMessage(message)) return;
     const messageId = (message.id || message._id)?.toString();
@@ -405,6 +451,8 @@ const DirectMessaging = ({
       onSendMessage={handleSendMessage}
       onEditMessage={handleEditMessage}
       onDeleteMessage={handleDeleteMessage}
+      onClearChat={handleClearChat}
+      onDeleteBatch={handleDeleteBatch}
       onToggleStar={handleToggleStar}
       onTogglePin={handleTogglePin}
       onToggleReaction={handleToggleReaction}

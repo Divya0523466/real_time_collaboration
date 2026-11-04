@@ -31,6 +31,8 @@ import {
   markNotificationAsRead as apiMarkAsRead,
   markAllNotificationsAsRead as apiMarkAllAsRead,
   deleteNotification as apiDeleteNotification,
+  deleteAllNotifications as apiDeleteAllNotifications,
+  deleteSelectedNotifications as apiDeleteSelectedNotifications,
 } from "../services/notificationService";
 
 const WorkspaceContext = createContext();
@@ -362,6 +364,31 @@ export const WorkspaceProvider = ({ children }) => {
         setUnreadNotificationsCount(res.unreadCount);
       }
     } catch (err) {}
+  }, []);
+
+  const deleteAllNotifications = useCallback(async () => {
+    try {
+      await apiDeleteAllNotifications();
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+    } catch (err) {
+      console.error("Failed to delete all notifications:", err);
+      throw err;
+    }
+  }, []);
+
+  const deleteSelectedNotifications = useCallback(async (ids) => {
+    try {
+      const res = await apiDeleteSelectedNotifications(ids);
+      const idSet = new Set(ids.map((id) => id?.toString()));
+      setNotifications((prev) => prev.filter((n) => !idSet.has(n._id?.toString())));
+      if (res.unreadCount !== undefined) {
+        setUnreadNotificationsCount(res.unreadCount);
+      }
+    } catch (err) {
+      console.error("Failed to delete selected notifications:", err);
+      throw err;
+    }
   }, []);
   const fetchPendingInvitations = useCallback(async () => {
     if (!user?.email) {
@@ -1484,6 +1511,8 @@ export const WorkspaceProvider = ({ children }) => {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     deleteNotification,
+    deleteAllNotifications,
+    deleteSelectedNotifications,
     isMutedGlobal,
     toggleGlobalMute,
     mutedConversations,

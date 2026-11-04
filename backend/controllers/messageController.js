@@ -281,7 +281,8 @@ const getChannelMessages = async (req, res) => {
       return res.status(403).json({ message: "Access denied to channel" });
     }
 
-    const messages = await ChannelMessage.find({ channelId })
+    const userObjId = new mongoose.Types.ObjectId(req.userId);
+    const messages = await ChannelMessage.find({ channelId, deletedBy: { $nin: [userObjId, req.userId] } })
       .populate("senderId", "username avatar")
       .populate({
         path: "replyTo",
@@ -1589,6 +1590,56 @@ const deleteDirectConversation = async (req, res) => {
   }
 };
 
+const deleteDirectMessagesBatch = async (req, res) => {
+  try {
+    const currentUserId = req.userId;
+    const { messageIds, deleteForEveryone = false } = req.body;
+
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ message: "No message IDs provided" });
+    }
+
+    const userObjId = mongoose.Types.ObjectId.isValid(currentUserId)
+      ? new mongoose.Types.ObjectId(currentUserId)
+      : currentUserId;
+
+    if (deleteForEveryone) {
+      await Message.updateMany(
+        {
+          _id: { $in: messageIds },
+          senderId: userObjId,
+        },
+        {
+          $set: { isDeleted: true, content: null, attachments: [] },
+        }
+      );
+    } else {
+      await Message.updateMany(
+        {
+          _id: { $in: messageIds },
+        },
+        {
+          $addToSet: { deletedBy: userObjId },
+        }
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: deleteForEveryone
+        ? "Messages deleted for everyone"
+        : "Messages deleted for you",
+      deletedIds: messageIds,
+      deleteForEveryone,
+    });
+  } catch (error) {
+    console.error("Error in deleteDirectMessagesBatch:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
+  }
+};
+
 const toggleBlockUser = async (req, res) => {
   try {
     const currentUserId = req.userId;
@@ -2007,7 +2058,114 @@ const getPinnedMessages = async (req, res) => {
   }
 };
 
+
+const deleteChannelMessagesBatch = async (req, res) => {
+  try {
+    const { messageIds, deleteForEveryone = false } = req.body;
+    const currentUserId = req.userId;
+    const userObjId = new mongoose.Types.ObjectId(currentUserId);
+
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ message: "messageIds array is required" });
+    }
+
+    const validIds = messageIds
+      .map((id) => (mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(id) : null))
+      .filter(Boolean);
+
+    if (validIds.length === 0) {
+      return res.status(400).json({ message: "No valid message IDs provided" });
+    }
+
+    const messages = await ChannelMessage.find({ _id: { $in: validIds } });
+
+    if (deleteForEveryone) {
+      const allowedMessages = messages.filter(
+        (m) => m.senderId && m.senderId.toString() === currentUserId
+      );
+      const allowedIds = allowedMessages.map((m) => m._id);
+
+      if (allowedIds.length > 0) {
+        await ChannelMessage.updateMany(
+          { _id: { $in: allowedIds } },
+          { $set: { isDeleted: true, content: null, attachments: [] } }
+        );
+
+        const io = req.app.get("io");
+        if (io) {
+          for (const m of allowedMessages) {
+            if (m.channelId) {
+              io.to(`channel:${m.channelId}`).emit("channel-message-deleted", {
+                id: m._id,
+                channelId: m.channelId,
+              });
+            } else if (m.spaceId) {
+              io.to(`space:${m.spaceId}`).emit("space-message-deleted", {
+                id: m._id,
+                spaceId: m.spaceId,
+              });
+            }
+          }
+        }
+      }
+
+      return res.json({
+        message: "Messages deleted for everyone",
+        deletedIds: allowedIds,
+        deleteForEveryone: true,
+      });
+    } else {
+      await ChannelMessage.updateMany(
+        { _id: { $in: validIds } },
+        { $addToSet: { deletedBy: userObjId } }
+      );
+
+      return res.json({
+        message: "Messages deleted for you",
+        deletedIds: validIds,
+        deleteForEveryone: false,
+      });
+    }
+  } catch (error) {
+    console.error("Error in deleteChannelMessagesBatch:", error);
+    return res.status(500).json({ message: "Failed to batch delete messages" });
+  }
+};
+
+const clearChannelConversation = async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const userObjId = new mongoose.Types.ObjectId(req.userId);
+    await ChannelMessage.updateMany(
+      { channelId },
+      { $addToSet: { deletedBy: userObjId } }
+    );
+    return res.json({ message: "Channel conversation cleared for your account" });
+  } catch (error) {
+    console.error("Error in clearChannelConversation:", error);
+    return res.status(500).json({ message: "Failed to clear channel conversation" });
+  }
+};
+
+const clearSpaceConversation = async (req, res) => {
+  try {
+    const { spaceId } = req.params;
+    const userObjId = new mongoose.Types.ObjectId(req.userId);
+    await ChannelMessage.updateMany(
+      { spaceId },
+      { $addToSet: { deletedBy: userObjId } }
+    );
+    return res.json({ message: "Space conversation cleared for your account" });
+  } catch (error) {
+    console.error("Error in clearSpaceConversation:", error);
+    return res.status(500).json({ message: "Failed to clear space conversation" });
+  }
+};
+
 export {
+  deleteChannelMessagesBatch,
+  clearChannelConversation,
+  clearSpaceConversation,
   togglePinMessage,
   getPinnedMessages,
   getDirectMessages,
@@ -2027,6 +2185,7 @@ export {
   markAllMentionsAsRead,
   forwardMessage,
   deleteDirectConversation,
+  deleteDirectMessagesBatch,
   toggleBlockUser,
   toggleReaction,
 };

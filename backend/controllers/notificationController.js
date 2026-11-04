@@ -178,3 +178,58 @@ export const deleteNotification = async (req, res) => {
     });
   }
 };
+
+export const deleteAllNotifications = async (req, res) => {
+  try {
+    const userId = req.userId;
+    await Notification.deleteMany({ recipientId: userId });
+
+    return res.status(200).json({
+      success: true,
+      message: "All notifications deleted successfully",
+      unreadCount: 0,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete all notifications",
+      error: error.message,
+    });
+  }
+};
+
+export const deleteSelectedNotifications = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide an array of notification IDs to delete",
+      });
+    }
+
+    await Notification.deleteMany({
+      _id: { $in: ids },
+      recipientId: userId,
+    });
+
+    const unreadCount = await Notification.countDocuments({
+      recipientId: userId,
+      isRead: false,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Selected notifications deleted successfully",
+      unreadCount,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete selected notifications",
+      error: error.message,
+    });
+  }
+};

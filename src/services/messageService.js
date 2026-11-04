@@ -287,3 +287,61 @@ export const fetchPinnedMessagesApi = async (params = {}) => {
       ? data
       : [];
 };
+
+export const deleteDirectMessagesBatchApi = async ({ messageIds, deleteForEveryone = false }) => {
+  const response = await fetch(`${API_URL}/messages/direct/batch-delete`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ messageIds, deleteForEveryone }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to delete messages")
+  }
+  return data
+}
+
+export const deleteChannelMessagesBatchApi = async ({ messageIds, deleteForEveryone = false }) => {
+  const response = await fetch(`${API_URL}/messages/channel/batch-delete`, {
+    credentials: "include",
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ messageIds, deleteForEveryone }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to delete messages");
+  }
+  return data;
+};
+
+export const clearChannelConversationApi = async (channelId) => {
+  const response = await fetch(`${API_URL}/messages/channels/${channelId}/conversation`, {
+    credentials: "include",
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to clear channel messages");
+  }
+  return data;
+};
+
+export const clearSpaceConversationApi = async (spaceId) => {
+  const response = await fetch(`${API_URL}/messages/spaces/${spaceId}/conversation`, {
+    credentials: "include",
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to clear space messages");
+  }
+  return data;
+};

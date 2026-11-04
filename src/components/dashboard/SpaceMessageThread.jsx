@@ -36,6 +36,9 @@ import EmojiPickerButton from "../common/EmojiPickerButton"
 import ConversationPinnedDrawer from "../common/ConversationPinnedDrawer"
 import SharedFilesGallery from "../common/SharedFilesGallery"
 import InConversationSearch from "../common/InConversationSearch"
+import MessageDeleteModal from "../common/MessageDeleteModal"
+import MessageSelectBar from "../common/MessageSelectBar"
+import { deleteChannelMessagesBatchApi, clearSpaceConversationApi } from "../../services/messageService"
 import ForwardedMessageCard from "../common/ForwardedMessageCard"
 import TypingIndicator from "../common/TypingIndicator"
 import useTypingIndicator from "../../hooks/useTypingIndicator"
@@ -156,6 +159,160 @@ const SpaceMessageThread = ({
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false)
   const [showFilesGallery, setShowFilesGallery] = useState(false)
   const [showSpaceSearch, setShowSpaceSearch] = useState(false)
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [selectedMessageIds, setSelectedMessageIds] = useState(new Set())
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    type: null,
+    targetMessages: [],
+    allMine: false,
+    isDeleting: false,
+  })
+
+  const activeNonDeletedMessages = useMemo(() => {
+    return messages.filter((m) => !m.isDeleted)
+  }, [messages])
+
+  const isAllSelected =
+    activeNonDeletedMessages.length > 0 &&
+    activeNonDeletedMessages.every((m) =>
+      selectedMessageIds.has((m.id || m._id)?.toString())
+    )
+
+  const toggleSelectMessage = (msgId) => {
+    setSelectedMessageIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(msgId)) next.delete(msgId)
+      else next.add(msgId)
+      return next
+    })
+  }
+
+  const toggleSelectAllMessages = () => {
+    if (isAllSelected) {
+      setSelectedMessageIds(new Set())
+    } else {
+      setSelectedMessageIds(
+        new Set(activeNonDeletedMessages.map((m) => (m.id || m._id)?.toString()))
+      )
+    }
+  }
+
+  const exitSelectMode = () => {
+    setIsSelectMode(false)
+    setSelectedMessageIds(new Set())
+  }
+
+  const openClearChatModal = () => {
+    setDeleteModal({
+      isOpen: true,
+      type: "CLEAR_CHAT",
+      targetMessages: [],
+      allMine: false,
+      isDeleting: false,
+    })
+  }
+
+  const openDeleteSingleModal = (message) => {
+    const senderId = (
+      message.senderId?._id ||
+      message.senderId ||
+      message.sender?.id ||
+      message.sender?._id
+    )?.toString()
+    const isMine = Boolean(senderId && activeUserId && senderId === activeUserId)
+
+    setDeleteModal({
+      isOpen: true,
+      type: "DELETE_MESSAGES",
+      targetMessages: [message],
+      allMine: isMine,
+      isDeleting: false,
+    })
+  }
+
+  const openDeleteSelectedModal = () => {
+    const targetMsgs = messages.filter(
+      (m) => selectedMessageIds.has((m.id || m._id)?.toString()) && !m.isDeleted
+    )
+    if (targetMsgs.length === 0) return
+
+    const allMine = targetMsgs.every((m) => {
+      const sId = (
+        m.senderId?._id ||
+        m.senderId ||
+        m.sender?.id ||
+        m.sender?._id
+      )?.toString()
+      return Boolean(sId && activeUserId && sId === activeUserId)
+    })
+
+    setDeleteModal({
+      isOpen: true,
+      type: "DELETE_MESSAGES",
+      targetMessages: targetMsgs,
+      allMine,
+      isDeleting: false,
+    })
+  }
+
+  const handleConfirmDelete = async (deleteForEveryone) => {
+    try {
+      setDeleteModal((prev) => ({ ...prev, isDeleting: true }))
+      const spaceIdentifier = (space?.id || space?._id)?.toString()
+
+      if (deleteModal.type === "CLEAR_CHAT") {
+        if (spaceIdentifier) {
+          await clearSpaceConversationApi(spaceIdentifier)
+          setMessages([])
+          toast.success("Space chat cleared for your account")
+        }
+      } else if (deleteModal.type === "DELETE_MESSAGES") {
+        const messageIds = deleteModal.targetMessages.map((m) =>
+          (m.id || m._id)?.toString()
+        )
+
+        if (deleteForEveryone) {
+          for (const m of deleteModal.targetMessages) {
+            deleteSpaceMessage(m.id || m._id)
+          }
+        }
+
+        await deleteChannelMessagesBatchApi({ messageIds, deleteForEveryone })
+        const idSet = new Set(messageIds)
+
+        if (deleteForEveryone) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              idSet.has((m.id || m._id)?.toString())
+                ? { ...m, isDeleted: true, content: null, attachments: [] }
+                : m
+            )
+          )
+          toast.success("Messages deleted for everyone")
+        } else {
+          setMessages((prev) =>
+            prev.filter((m) => !idSet.has((m.id || m._id)?.toString()))
+          )
+          toast.success("Messages deleted for you")
+        }
+        exitSelectMode()
+      }
+
+      setDeleteModal({
+        isOpen: false,
+        type: null,
+        targetMessages: [],
+        allMine: false,
+        isDeleting: false,
+      })
+    } catch (err) {
+      console.error("Delete failed:", err)
+      toast.error(err.message || "Failed to delete messages")
+    } finally {
+      setDeleteModal((prev) => ({ ...prev, isDeleting: false }))
+    }
+  }
   const pinnedMessages = useMemo(() => messages.filter((m) => m.isPinned && !m.isDeleted), [messages])
   const filesCount = useMemo(() => {
     return messages.reduce((acc, msg) => {
@@ -529,7 +686,16 @@ const SpaceMessageThread = ({
   return (
     <div className="flex min-w-0 flex-1 w-full h-full flex-col bg-white dark:bg-[#121717] text-[#2C3333] dark:text-[#E7F6F2] transition-colors">
       {/* ── Space Header ─────────────────────────────────────────────── */}
-      <div className="flex h-14 items-center justify-between border-b border-gray-200 dark:border-[#2C3333] px-2.5 sm:px-6 bg-white dark:bg-[#1A2121] flex-shrink-0 gap-2">
+      {isSelectMode ? (
+        <MessageSelectBar
+          selectedCount={selectedMessageIds.size}
+          isAllSelected={isAllSelected}
+          onToggleSelectAll={toggleSelectAllMessages}
+          onDeleteSelected={openDeleteSelectedModal}
+          onExit={exitSelectMode}
+        />
+      ) : (
+        <div className="flex h-14 items-center justify-between border-b border-gray-200 dark:border-[#2C3333] px-2.5 sm:px-6 bg-white dark:bg-[#1A2121] flex-shrink-0 gap-2">
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
           {handleOpenSidebar && (
             <button
@@ -616,6 +782,30 @@ const SpaceMessageThread = ({
             <span className="hidden xl:inline">Search</span>
           </button>
 
+          {/* Select Messages Button */}
+          <button
+            type="button"
+            onClick={() => setIsSelectMode(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-[#395B64] bg-white dark:bg-[#242D2D] p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold text-[#395B64] dark:text-[#A5C9CA] hover:bg-[#E7F6F2] dark:hover:bg-[#395B64]/40 transition shadow-xs cursor-pointer"
+            title="Select messages"
+          >
+            <i className="fa-solid fa-check-double text-xs text-[#395B64] dark:text-[#A5C9CA]" />
+            <span className="hidden xl:inline">Select</span>
+          </button>
+
+          {/* Clear Chat Button */}
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={openClearChatModal}
+              className="flex items-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-900/40 bg-white dark:bg-[#242D2D] p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition shadow-xs cursor-pointer"
+              title="Clear this Space chat"
+            >
+              <i className="fa-solid fa-trash-can text-xs" />
+              <span className="hidden xl:inline">Clear Chat</span>
+            </button>
+          )}
+
           {/* Shared Files Gallery Button */}
           <button
             type="button"
@@ -695,6 +885,7 @@ const SpaceMessageThread = ({
           )}
         </div>
       </div>
+      )}
 
       <InConversationSearch
         isOpen={showSpaceSearch}
@@ -743,10 +934,57 @@ const SpaceMessageThread = ({
                 {showDate && <DateSeparator date={message.createdAt} />}
                 <div
                   id={`msg-${(message.id || message._id)?.toString()}`}
-                  className={`group flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.015] ${
-                    isSender ? "justify-end" : "justify-start"
+                  onClick={
+                    isSelectMode && !isDeleted
+                      ? () => toggleSelectMessage((message.id || message._id)?.toString())
+                      : undefined
+                  }
+                  className={`w-full flex items-center transition-colors group relative rounded-lg ${
+                    isSelectMode && !isDeleted
+                      ? "cursor-pointer hover:bg-[#395B64]/5 dark:hover:bg-[#395B64]/10"
+                      : ""
+                  } ${
+                    selectedMessageIds.has((message.id || message._id)?.toString())
+                      ? "bg-[#395B64]/10 dark:bg-[#395B64]/20"
+                      : ""
                   }`}
                 >
+                  {/* Far-Left Vertical Selection Column */}
+                  {isSelectMode && (
+                    <div
+                      className="w-9 sm:w-11 flex-shrink-0 flex items-center justify-center pl-2 select-none"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!isDeleted)
+                          toggleSelectMessage((message.id || message._id)?.toString())
+                      }}
+                    >
+                      {!isDeleted ? (
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer ${
+                            selectedMessageIds.has(
+                              (message.id || message._id)?.toString()
+                            )
+                              ? "bg-[#395B64] border-2 border-[#395B64] text-white shadow-xs scale-105"
+                              : "border-2 border-gray-300 dark:border-gray-500 hover:border-[#395B64] bg-white/80 dark:bg-[#242D2D]"
+                          }`}
+                        >
+                          {selectedMessageIds.has(
+                            (message.id || message._id)?.toString()
+                          ) && <i className="fa-solid fa-check text-[10px]" />}
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5" />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Message Row Body */}
+                  <div
+                    className={`flex-1 flex items-end gap-2 px-2 sm:px-4 py-1 transition-colors ${
+                      isSender ? "justify-end" : "justify-start"
+                    }`}
+                  >
                   {!isSender && (
                     <div className="flex-shrink-0 mb-0.5">
                       <button type="button" onClick={() => onViewProfile && onViewProfile(message.sender || { _id: senderId, id: senderId, username, avatar })} className="hover:opacity-85 transition-opacity cursor-pointer focus:outline-none"><Avatar username={username} avatar={avatar} /></button>
@@ -870,7 +1108,7 @@ const SpaceMessageThread = ({
                           type="button"
                           onClick={(e) => {
                             e.currentTarget.blur()
-                            handleDeleteMessage(message)
+                            openDeleteSingleModal(message)
                           }}
                           aria-label="Delete message"
                           className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
@@ -1123,7 +1361,7 @@ const SpaceMessageThread = ({
                               type="button"
                               onClick={(e) => {
                                 e.currentTarget.blur()
-                                handleDeleteMessage(message)
+                                openDeleteSingleModal(message)
                               }}
                               aria-label="Delete message"
                               className="flex h-6 w-6 items-center justify-center rounded-md text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
@@ -1138,6 +1376,7 @@ const SpaceMessageThread = ({
                       )}
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             )
@@ -1300,6 +1539,26 @@ const SpaceMessageThread = ({
           )}
         </div>
       </div>
+
+      {/* WhatsApp-Style Custom Confirmation Modal */}
+      <MessageDeleteModal
+        isOpen={deleteModal.isOpen}
+        type={deleteModal.type}
+        count={deleteModal.targetMessages.length}
+        allMine={deleteModal.allMine}
+        isDeleting={deleteModal.isDeleting}
+        onClose={() =>
+          !deleteModal.isDeleting &&
+          setDeleteModal({
+            isOpen: false,
+            type: null,
+            targetMessages: [],
+            allMine: false,
+            isDeleting: false,
+          })
+        }
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

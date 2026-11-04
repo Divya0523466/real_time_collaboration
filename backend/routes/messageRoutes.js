@@ -18,6 +18,10 @@ import {
   markAllMentionsAsRead,
   forwardMessage,
   deleteDirectConversation,
+  deleteDirectMessagesBatch,
+  deleteChannelMessagesBatch,
+  clearChannelConversation,
+  clearSpaceConversation,
   toggleBlockUser,
   toggleReaction,
 } from "../controllers/messageController.js"
@@ -44,6 +48,12 @@ router.post("/channels/:channelId/unread", markChannelAsUnread)
 router.post("/direct/:userId/read", markDirectMessagesAsRead)
 router.post("/direct/:userId/unread", markDirectMessagesAsUnread)
 router.post("/direct/:userId/block", toggleBlockUser)
+router.post("/direct/batch-delete", deleteDirectMessagesBatch)
+router.post("/channel/batch-delete", deleteChannelMessagesBatch)
+router.delete("/channel/batch", deleteChannelMessagesBatch)
+router.delete("/channels/:channelId/conversation", clearChannelConversation)
+router.delete("/spaces/:spaceId/conversation", clearSpaceConversation)
+router.delete("/direct/batch", deleteDirectMessagesBatch)
 router.delete("/direct/:userId/conversation", deleteDirectConversation)
 router.delete("/direct/:userId", deleteDirectConversation)
 router.delete("/:userId/conversation", deleteDirectConversation)

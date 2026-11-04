@@ -494,7 +494,8 @@ export const getSpaceMessages = async (req, res) => {
       return res.status(403).json({ message: "Access denied to Space messages." })
     }
 
-    const messages = await ChannelMessage.find({ spaceId })
+    const userObjId = new mongoose.Types.ObjectId(req.userId);
+    const messages = await ChannelMessage.find({ spaceId, deletedBy: { $nin: [userObjId, req.userId] } })
       .populate("senderId", "username avatar")
       .populate({
         path: "replyTo",
